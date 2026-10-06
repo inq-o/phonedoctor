@@ -28,17 +28,19 @@
 |---|---|---|---|---|
 | 권한 | v1 어휘 121개 (MH-1M 보유율 ≥0.1% + 보안 권한 강제 포함) | multi-hot | `PackageInfo.requestedPermissions` | androguard `get_permissions()` |
 | 인텐트 필터 | v1 어휘 91개. activity·receiver·service의 intent-filter **action·category 값** | multi-hot | **base.apk의 AndroidManifest.xml을 직접 파싱** (`ApplicationInfo.sourceDir`, 바이너리 XML) | androguard `get_intent_filters()` |
-| 광고 SDK | 광고 SDK 수, 주요 SDK 12종 플래그 (AdMob, AppLovin, Pangle, Unity Ads, ironSource, Mintegral, Vungle, InMobi, Meta AN, 카울리, 애드핏, 모비온 🔶목록 확정은 6주차) | count + multi-hot | 컴포넌트 이름을 LibChecker-Rules DB와 대조 | 같은 규칙 DB를 androguard 컴포넌트 목록에 적용 |
+| 광고 SDK | 광고 SDK 수(23종 기준), 주요 SDK 12종 플래그 (AdMob, AppLovin, Pangle, Unity Ads, ironSource, Mintegral, Vungle, InMobi, Meta AN, 카울리, 애드핏, 모비온) | count + multi-hot | 매니페스트 컴포넌트 이름을 `ml/rules/ad_sdk_tags.csv` 접두어와 대조 | 같은 접두어를 androguard 컴포넌트 목록에 적용 |
 | 컴포넌트 | activity·service·receiver·provider 수 | int ×4 | `GET_ACTIVITIES` 등 플래그 | androguard |
 | 메타 | targetSdk, minSdk, APK 크기(MB, log) | int/float | `ApplicationInfo`, `sourceDir` 파일 크기 | androguard·파일 크기 |
 | 아이콘 | 런처 아이콘 없음 | bool | `queryIntentActivities(MAIN/LAUNCHER).setPackage` 결과 0개 | 매니페스트에 MAIN/LAUNCHER activity 없음 |
-| 이름 패턴 | 클리너·부스터·배터리·와이파이 키워드 (한·영) | bool | 앱 라벨 | 매니페스트 라벨·패키지명 |
+| 이름 패턴 | 클리너·부스터·배터리·와이파이 키워드 (한·영) | bool | 앱 라벨·패키지명 | 매니페스트 라벨·패키지명 |
 
 - 어휘 목록은 `ml/schema/feature_schema_v1.json` 하나로 관리하고, 빌드 시 앱 asset으로 복사 → 두 쪽이 같은 파일을 읽음 (생성: `ml/schema/build_schema_v1.py`, 2026-10-03)
 - **이름 정규화**: 문자열을 `.`로 나눈 마지막 조각을 소문자로 → vocab에 있으면 1 (`android.intent.action.BOOT_COMPLETED` → `boot_completed`). MH-1M 추출 코드(Malware-Hunter/SF23-AMGenerator `extraction.py`)를 직접 읽어 확인한 규칙과 같음
 - **변경(2026-10-03)**: 인텐트는 원래 "액션마다 `queryBroadcastReceivers`"였으나, MH-1M 특징은 **activity·receiver·service의 매니페스트 intent-filter 전체**에서 나온 값이라 receiver 조회로는 의미가 어긋남 → 기기에서도 매니페스트를 직접 읽음. 같은 파싱으로 컴포넌트 수·런처 아이콘·min/targetSdk도 얻어 PC(androguard)와 일치시키기 쉬움
+- **광고 SDK 규칙(T021, 2026-10-06)**: 정확한 클래스 이름이 아니라 **패키지 접두어**로 대조. LibChecker-Rules(60fe485)는 정확한 이름 위주라 SDK 버전이 바뀌면 놓침(예: Unity Ads 4.21 컴포넌트 `com.unity3d.ads.adplayer.*`가 규칙엔 없음). 접두어는 각 SDK 최신 AAR 매니페스트에서 뽑아 확인(18종 112개 전부 일치), 중국계 4종은 LibChecker 규칙에서 가져옴. 바이트댄스 공용 라이브러리(`com.ss.android.*`, `embedapplog`)는 틱톡 등 정상 앱에도 있어 **오탐 방지를 위해 제외**. εxodus 추적기 DB(AGPL)는 대조만 하고 복사하지 않음
+- 한계: 컴포넌트를 선언하지 않는 SDK는 못 잡음(카울리는 앱이 직접 선언해서 잡힘). TNK·애드팝콘·버즈빌·애드믹서는 컴포넌트 확인 못 해 제외 → 직접 수집 APK(T025)에서 보충
 - MH-1M이 주는 특징은 **권한·인텐트 필터·APK 크기(VT_SIZE)**뿐. 광고 SDK·컴포넌트 수·SDK 버전·아이콘·이름 패턴은 직접 수집 APK(T025)에서만 학습됨 → 베이스라인(T040)은 MH-1M 3그룹으로 먼저
-- 스키마가 바뀌면 `featureSchemaVersion`을 올리고, 앱은 지원하지 않는 버전의 모델을 받지 않음 (openapi `ModelRelease`)
+- v1은 첫 모델 학습(T040) 시점에 동결. 그 전 변경은 v1 안에서 함. 동결 뒤 스키마가 바뀌면 `featureSchemaVersion`을 올리고, 앱은 지원하지 않는 버전의 모델을 받지 않음 (openapi `ModelRelease`)
 
 ### 층 2 런타임 신호 (학습 안 함)
 
