@@ -33,7 +33,7 @@ NAME_KEYWORDS = [
 
 
 def load_ad_sdks(path=AD_SDK_CSV):
-    with open(path, newline="") as f:
+    with open(path, newline="", encoding="utf-8") as f:
         return [{"id": r["sdk_id"], "flag": r["flag"] == "1", "prefixes": r["prefixes"].split("|"), "example": r["example"]}
                 for r in csv.DictReader(f)]
 
@@ -114,7 +114,7 @@ def _check():
 if __name__ == "__main__":
     _check()
     schema = build(pd.read_csv(sys.argv[1]), load_ad_sdks())
-    with open(sys.argv[2], "w") as f:
+    with open(sys.argv[2], "w", encoding="utf-8") as f:
         json.dump(schema, f, ensure_ascii=False, indent=2)
     g = {x["name"]: len(x.get("vocab", [])) for x in schema["groups"]}
     print(f"→ {sys.argv[2]}: permissions {g['permissions']}, intent_filters {g['intent_filters']}, "
