@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: ko-KR
+reviews:
+  profile: chill
+  high_level_summary: true
+  poem: false
+  in_progress_fortune: false
+  sequence_diagrams: false
+  # 봇이 커밋·PR을 만들지 않도록 자동 수정 기능은 끔 (기여자 목록을 본인만으로 유지)
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    simplify:
+      enabled: false
+    autofix:
+      enabled: false
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!gradle/wrapper/**"
+    - "!**/*.webp"
+  path_instructions:
+    - path: "**/*.kt"
+      instructions: |
+        Android 17 고급 보호 모드에서 접근성 권한이 취소되므로 핵심 기능이 AccessibilityService에 의존하면 지적할 것.
+        QUERY_ALL_PACKAGES·VpnService 사용은 Play 선언 용도(백신·보호자 통제) 범위를 벗어나는지 확인할 것.
+        시니어 화면 문구는 해요체, 시간 제한·자동 닫힘 금지.
+    - path: "ml/**/*.py"
+      instructions: |
+        학습 특징은 기기에서 뽑을 수 있는 것만 써야 함(ml/schema/feature_schema_v1.json 기준).
+        동결한 테스트셋이 학습·튜닝에 섞이면 반드시 지적할 것. 최우선 지표는 오탐률(FPR) 5% 이하.
+    - path: "specs/**"
+      instructions: "문서 사이 수치·용어 불일치(spec.md, contracts, tasks.md)를 지적할 것."
