@@ -1,0 +1,686 @@
+openapi: 3.1.0
+info:
+  title: 폰주치의 API
+  version: 0.1.0
+  summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
+  description: |
+    - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
+    - 서버로 오는 앱 정보는 "위험" 판정 건뿐. 설치 앱 전체 목록은 받지 않음 (constitution III)
+    - 인증: 모든 요청에 Firebase ID 토큰(`Authorization: Bearer`) + App Check 토큰(`X-Firebase-AppCheck`)
+      - 시니어 기기: Firebase 익명 인증 (로그인 화면 없음)
+      - 보호자 기기: Google 로그인 (Credential Manager)
+    - 오류 형식: RFC 9457 `application/problem+json`
+    - 생성 요청(POST)은 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비)
+    - 서버 구현 방식(Firebase Functions vs Cloud Run)은 docs/adr/0001-backend.md에서 결정. 이 계약은 둘 다에 적용
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.phonedoctor.example/v1
+    description: 운영 (도메인 미정)
+  - url: http://10.0.2.2:8080/v1
+    description: 에뮬레이터 → 로컬 개발 서버
+
+security:
+  - firebaseIdToken: []
+    appCheck: []
+
+tags:
+  - name: devices
+    description: 기기 등록·푸시 토큰
+  - name: pairing
+    description: 연결 코드 발급·수락·확정·해제
+  - name: alerts
+    description: 위험 앱 승인 요청과 응답
+  - name: feedback
+    description: 오탐 익명 신고
+  - name: models
+    description: 온디바이스 모델 배포 메타데이터
+
+paths:
+  /devices:
+    post:
+      tags: [devices]
+      operationId: registerDevice
+      summary: 기기 등록 (앱 첫 실행 시 1회, 재설치 시 다시)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceRegistration' }
+      responses:
+        '201':
+          description: 등록됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /devices/{deviceId}:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    patch:
+      tags: [devices]
+      operationId: updateDevice
+      summary: 푸시 토큰·앱 버전·표시 이름 갱신
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceUpdate' }
+      responses:
+        '200':
+          description: 갱신됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Device' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [devices]
+      operationId: deleteDevice
+      summary: 기기 삭제 (앱 안의 "모든 데이터 지우기"). 연결·요청 전부 삭제
+      responses:
+        '204': { description: 삭제됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /pairing-codes:
+    post:
+      tags: [pairing]
+      operationId: createPairingCode
+      summary: (시니어) 연결 코드 발급 — 10분 유효, 기존 미사용 코드는 무효화
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: 발급됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PairingCode' }
+        '403':
+          description: 보호자 기기는 발급 불가
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /pairing-codes/{code}/accept:
+    parameters:
+      - name: code
+        in: path
+        required: true
+        schema: { type: string, pattern: '^[0-9]{6}$' }
+    post:
+      tags: [pairing]
+      operationId: acceptPairingCode
+      summary: (보호자) 코드 입력·QR 스캔 → pending 링크 생성, 시니어 기기에 LINK_REQUESTED 푸시
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      responses:
+        '201':
+          description: 시니어 확인 대기
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Link' }
+        '404':
+          description: 코드 없음
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '410':
+          description: 코드 만료 (type = .../problems/pairing-code-expired)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '429': { $ref: '#/components/responses/TooManyRequests' }
+
+  /links:
+    get:
+      tags: [pairing]
+      operationId: listLinks
+      summary: 내 기기의 연결 목록 (시니어·보호자 공통)
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/LinkStatus' }
+      responses:
+        '200':
+          description: 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Link' }
+
+  /links/{linkId}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    post:
+      tags: [pairing]
+      operationId: confirmLink
+      summary: (시니어) "연결할게요" — pending → active. 거절은 DELETE
+      responses:
+        '200':
+          description: 연결됨, 보호자에게 LINK_ACTIVATED 푸시
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Link' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: 이미 active 또는 revoked
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+  /links/{linkId}:
+    parameters:
+      - $ref: '#/components/parameters/LinkId'
+    delete:
+      tags: [pairing]
+      operationId: revokeLink
+      summary: 연결 해제 (양쪽 모두 가능, 시니어는 항상 가능). 상대에게 LINK_REVOKED 푸시, 해당 링크의 요청 데이터 즉시 삭제
+      responses:
+        '204': { description: 해제됨 }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /alerts:
+    post:
+      tags: [alerts]
+      operationId: createAlert
+      summary: (시니어) 위험 판정 보고 → 연결된 보호자 전원에게 ALERT_CREATED 푸시
+      description: |
+        - level = RISK 만 기본 전송. CAUTION은 보호자가 설정에서 켠 경우만 (FR-028)
+        - 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AlertCreate' }
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alert' }
+        '200':
+          description: 같은 앱의 열린 요청이 이미 있음
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alert' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: active 링크 없음 (type = .../problems/no-active-link)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+    get:
+      tags: [alerts]
+      operationId: listAlerts
+      summary: 요청 목록 — 보호자는 연결된 시니어 전체, 시니어는 자기 것. 푸시 누락 대비 pull 용도
+      parameters:
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/AlertStatus' }
+        - name: updatedSince
+          in: query
+          description: 이 시각 이후 변경분만 (동기화용)
+          schema: { type: string, format: date-time }
+        - name: pageToken
+          in: query
+          schema: { type: string }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: 목록
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Alert' }
+                  nextPageToken: { type: string }
+
+  /alerts/{alertId}:
+    parameters:
+      - $ref: '#/components/parameters/AlertId'
+    get:
+      tags: [alerts]
+      operationId: getAlert
+      responses:
+        '200':
+          description: 상세
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alert' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /alerts/{alertId}/decision:
+    parameters:
+      - $ref: '#/components/parameters/AlertId'
+    post:
+      tags: [alerts]
+      operationId: decideAlert
+      summary: (보호자) 응답 — 먼저 도착한 응답만 유효 (FR-024)
+      description: |
+        - 성공 시 시니어 기기에 DECISION_MADE 푸시, 다른 보호자에게 ALERT_UPDATED 푸시
+        - 이미 결정된 요청이면 409 + 기존 결정 반환 → 보호자 앱은 "△△님이 먼저 답했어요" 표시
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DecisionCreate' }
+      responses:
+        '200':
+          description: 반영됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alert' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: 이미 결정됨
+          content:
+            application/problem+json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Problem'
+                  - type: object
+                    properties:
+                      existingDecision: { $ref: '#/components/schemas/Decision' }
+
+  /alerts/{alertId}/outcome:
+    parameters:
+      - $ref: '#/components/parameters/AlertId'
+    post:
+      tags: [alerts]
+      operationId: reportOutcome
+      summary: (시니어) 처리 결과 보고 → 보호자에게 ALERT_RESOLVED 푸시
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/OutcomeCreate' }
+      responses:
+        '200':
+          description: 반영됨
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Alert' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /feedback/false-positives:
+    post:
+      tags: [feedback]
+      operationId: reportFalsePositive
+      summary: 오탐 익명 신고 (US7). 기기 ID를 저장하지 않음 — 서버는 집계만
+      security:
+        - appCheck: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FalsePositiveReport' }
+      responses:
+        '202': { description: 접수됨 }
+
+  /models/latest:
+    get:
+      tags: [models]
+      operationId: getLatestModel
+      summary: 최신 판정 모델 메타데이터 (FR-008). 기기는 sha256 검증 후 교체
+      parameters:
+        - name: appVersionCode
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: 메타데이터
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ModelRelease' }
+        '304': { description: 변경 없음 (If-None-Match) }
+
+components:
+  securitySchemes:
+    firebaseIdToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Firebase Auth ID 토큰. 시니어=익명, 보호자=Google
+    appCheck:
+      type: apiKey
+      in: header
+      name: X-Firebase-AppCheck
+      description: Firebase App Check 토큰 (Play Integrity 공급자)
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 클라이언트가 만든 UUIDv4. 24시간 보관
+      schema: { type: string, format: uuid }
+    DeviceId:
+      name: deviceId
+      in: path
+      required: true
+      schema: { type: string }
+    LinkId:
+      name: linkId
+      in: path
+      required: true
+      schema: { type: string }
+    AlertId:
+      name: alertId
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: 요청 형식 오류
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: 토큰 없음·만료
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: 내 기기·내 링크가 아님
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: 없음
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: 연결 코드 대입 방지 (기기당 분당 5회, NFR-08)
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri, example: 'https://phonedoctor.example/problems/pairing-code-expired' }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+
+    DeviceRole:
+      type: string
+      enum: [protected, guardian]
+
+    DeviceRegistration:
+      type: object
+      required: [role, fcmToken, appVersionCode, sdkInt]
+      properties:
+        role: { $ref: '#/components/schemas/DeviceRole' }
+        fcmToken: { type: string }
+        displayName:
+          type: string
+          maxLength: 20
+          description: 상대에게 보일 이름. 시니어 기본값 "부모님", 보호자 기본값은 Google 계정 이름
+        appVersionCode: { type: integer }
+        sdkInt: { type: integer, description: Build.VERSION.SDK_INT }
+        manufacturer: { type: string, description: 'Build.MANUFACTURER (FCM 지연 분석용)' }
+        locale: { type: string, example: ko-KR }
+
+    DeviceUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        fcmToken: { type: string }
+        displayName: { type: string, maxLength: 20 }
+        appVersionCode: { type: integer }
+        notifyCaution:
+          type: boolean
+          description: (보호자) "주의" 판정도 받기 (FR-028)
+
+    Device:
+      type: object
+      required: [deviceId, role, displayName, createdAt]
+      properties:
+        deviceId: { type: string }
+        role: { $ref: '#/components/schemas/DeviceRole' }
+        displayName: { type: string }
+        notifyCaution: { type: boolean, default: false }
+        createdAt: { type: string, format: date-time }
+
+    PairingCode:
+      type: object
+      required: [code, qrPayload, expiresAt]
+      properties:
+        code: { type: string, pattern: '^[0-9]{6}$' }
+        qrPayload:
+          type: string
+          description: 'phonedoctor://pair?c=123456 — 보호자 앱이 스캔'
+        expiresAt: { type: string, format: date-time }
+
+    LinkStatus:
+      type: string
+      enum: [pending, active, revoked]
+
+    Link:
+      type: object
+      required: [linkId, status, protectedDevice, guardianDevice, createdAt]
+      properties:
+        linkId: { type: string }
+        status: { $ref: '#/components/schemas/LinkStatus' }
+        protectedDevice: { $ref: '#/components/schemas/DeviceSummary' }
+        guardianDevice: { $ref: '#/components/schemas/DeviceSummary' }
+        createdAt: { type: string, format: date-time }
+        activatedAt: { type: string, format: date-time }
+        lastSeenAt:
+          type: string
+          format: date-time
+          description: 시니어 기기 마지막 동기화 시각 (보호자 홈 "마지막 검사")
+
+    DeviceSummary:
+      type: object
+      required: [deviceId, displayName]
+      properties:
+        deviceId: { type: string }
+        displayName: { type: string }
+
+    RiskLevel:
+      type: string
+      enum: [SAFE, CAUTION, RISK]
+
+    InstallSource:
+      type: string
+      enum: [GOOGLE_PLAY, ONE_STORE, GALAXY_STORE, OTHER_STORE, BROWSER_OR_FILE, ADB, UNKNOWN]
+
+    ReasonCode:
+      type: string
+      description: contracts/classifier.md §4 근거 코드 표와 동일
+      enum:
+        - AD_SDK_HEAVY
+        - OVERLAY_PERMISSION
+        - LAUNCHER_ICON_HIDDEN
+        - SIDELOADED
+        - DEVICE_ADMIN
+        - ACCESSIBILITY_SERVICE
+        - NOTIFICATION_LISTENER
+        - SMS_CALL_ACCESS
+        - INSTALL_OTHER_APPS
+        - BOOT_AUTOSTART
+        - IMPERSONATION
+        - FREQUENT_BACKGROUND_LAUNCH
+        - CLEANER_BOOSTER_PATTERN
+
+    Reason:
+      type: object
+      required: [code, weight]
+      properties:
+        code: { $ref: '#/components/schemas/ReasonCode' }
+        weight: { type: number, description: '기여도 0~1' }
+        evidence:
+          type: object
+          additionalProperties: true
+          description: '코드별 근거 값. 예: AD_SDK_HEAVY → {"sdks": ["AdMob","AppLovin","Pangle"]}'
+
+    Verdict:
+      type: object
+      required: [level, score, modelVersion, reasons]
+      properties:
+        level: { $ref: '#/components/schemas/RiskLevel' }
+        score: { type: number, minimum: 0, maximum: 1 }
+        modelVersion: { type: string, example: '2026.11.1-int8' }
+        reasons:
+          type: array
+          maxItems: 3
+          items: { $ref: '#/components/schemas/Reason' }
+
+    AppInfo:
+      type: object
+      description: 위험 판정 앱 1개의 정보. 설치 앱 목록이 아님
+      required: [packageName, appLabel, versionCode, signingCertSha256, installSource, firstInstallTime]
+      properties:
+        packageName: { type: string, example: com.example.cleaner }
+        appLabel: { type: string, maxLength: 60 }
+        versionCode: { type: integer, format: int64 }
+        versionName: { type: string }
+        signingCertSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        installSource: { $ref: '#/components/schemas/InstallSource' }
+        installerPackage: { type: [string, 'null'] }
+        firstInstallTime: { type: string, format: date-time }
+        lastUpdateTime: { type: string, format: date-time }
+        iconPngBase64:
+          type: string
+          maxLength: 20000
+          description: 96x96 PNG. 보호자가 앱을 알아보게 하는 용도
+
+    AlertCreate:
+      type: object
+      required: [app, verdict, detectedAt]
+      properties:
+        app: { $ref: '#/components/schemas/AppInfo' }
+        verdict: { $ref: '#/components/schemas/Verdict' }
+        detectedAt: { type: string, format: date-time }
+
+    AlertStatus:
+      type: string
+      enum: [open, decided, resolved, expired]
+
+    DecisionType:
+      type: string
+      enum: [recommend_uninstall, allow]
+
+    DecisionCreate:
+      type: object
+      required: [decision]
+      properties:
+        decision: { $ref: '#/components/schemas/DecisionType' }
+        messageToSenior:
+          type: string
+          maxLength: 40
+          description: '선택. 시니어 화면에 그대로 표시. 예: "엄마 이거 광고 앱이에요"'
+
+    Decision:
+      type: object
+      required: [decision, decidedBy, decidedAt]
+      properties:
+        decision: { $ref: '#/components/schemas/DecisionType' }
+        messageToSenior: { type: string }
+        decidedBy: { $ref: '#/components/schemas/DeviceSummary' }
+        decidedAt: { type: string, format: date-time }
+
+    OutcomeType:
+      type: string
+      enum: [uninstalled, declined, already_removed, suspended, allowed]
+
+    OutcomeCreate:
+      type: object
+      required: [outcome, occurredAt]
+      properties:
+        outcome: { $ref: '#/components/schemas/OutcomeType' }
+        occurredAt: { type: string, format: date-time }
+
+    Alert:
+      type: object
+      required: [alertId, linkIds, status, app, verdict, detectedAt, createdAt]
+      properties:
+        alertId: { type: string }
+        protectedDevice: { $ref: '#/components/schemas/DeviceSummary' }
+        linkIds:
+          type: array
+          items: { type: string }
+        status: { $ref: '#/components/schemas/AlertStatus' }
+        app: { $ref: '#/components/schemas/AppInfo' }
+        verdict: { $ref: '#/components/schemas/Verdict' }
+        decision: { $ref: '#/components/schemas/Decision' }
+        outcome:
+          type: object
+          properties:
+            outcome: { $ref: '#/components/schemas/OutcomeType' }
+            occurredAt: { type: string, format: date-time }
+        detectedAt: { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        remindAt:
+          type: string
+          format: date-time
+          description: 보호자 재알림 예정 (생성 + 24h, FR-026)
+
+    FalsePositiveReport:
+      type: object
+      required: [packageName, versionCode, signingCertSha256, modelVersion, score, reasonCodes]
+      properties:
+        packageName: { type: string }
+        versionCode: { type: integer, format: int64 }
+        signingCertSha256: { type: string }
+        modelVersion: { type: string }
+        score: { type: number }
+        reasonCodes:
+          type: array
+          items: { $ref: '#/components/schemas/ReasonCode' }
+
+    ModelRelease:
+      type: object
+      required: [modelVersion, url, sha256, sizeBytes, featureSchemaVersion, thresholds]
+      properties:
+        modelVersion: { type: string }
+        url: { type: string, format: uri }
+        sha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        sizeBytes: { type: integer }
+        featureSchemaVersion:
+          type: integer
+          description: 앱이 지원하는 특징 스키마와 다르면 받지 않음 (classifier.md §2)
+        thresholds:
+          type: object
+          required: [caution, risk]
+          properties:
+            caution: { type: number }
+            risk: { type: number }
+        sdkRulesVersion: { type: string }
