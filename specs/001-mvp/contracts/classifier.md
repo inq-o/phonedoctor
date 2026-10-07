@@ -32,7 +32,7 @@
 | 컴포넌트 | activity·service·receiver·provider 수 | int ×4 | `GET_ACTIVITIES` 등 플래그 | androguard |
 | 메타 | targetSdk, minSdk, APK 크기(MB, log) | int/float | `ApplicationInfo`, `sourceDir` 파일 크기 | androguard·파일 크기 |
 | 아이콘 | 런처 아이콘 없음 | bool | `queryIntentActivities(MAIN/LAUNCHER).setPackage` 결과 0개 | 매니페스트에 MAIN/LAUNCHER activity 없음 |
-| 이름 패턴 | 클리너·부스터·배터리·와이파이 키워드 (한·영) | bool | 앱 라벨·패키지명 | 매니페스트 라벨·패키지명 |
+| 이름 패턴 | 클리너·부스터·배터리·와이파이 키워드 (한·영) | bool | 앱 라벨(시스템 로케일 = 한국어)·패키지명 | 매니페스트 라벨 `ko` 리소스, 없으면 기본 라벨·패키지명 |
 
 - 어휘 목록은 `ml/schema/feature_schema_v1.json` 하나로 관리하고, 빌드 시 앱 asset으로 복사 → 두 쪽이 같은 파일을 읽음 (생성: `ml/schema/build_schema_v1.py`, 2026-10-03)
 - **이름 정규화**: 문자열을 `.`로 나눈 마지막 조각을 소문자로 → vocab에 있으면 1 (`android.intent.action.BOOT_COMPLETED` → `boot_completed`). MH-1M 추출 코드(Malware-Hunter/SF23-AMGenerator `extraction.py`)를 직접 읽어 확인한 규칙과 같음
