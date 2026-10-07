@@ -91,10 +91,10 @@ def vectorize(raw, s):
 
 def _row(path):
     logger.remove()  # androguard 로그 끄기 (워커마다)
+    data = Path(path).read_bytes()  # 읽기 오류는 진짜 문제라 배치를 멈춘다
     try:
-        data = Path(path).read_bytes()
         raw = parse(data)
-    except Exception as e:  # 깨진 APK는 건너뛰고 기록
+    except Exception as e:  # 깨진·난독화 APK는 건너뛰고 기록
         return path, None, repr(e)
     sha = hashlib.sha256(data).hexdigest().upper()
     return path, (sha, raw), None
