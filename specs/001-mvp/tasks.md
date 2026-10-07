@@ -31,10 +31,10 @@
 ## 단계 2 — 6~7주차 10/5~10/16 · 계획서 산출물 "데이터셋"
 
 데이터·특징 (US1의 기반)
-- [~] T020 특징 스키마 v1 `ml/schema/feature_schema_v1.json` — **권한 121·인텐트 필터 91 확정**(2026-10-03, MH-1M 보유율 기준). 남은 것: 광고 SDK(T021), 이름 키워드 목록
+- [x] T020 특징 스키마 v1 `ml/schema/feature_schema_v1.json` — **권한 121·인텐트 필터 91 확정**(2026-10-03, MH-1M 보유율 기준), 광고 SDK·이름 키워드 21개(2026-10-06)
   - 데이터: `ml/data_prep/mh1m_static.py` → `ml/data/mh1m/static.npz`(134만×416, 26초) + `vocab_stats.csv`
   - ⚠️ 계약 변경: 기기 인텐트 추출을 receiver 조회 → **매니페스트 직접 파싱**으로 (classifier.md §2)
-- [ ] T021 [P] LibChecker-Rules DB에 광고 SDK 태그 추가 `ml/rules/ad_sdk_tags.csv`
+- [x] T021 [P] 광고 SDK 태그 `ml/rules/ad_sdk_tags.csv` — 플래그 12종 + 개수용 11종, 접두어 대조, 최신 AAR 18종 매니페스트로 확인 (2026-10-06)
 - [ ] T022 [P] PC 특징 추출기 `ml/extract/` (androguard 4.1.4 고정)
 - [ ] T023 [P] 기기 특징 추출기 `core/packages` + `core/classifier/feature` — PackageManager 래퍼 + **base.apk 매니페스트(바이너리 XML) 파서**
 - [ ] T024 일치 테스트 (APK 20개, 비트 단위) — T022·T023 이후

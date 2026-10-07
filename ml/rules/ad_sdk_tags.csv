@@ -1,0 +1,24 @@
+sdk_id,label,flag,prefixes,example,source
+admob,Google AdMob,1,com.google.android.gms.ads.,com.google.android.gms.ads.AdActivity,com.google.android.gms:play-services-ads-api:24.8.0 AAR 매니페스트
+applovin,AppLovin,1,com.applovin.,com.applovin.adview.AppLovinFullscreenActivity,com.applovin:applovin-sdk:13.6.4 AAR 매니페스트
+pangle,Pangle,1,com.bytedance.sdk.openadsdk.|com.bytedance.pangle.,com.bytedance.sdk.openadsdk.activity.single.TTAdActivity,com.pangle.global:pag-sdk-ad:8.3.0.4 AAR 매니페스트 + LibChecker-Rules 60fe485(com.bytedance.pangle.*)
+unity_ads,Unity Ads,1,com.unity3d.ads.|com.unity3d.services.ads.,com.unity3d.ads.adplayer.FullScreenWebViewDisplay,com.unity3d.ads:unity-ads:4.21.0 AAR 매니페스트 + LibChecker-Rules 60fe485(구버전 com.unity3d.services.ads.*)
+ironsource,ironSource (LevelPlay),1,com.ironsource.|com.unity3d.ironsourceads.,com.ironsource.sdk.controller.ControllerActivity,com.unity3d.ads-mediation:mediation-sdk:9.6.1 AAR 매니페스트
+mintegral,Mintegral,1,com.mbridge.msdk.|com.mintegral.msdk.,com.mbridge.msdk.activity.MBCommonActivity,com.mbridge.msdk.oversea:mbridge_android_sdk:17.1.81 AAR 매니페스트 (com.mintegral.msdk는 15.x 이전 패키지)
+vungle,Vungle (Liftoff Monetize),1,com.vungle.,com.vungle.ads.internal.ui.VungleActivity,com.vungle:vungle-ads:7.7.9 AAR 매니페스트 + LibChecker-Rules 60fe485(구버전 com.vungle.warren.*)
+inmobi,InMobi,1,com.inmobi.,com.inmobi.ads.rendering.InMobiAdActivity,com.inmobi.monetization:inmobi-ads-kotlin:11.5.0 AAR 매니페스트
+meta_an,Meta Audience Network,1,com.facebook.ads.,com.facebook.ads.AudienceNetworkActivity,com.facebook.android:audience-network-sdk:6.22.0 AAR 매니페스트
+cauly,카울리,1,com.fsn.cauly.,com.fsn.cauly.blackdragoncore.LandingActivity,cauly/Android-SDK CaulyExample 매니페스트 (AAR 3.5.46은 컴포넌트를 선언하지 않고 앱이 직접 선언)
+adfit,카카오 애드핏,1,com.kakao.adfit.,com.kakao.adfit.AdFitSdkInitProvider,com.kakao.adfit:ads-base:3.23.1 AAR 매니페스트
+mobon,모비온,1,com.mobon.sdk.,com.mobon.sdk.ShortcutActivity,io.github.mobon:mobonSDK:1.0.0.66 AAR 매니페스트
+chartboost,Chartboost,0,com.chartboost.sdk.,com.chartboost.sdk.view.CBImpressionActivity,com.chartboost:chartboost-sdk:9.2.1 AAR 매니페스트
+yandex_ads,Yandex Mobile Ads,0,com.yandex.mobile.ads.,com.yandex.mobile.ads.common.AdActivity,com.yandex.android:mobileads:8.6.0 AAR 매니페스트
+bigo_ads,Bigo Ads,0,sg.bigo.ads.,sg.bigo.ads.api.AdActivity,com.bigossp:bigo-ads:6.1.0 AAR 매니페스트
+moloco,Moloco,0,com.moloco.sdk.,com.moloco.sdk.xenoss.sdkdevkit.android.adrenderer.internal.vast.VastActivity,com.moloco.sdk:moloco-sdk:4.13.0 AAR 매니페스트
+fyber,DT Exchange (Fyber),0,com.fyber.inneractive.,com.fyber.inneractive.sdk.activities.InneractiveFullscreenAdActivity,com.fyber:marketplace-sdk:8.4.7 AAR 매니페스트
+amazon_aps,Amazon Publisher Services,0,com.amazon.aps.ads.|com.amazon.device.ads.,com.amazon.device.ads.DTBInterstitialActivity,com.amazon.android:aps-sdk:12.0.2 AAR 매니페스트
+startapp,Start.io (StartApp),0,com.startapp.sdk.,com.startapp.sdk.ads.interstitials.OverlayActivity,com.startapp:inapp-sdk:5.3.2 AAR 매니페스트
+tencent_gdt,Tencent Ads (GDT),0,com.qq.e.,com.qq.e.ads.RewardvideoLandscapeADActivity,LibChecker-Rules 60fe485 (D10C56EE)
+kuaishou_ads,Kuaishou Ads,0,com.kwad.sdk.|com.ksad.download.|com.kuaishou.commercial.,com.ksad.download.service.DownloadService,LibChecker-Rules 60fe485 (E50EE803)
+huawei_ads,HUAWEI Ads,0,com.huawei.openalliance.ad.,com.huawei.openalliance.ad.provider.PPSECProvider,LibChecker-Rules 60fe485 (B3773373·14A524DE)
+anythink,TopOn (AnyThink),0,com.anythink.,com.anythink.basead.ui.ATPortraitActivity,LibChecker-Rules 60fe485 (06FF1408)
