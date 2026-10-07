@@ -35,7 +35,7 @@
   - 데이터: `ml/data_prep/mh1m_static.py` → `ml/data/mh1m/static.npz`(134만×416, 26초) + `vocab_stats.csv`
   - ⚠️ 계약 변경: 기기 인텐트 추출을 receiver 조회 → **매니페스트 직접 파싱**으로 (classifier.md §2)
 - [x] T021 [P] 광고 SDK 태그 `ml/rules/ad_sdk_tags.csv` — 플래그 12종 + 개수용 11종, 접두어 대조, 최신 AAR 18종 매니페스트로 확인 (2026-10-06)
-- [x] T022 [P] PC 특징 추출기 `ml/extract/extract.py` (androguard 4.1.4 고정) — 스키마 v1 열 233개, 받는 중·깨진 APK는 건너뜀 (2026-10-07)
+- [x] T022 [P] PC 특징 추출기 `ml/extract/extract.py` (androguard 4.1.4 고정) — 스키마 v1 특징 234개, 받는 중·깨진 APK는 건너뜀 (2026-10-07)
 - [ ] T023 [P] 기기 특징 추출기 `core/packages` + `core/classifier/feature` — PackageManager 래퍼 + **base.apk 매니페스트(바이너리 XML) 파서**
 - [ ] T024 일치 테스트 (APK 20개, 비트 단위) — T022·T023 이후
 - [ ] T025 [P] 직접 수집: 광고·회색지대 앱 + 시니어 정상 앱 (원스토어·Play 인기 "클리너·부스터·와이파이" 장르)

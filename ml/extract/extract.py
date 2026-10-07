@@ -3,7 +3,7 @@
 기기 추출기(T023)와 같은 규칙이어야 한다 → specs/001-mvp/contracts/classifier.md §2.
 어휘·광고 SDK 접두어·이름 키워드는 전부 ml/schema/feature_schema_v1.json에서 읽는다.
 
-  parse(path)        APK → 원시 값(dict). 기기 쪽도 같은 모양을 만든다
+  parse(data)        APK 바이트 → 원시 값(dict). 기기 쪽도 같은 모양을 만든다
   vectorize(raw, s)  원시 값 → (열 이름, 값) 목록. 열 순서는 스키마 groups 순서
 
 사용: python ml/extract/extract.py ml/data/apk ml/data/apk_features.csv.gz
@@ -41,8 +41,9 @@ def korean_label(a):
     return ko if ko and not ko.startswith("@") else (a.get_app_name() or "")
 
 
-def parse(path):
-    a = APK(str(path))
+def parse(data):
+    """data: APK 파일 바이트. 해시·크기와 같은 바이트를 쓰도록 한 번만 읽는다"""
+    a = APK(data, raw=True)
     if not a.is_valid_APK():  # 받는 중이거나 깨진 파일은 예외 없이 빈 값이 나온다
         raise ValueError("AndroidManifest.xml 없음")
     pkg = a.get_package()
@@ -65,7 +66,7 @@ def parse(path):
         "min_sdk": int(a.get_min_sdk_version() or 1),
         "target_sdk": int(a.get_effective_target_sdk_version()),
         "has_launcher": bool(a.get_main_activities()),
-        "size_bytes": Path(path).stat().st_size,
+        "size_bytes": len(data),
     }
 
 
@@ -91,10 +92,11 @@ def vectorize(raw, s):
 def _row(path):
     logger.remove()  # androguard 로그 끄기 (워커마다)
     try:
-        raw = parse(path)
+        data = Path(path).read_bytes()
+        raw = parse(data)
     except Exception as e:  # 깨진 APK는 건너뛰고 기록
         return path, None, repr(e)
-    sha = hashlib.sha256(Path(path).read_bytes()).hexdigest().upper()
+    sha = hashlib.sha256(data).hexdigest().upper()
     return path, (sha, raw), None
 
 
