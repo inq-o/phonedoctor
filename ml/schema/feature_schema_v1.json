@@ -248,8 +248,127 @@
     {
       "name": "ad_sdk",
       "type": "count+multi_hot",
-      "vocab": [],
-      "status": "T021에서 확정 (LibChecker-Rules 광고 태깅)",
+      "vocab": [
+        "adfit",
+        "admob",
+        "applovin",
+        "cauly",
+        "inmobi",
+        "ironsource",
+        "meta_an",
+        "mintegral",
+        "mobon",
+        "pangle",
+        "unity_ads",
+        "vungle"
+      ],
+      "count_over": [
+        "admob",
+        "applovin",
+        "pangle",
+        "unity_ads",
+        "ironsource",
+        "mintegral",
+        "vungle",
+        "inmobi",
+        "meta_an",
+        "cauly",
+        "adfit",
+        "mobon",
+        "chartboost",
+        "yandex_ads",
+        "bigo_ads",
+        "moloco",
+        "fyber",
+        "amazon_aps",
+        "startapp",
+        "tencent_gdt",
+        "kuaishou_ads",
+        "huawei_ads",
+        "anythink"
+      ],
+      "rules": {
+        "admob": [
+          "com.google.android.gms.ads."
+        ],
+        "applovin": [
+          "com.applovin."
+        ],
+        "pangle": [
+          "com.bytedance.sdk.openadsdk.",
+          "com.bytedance.pangle."
+        ],
+        "unity_ads": [
+          "com.unity3d.ads.",
+          "com.unity3d.services.ads."
+        ],
+        "ironsource": [
+          "com.ironsource.",
+          "com.unity3d.ironsourceads."
+        ],
+        "mintegral": [
+          "com.mbridge.msdk.",
+          "com.mintegral.msdk."
+        ],
+        "vungle": [
+          "com.vungle."
+        ],
+        "inmobi": [
+          "com.inmobi."
+        ],
+        "meta_an": [
+          "com.facebook.ads."
+        ],
+        "cauly": [
+          "com.fsn.cauly."
+        ],
+        "adfit": [
+          "com.kakao.adfit."
+        ],
+        "mobon": [
+          "com.mobon.sdk."
+        ],
+        "chartboost": [
+          "com.chartboost.sdk."
+        ],
+        "yandex_ads": [
+          "com.yandex.mobile.ads."
+        ],
+        "bigo_ads": [
+          "sg.bigo.ads."
+        ],
+        "moloco": [
+          "com.moloco.sdk."
+        ],
+        "fyber": [
+          "com.fyber.inneractive."
+        ],
+        "amazon_aps": [
+          "com.amazon.aps.ads.",
+          "com.amazon.device.ads."
+        ],
+        "startapp": [
+          "com.startapp.sdk."
+        ],
+        "tencent_gdt": [
+          "com.qq.e."
+        ],
+        "kuaishou_ads": [
+          "com.kwad.sdk.",
+          "com.ksad.download.",
+          "com.kuaishou.commercial."
+        ],
+        "huawei_ads": [
+          "com.huawei.openalliance.ad."
+        ],
+        "anythink": [
+          "com.anythink."
+        ]
+      },
+      "match": "activity·service·receiver·provider 전체 이름이 접두어로 시작하면 해당 SDK. '.'으로 시작하는 상대 이름은 패키지명을 붙여 푼 뒤 비교",
+      "device": "base.apk 매니페스트 컴포넌트 이름",
+      "pc": "androguard get_activities·get_services·get_receivers·get_providers",
+      "source": "ml/rules/ad_sdk_tags.csv",
       "mh1m": false
     },
     {
@@ -280,7 +399,30 @@
     {
       "name": "cleaner_name_pattern",
       "type": "bool",
-      "status": "키워드 목록 T020 후속",
+      "keywords": [
+        "청소",
+        "클리너",
+        "클린",
+        "부스터",
+        "최적화",
+        "정크",
+        "배터리",
+        "절전",
+        "와이파이",
+        "쿨러",
+        "속도 향상",
+        "cleaner",
+        "clean",
+        "booster",
+        "boost",
+        "optimizer",
+        "junk",
+        "battery",
+        "wifi",
+        "cooler",
+        "speedup"
+      ],
+      "match": "앱 라벨 + ' ' + 패키지명을 소문자로 바꿔 키워드가 부분 문자열로 들어 있으면 1",
       "mh1m": false
     }
   ]
