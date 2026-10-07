@@ -1,0 +1,498 @@
+package,group,query,rank
+myfiles.filemanager.fileexplorer.cleaner,grayzone,폰 클리너,1
+com.piriform.ccleaner,grayzone,폰 클리너,2
+com.avg.cleaner,grayzone,폰 클리너,3
+cleaner.clean.booster,grayzone,폰 클리너,4
+antivirus.virus.cleaner.clean.vpn.booster,grayzone,폰 클리너,5
+com.avast.android.cleaner,grayzone,폰 클리너,6
+com.phonecleaner.storagecleaner.junkcleaner.cleanphone,grayzone,폰 클리너,7
+com.storage.androidcleaner,grayzone,폰 클리너,8
+com.cleaner.phone.junk.files,grayzone,폰 클리너,9
+ai.storage.cleaner.app,grayzone,폰 클리너,10
+cleaner.antivirus.cleaner.virus.clean.vpn,grayzone,폰 클리너,11
+com.a0soft.gphone.acc.free,grayzone,폰 클리너,12
+com.symantec.cleansweep,grayzone,폰 클리너,13
+ai.junk.cleaner,grayzone,폰 클리너,14
+eu.thedarken.sdm,grayzone,폰 클리너,15
+com.cleanmaster.phonejunkcleaner,grayzone,폰 클리너,16
+com.totalcleaner.android,grayzone,폰 클리너,17
+com.aicleaner.phone.storagecleanup,grayzone,폰 클리너,18
+biz.cloudex.android.cleaner,grayzone,폰 클리너,19
+com.pixsterstudio.cleaner,grayzone,폰 클리너,20
+com.samsung.android.lool,grayzone,휴대폰 최적화,4
+com.ahnlab.v3mobilesecurity.soda,grayzone,휴대폰 최적화,6
+phonecleaner.junkfiles.appmanager.duplicatefileremover.applock,grayzone,휴대폰 최적화,7
+smart.cleaner.clean.master.booster.free,grayzone,휴대폰 최적화,8
+com.estsoft.alyac,grayzone,휴대폰 최적화,10
+com.coloros.phonemanager,grayzone,휴대폰 최적화,15
+com.stolitomson,grayzone,휴대폰 최적화,16
+com.pro.filecleaner.app,grayzone,휴대폰 최적화,19
+com.pivotmasterapps.phonecleaner,grayzone,휴대폰 최적화,20
+com.sc.phonecleaner.storagecleaner,grayzone,휴대폰 최적화,21
+com.trusted.cleaner.storage.ai,grayzone,휴대폰 최적화,23
+com.ytheekshana.deviceinfo,grayzone,휴대폰 최적화,24
+app.quiet.storagecleaner,grayzone,휴대폰 최적화,27
+com.xtraszone.smartclean,grayzone,휴대폰 최적화,28
+com.phone.cleaner.ai.quick.clean,grayzone,휴대폰 최적화,29
+com.clean.ai.cleanduplicated.cleanstorage,grayzone,휴대폰 최적화,30
+gps.speedometer.gpsspeedometer.odometer,grayzone,휴대폰 속도 향상,5
+org.zwanoo.android.speedtest,grayzone,휴대폰 속도 향상,7
+com.nia.main,grayzone,휴대폰 속도 향상,8
+apps.r.speedometer,grayzone,휴대폰 속도 향상,9
+com.nisargjhaveri.netspeed,grayzone,휴대폰 속도 향상,10
+force.lteonlymode.fiveg.speedtest.datausage,grayzone,휴대폰 속도 향상,14
+com.nclear.gps,grayzone,휴대폰 속도 향상,15
+com.morkam.speedometer.gps,grayzone,휴대폰 속도 향상,16
+com.pbstudios.speedometer,grayzone,휴대폰 속도 향상,17
+com.connectionstabilizerbooster,grayzone,휴대폰 속도 향상,18
+com.ax.fancydashboard.speedometer,grayzone,휴대폰 속도 향상,19
+com.predictapps.speedometer,grayzone,휴대폰 속도 향상,20
+com.glasswire.android,grayzone,휴대폰 속도 향상,21
+com.ktwapps.speedometer,grayzone,휴대폰 속도 향상,22
+com.sm.gpsmobilespeedometer,grayzone,휴대폰 속도 향상,23
+com.digitalspeedometer.odometer.speedometer.speed,grayzone,휴대폰 속도 향상,24
+com.funapps.hud,grayzone,휴대폰 속도 향상,25
+com.masha.myfiles.filemanager.fileexplorer.cleaner,grayzone,휴대폰 속도 향상,26
+com.phone.junk.clean.go,grayzone,휴대폰 속도 향상,27
+com.droidnova.speedometer,grayzone,휴대폰 속도 향상,28
+com.phonecleaner.junkcleaner.virusscan.antivirus.viruscleaner,grayzone,휴대폰 속도 향상,30
+com.glgjing.captain,grayzone,메모리 부스터,1
+com.akuapps.memcleaner,grayzone,메모리 부스터,3
+com.storagecleaner.cleanmasterapp.phonestorage.memorycleaner,grayzone,메모리 부스터,4
+com.UtkuGogen.CalismaMuzikleri,grayzone,메모리 부스터,5
+com.terexo.booster,grayzone,메모리 부스터,7
+com.specupad.memoryword,grayzone,메모리 부스터,8
+com.nixgames.cognitive.training.memory,grayzone,메모리 부스터,10
+com.overkaiser.libmemory,grayzone,메모리 부스터,11
+com.trainteks.memorybooster,grayzone,메모리 부스터,13
+com.geetmark.cpuxram,grayzone,메모리 부스터,14
+com.momentsforever.memoried,grayzone,메모리 부스터,15
+com.fujianjin6471.memoryhelper,grayzone,메모리 부스터,16
+com.memorize.mvpmemo,grayzone,메모리 부스터,17
+com.memory.brain.training.games,grayzone,메모리 부스터,18
+com.magicalstory.MemoryKiller,grayzone,메모리 부스터,19
+com.hiza.pj019.main,grayzone,메모리 부스터,20
+com.kosajun.easymemorycleaner,grayzone,메모리 부스터,21
+com.ravensburger.memory,grayzone,메모리 부스터,22
+com.apps_games.memory_flash,grayzone,메모리 부스터,23
+com.insideinc.gcpu,grayzone,메모리 부스터,24
+com.cbinnovations.androideraser,grayzone,메모리 부스터,26
+com.DisisaEstudio.Memory,grayzone,메모리 부스터,27
+com.tripletfamdev.studymusicbooster,grayzone,메모리 부스터,28
+com.reaction.time.reflex,grayzone,메모리 부스터,29
+ai.memorae,grayzone,메모리 부스터,30
+com.digibites.accubattery,grayzone,배터리 절약,1
+net.hubalek.android.reborn.beta,grayzone,배터리 절약,2
+com.developer.zpallagi.batteryanalyzer,grayzone,배터리 절약,3
+com.paget96.batteryguru,grayzone,배터리 절약,4
+com.glgjing.thor,grayzone,배터리 절약,5
+net.hubalek.android.apps.reborn.pro,grayzone,배터리 절약,6
+ch.smalltech.battery.free,grayzone,배터리 절약,7
+com.sjmk.batterymaster,grayzone,배터리 절약,8
+simple.batttery.alarm,grayzone,배터리 절약,9
+com.pextor.batterychargeralarm,grayzone,배터리 절약,10
+apps.syrupy.fullbatterychargealarm,grayzone,배터리 절약,11
+com.oneapps.batteryone,grayzone,배터리 절약,12
+com.bat.batsaver,grayzone,배터리 절약,13
+net.hubalek.android.gaugebattwidget,grayzone,배터리 절약,14
+com.x.batterysaver.healthmonitor,grayzone,배터리 절약,15
+ch.smalltech.battery.pro,grayzone,배터리 절약,16
+com.weartools.phonebattcomp,grayzone,배터리 절약,17
+com.dangundad.batterydrain,grayzone,배터리 절약,18
+com.appcanopy.batteryvitals,grayzone,배터리 절약,19
+com.yugongkeji.podstool,grayzone,배터리 절약,20
+bt.fullbatteryalert.charge.alarm,grayzone,배터리 절약,21
+com.onesilicondiode.batterywise,grayzone,배터리 절약,22
+com.monospace.battery,grayzone,배터리 절약,23
+eco.silence.batterystation,grayzone,배터리 절약,24
+software110kv.battery.plus,grayzone,배터리 절약,25
+com.dc.bm6_intact,grayzone,배터리 절약,26
+io.github.ifa.glancewidget,grayzone,배터리 절약,27
+com.oneapps.batterynotification,grayzone,배터리 절약,28
+com.battery.health.pro,grayzone,배터리 절약,29
+com.h3r3t1c.phonebatteryinfoonwear,grayzone,배터리 절약,30
+com.antivirus,grayzone,바이러스 제거,3
+com.avast.android.mobilesecurity,grayzone,바이러스 제거,4
+org.malwarebytes.antimalware,grayzone,바이러스 제거,5
+com.symantec.mobilesecurity,grayzone,바이러스 제거,6
+antivirus.anti.virus.applock.protection.vpn,grayzone,바이러스 제거,7
+com.tafayor.roxapp,grayzone,바이러스 제거,9
+com.eset.ems2.gp,grayzone,바이러스 제거,10
+com.protectstar.antivirus,grayzone,바이러스 제거,11
+com.anti.virus.security,grayzone,바이러스 제거,12
+kr.co.publicwifi,grayzone,무료 와이파이,1
+io.wifimap.wifimap,grayzone,무료 와이파이,2
+com.kapron.ap.hotspot,grayzone,무료 와이파이,3
+com.bongs.sharewifi,grayzone,무료 와이파이,4
+com.instabridge.android,grayzone,무료 와이파이,5
+com.ertunga.wifihotspot,grayzone,무료 와이파이,6
+com.cklee.freewifisearch2,grayzone,무료 와이파이,7
+com.halo.wifikey.wifilocating,grayzone,무료 와이파이,8
+com.triggers.wifiing,grayzone,무료 와이파이,9
+kr.app.wifimoney,grayzone,무료 와이파이,10
+com.JindoBlu.OfflineGames,grayzone,무료 와이파이,11
+com.free.wifi.internet.network.finder,grayzone,무료 와이파이,12
+de.pnpq.hotspotlocator,grayzone,무료 와이파이,13
+com.appworld.wifi.free,grayzone,무료 와이파이,14
+com.osmino.wifil,grayzone,무료 와이파이,15
+com.media720.games2020,grayzone,무료 와이파이,16
+offline.AppSmartz.games,grayzone,무료 와이파이,17
+com.osmino.wifilight,grayzone,무료 와이파이,18
+com.wefi.wefi,grayzone,무료 와이파이,19
+com.publicwifi.wifi.automatic.connection,grayzone,무료 와이파이,20
+wifi.auto.connect.wifi.qrcode.wifiscanner.manager,grayzone,무료 와이파이,21
+com.gomin.portable.wifi.hotspot,grayzone,무료 와이파이,22
+com.free.wireless.hack.network.connection.hotspot.password.wifi,grayzone,무료 와이파이,23
+uz.zarifergashev.offline_games,grayzone,무료 와이파이,24
+de.j4velin.wifiAutoOff,grayzone,무료 와이파이,25
+com.widemobile.sink.widereserv,grayzone,무료 와이파이,26
+com.portable.wifihotspot,grayzone,무료 와이파이,27
+abdelrahman.wifianalyzerpro,grayzone,무료 와이파이,28
+com.ubnt.usurvey,grayzone,무료 와이파이,29
+com.bubblegame.bubbleshooterpop,grayzone,무료 와이파이,30
+wifi.automatic.wifi.auto.connect.wifi.manager,grayzone,와이파이 자동 연결,5
+com.androidyou.wifiloginnew,grayzone,와이파이 자동 연결,6
+com.rbnvision.auto.wifi.connect,grayzone,와이파이 자동 연결,7
+de.android.wifioverviewpro,grayzone,와이파이 자동 연결,11
+wifi.auto.connect.wifi.setup.master,grayzone,와이파이 자동 연결,12
+com.nttbp.jw2,grayzone,와이파이 자동 연결,13
+com.wificonnect.manager.auto,grayzone,와이파이 자동 연결,15
+com.tartar.strongestwifi,grayzone,와이파이 자동 연결,16
+com.wifi.auto.share,grayzone,와이파이 자동 연결,18
+com.nero.android.kwiksync,grayzone,와이파이 자동 연결,19
+com.calify.portablewifi,grayzone,와이파이 자동 연결,20
+com.roamingsoft.manager,grayzone,와이파이 자동 연결,22
+com.wifi.connect.auto,grayzone,와이파이 자동 연결,23
+com.signalmonitoring.wifimonitoring,grayzone,와이파이 자동 연결,24
+com.gonext.wifirepair,grayzone,와이파이 자동 연결,25
+com.galaxy.cube.wifi.auto.connect,grayzone,와이파이 자동 연결,26
+com.kraph.wifiexplorer,grayzone,와이파이 자동 연결,27
+daily.detail.wificonnectionanywhere,grayzone,와이파이 자동 연결,28
+com.nextgen.wifi.finder.pv,grayzone,와이파이 자동 연결,29
+com.b01t.wifialerts,grayzone,와이파이 자동 연결,30
+com.devuni.flashlight,grayzone,손전등,1
+com.life.myTorch,grayzone,손전등,2
+torch.lanterna.flashlight,grayzone,손전등,3
+mobi.freeapps.flashlight.free,grayzone,손전등,4
+com.sunfire.flashlight,grayzone,손전등,5
+com.axiomatic.flashlight,grayzone,손전등,6
+pl.nenter.app.flashlightgalaxys,grayzone,손전등,7
+com.ihandysoft.ledflashlight.mini,grayzone,손전등,8
+com.timestech.flashlightsos,grayzone,손전등,9
+com.pony.magnifyingglass,grayzone,손전등,10
+app.dopita.wear.shortcut.flashlight,grayzone,손전등,11
+com.cyb3rko.flashdim,grayzone,손전등,12
+sk.forbis.flashlight,grayzone,손전등,13
+com.bitmavrick.lumolight,grayzone,손전등,14
+nodomain.greensnowapps.lightsignals,grayzone,손전등,15
+com.luxebyte.shaketoenabletorch,grayzone,손전등,16
+com.waqasali.beamix_torch,grayzone,손전등,17
+com.peacock.flashlight,grayzone,손전등,18
+com.just4funutils.flashlight.led.widget,grayzone,손전등,19
+org.nixgame.flashlight,grayzone,손전등,20
+com.pocketcursor.torch,grayzone,손전등,21
+coocent.app.tools.light.flashlight.pro,grayzone,손전등,22
+com.boss.flashapp,grayzone,손전등,23
+org.rnazarevych.shaketorch,grayzone,손전등,24
+com.eco.flashlight,grayzone,손전등,25
+com.ledtorchlight.simpleflashlight,grayzone,손전등,26
+com.falnesc.flashlight,grayzone,손전등,27
+app.forlong.flashlightmaster,grayzone,손전등,28
+com.bharatdev.flashify,grayzone,손전등,29
+com.devmj.flashlightapp,grayzone,손전등,30
+com.ez.memo,grayzone,큰글씨 키보드,1
+com.happyq.bigtextsizememopad,grayzone,큰글씨 키보드,2
+com.designkeyboard.keyboard,grayzone,큰글씨 키보드,3
+com.ez.calendar,grayzone,큰글씨 키보드,4
+com.kptech.bigmemo,grayzone,큰글씨 키보드,5
+kr.bitbyte.playkeyboard,grayzone,큰글씨 키보드,6
+jo.old.calculator,grayzone,큰글씨 키보드,7
+io.bloco.largetext,grayzone,큰글씨 키보드,8
+com.stormvortex.size.bigfont,grayzone,큰글씨 키보드,9
+com.touchtalent.bobbleapp,grayzone,큰글씨 키보드,10
+com.cac.bigkeyboard,grayzone,큰글씨 키보드,11
+com.bigtextbible,grayzone,큰글씨 키보드,12
+com.big.button.keyboard.largekeyboard.app,grayzone,큰글씨 키보드,13
+com.github.inputmethod.alphabetical,grayzone,큰글씨 키보드,14
+abk.keyboard,grayzone,큰글씨 키보드,15
+com.eco.bigfont,grayzone,큰글씨 키보드,16
+rkr.simplekeyboard.inputmethod,grayzone,큰글씨 키보드,17
+com.bokhary.lazyboard,grayzone,큰글씨 키보드,18
+com.tss21.cjk.tsbigkeyboard,grayzone,큰글씨 키보드,19
+com.simplit.leddisplayboard,grayzone,큰글씨 키보드,20
+com.onecwearable.keyboard,grayzone,큰글씨 키보드,21
+handwriting.keyboard.drawing.keyboard.input.keyboard,grayzone,큰글씨 키보드,22
+com.onecwearable.keyboard.base,grayzone,큰글씨 키보드,23
+net.temperstone.seniorhealthlog,grayzone,큰글씨 키보드,24
+com.creplex.news,grayzone,큰글씨 키보드,25
+com.adyala.free.apps.input.language.chinese.keyboard.hanzi.text.writing.program,grayzone,큰글씨 키보드,26
+com.brainpub.phonedecor,grayzone,큰글씨 키보드,27
+com.hadam.bigmemo,grayzone,큰글씨 키보드,28
+com.fontskeyboard.fonts,grayzone,큰글씨 키보드,29
+io.nobldg.seniorwork,senior,시니어,1
+com.theovkg.seniorlauncher,senior,시니어,2
+com.jumaappsllc.seniorcare,senior,시니어,3
+site.elderly.brain_games_for_seniors,senior,시니어,4
+workout.seniors.home.exercise,senior,시니어,5
+com.nowmatters.smartsenior,senior,시니어,6
+kr.co.kiwiplus.kiwichild.senior,senior,시니어,7
+com.successfulmatch.seniormatchdating,senior,시니어,8
+com.ndegree.senior,senior,시니어,9
+chairyogaforseniors.yogaworkout.chairworkout.loseweight,senior,시니어,10
+com.flexis.right_hand,senior,시니어,11
+com.seniorlauncher.global,senior,시니어,12
+name.kunes.android.launcher.demo,senior,시니어,13
+io.gajida.dolbom,senior,시니어,14
+com.eldo.launcher,senior,시니어,15
+com.seniorlauncher.app,senior,시니어,16
+app.inglenook.launcher,senior,시니어,17
+com.seniorcareworkout,senior,시니어,18
+com.seniormatch.lite,senior,시니어,19
+com.seniorsharp.app,senior,시니어,20
+com.manyulab.memorize,senior,시니어,21
+net.workoutinc.workout_for_older_adults_app,senior,시니어,22
+com.wildcard.classicspades,senior,시니어,23
+com.mohdrafey1.studentsenior,senior,시니어,24
+name.kunes.android.launcher.bigmessages,senior,시니어,25
+com.omniverseloop.seniorcare,senior,시니어,26
+net.workoutinc.senior_chair_yoga_workout_app,senior,시니어,27
+com.ertigo.chairyoga,senior,시니어,28
+com.ai4senior.ssiniya,senior,시니어,29
+name.kunes.android.launcher.bigphone,senior,시니어,30
+com.buddyn.health_magazine,senior,큰글씨,2
+com.macroglass.macroglass,senior,큰글씨,10
+com.antigravity.large_unit_calc,senior,큰글씨,11
+com.lambdafont.bigfont,senior,큰글씨,14
+kr.glssy.app,senior,큰글씨,16
+app.connectopia.video.calendar,senior,큰글씨,17
+com.hdpsolutions.bigfont,senior,큰글씨,18
+com.bsrnsoft.bigfontphone,senior,큰글씨,19
+com.lch.bigfont.calc,senior,큰글씨,20
+com.mangosoft.util.bigtypebible,senior,큰글씨,21
+kr.co.lottofirst.bigletter,senior,큰글씨,22
+kr.co.appmanager.bigfontcalculator,senior,큰글씨,23
+com.basa.largetext,senior,큰글씨,24
+com.hito.bigfont,senior,큰글씨,25
+com.gandan.android.largetextcalculator,senior,큰글씨,27
+com.bymysidelab.bigtextbrowser,senior,큰글씨,28
+com.watchfacestudio.awd_big_font_gif,senior,큰글씨,29
+com.app2u.magnifier,senior,돋보기,1
+com.hantor.CozyMag,senior,돋보기,2
+com.binghuo.magnifier.magnifyingglass,senior,돋보기,3
+mmapps.mobile.magnifier,senior,돋보기,4
+magnifier.sonky.co.kr.magnifier,senior,돋보기,6
+com.binghuo.magnifyingglass.magnifier,senior,돋보기,7
+com.app.magnifier.magnifyingglass,senior,돋보기,8
+com.life.zoomin,senior,돋보기,9
+com.rvappstudios.magnifyingglass,senior,돋보기,10
+com.hantor.CozyMagPlus,senior,돋보기,11
+com.bestappinc.readingglasses,senior,돋보기,12
+kr.co.simplebestapp.readingglasses,senior,돋보기,13
+com.studio360apps.magnifier,senior,돋보기,14
+com.sunfire.magnifyingglass,senior,돋보기,15
+com.fortuna.magnifier,senior,돋보기,16
+de.stoehr.loviapps.wezoom,senior,돋보기,17
+club.fitapps.magnifier,senior,돋보기,18
+com.devloach.smartlens,senior,돋보기,19
+com.magnifying.glass.magnifylight.microscopeapp,senior,돋보기,20
+com.google.android.apps.accessibility.magnifier,senior,돋보기,21
+com.bzezz.magnifier,senior,돋보기,22
+com.magnifying.glass.magnifiercamera.flashlight,senior,돋보기,23
+com.volabsgroup.simplemagnifyingglass,senior,돋보기,24
+com.humanware.hwmagnifier,senior,돋보기,25
+com.jkfantasy.camera.jkpmagnifiercamera,senior,돋보기,26
+com.oddmentsapp.magnifier,senior,돋보기,27
+camera.magnifying.glass.magnifier,senior,돋보기,28
+com.joshuaandcompany.magnifier,senior,돋보기,29
+com.shani.magnifyingglass.pro,senior,돋보기,30
+pedometer.steptracker.calorieburner.stepcounter,senior,만보기,1
+com.cashwalk.cashwalk,senior,만보기,2
+com.tayu.tau.pedometer,senior,만보기,3
+com.sec.android.app.shealth,senior,만보기,4
+stepcounter.pedometer.stepstracker,senior,만보기,5
+pedometer.stepcounter.calorieburner.pedometerforwalking,senior,만보기,6
+com.tracerofficial,senior,만보기,7
+com.fitbit.FitbitMobile,senior,만보기,8
+com.google.android.apps.fitness,senior,만보기,9
+com.alpaca.step_counter,senior,만보기,10
+com.nike.plusgps,senior,만보기,11
+in.sweatco.app,senior,만보기,12
+steptracker.healthandfitness.walkingtracker.pedometer,senior,만보기,13
+cc.pacer.androidapp,senior,만보기,14
+com.garmin.android.apps.connectmobile,senior,만보기,15
+com.nianticlabs.pikmin,senior,만보기,16
+com.myfitnesspal.android,senior,만보기,17
+com.huami.watch.hmwatchmanager,senior,만보기,18
+com.hevy,senior,만보기,19
+com.runtastic.android,senior,만보기,20
+com.swallaby.walkon,senior,만보기,21
+com.alltrails.alltrails,senior,만보기,22
+com.fitnesskeeper.runkeeper.pro,senior,만보기,23
+kr.bitbyte.moneypig,senior,만보기,24
+com.stepsappgmbh.stepsapp,senior,만보기,25
+com.crrepa.band.dafit,senior,만보기,26
+com.xiaomi.wearable,senior,만보기,27
+com.mapmyfitness.android2,senior,만보기,28
+com.transsion.healthlife,senior,만보기,29
+com.noisefit,senior,만보기,30
+com.trot.trot_app,senior,트로트,1
+com.castor.trot,senior,트로트,2
+com.kuksulab.trotplayer,senior,트로트,3
+com.simsimmedia.trot,senior,트로트,4
+com.megastudio.trot,senior,트로트,5
+com.trot.music.mp3.listen,senior,트로트,6
+com.appworld.musictime3,senior,트로트,7
+com.touchsound.trot,senior,트로트,8
+com.trot7080.app,senior,트로트,9
+com.xill0riumlab.trotpack,senior,트로트,10
+com.podoplayapp.goodtrot,senior,트로트,11
+com.xill0riumlab.youknowtrot,senior,트로트,12
+app.happytoday.allfree,senior,트로트,13
+com.collisional.trotstream,senior,트로트,14
+kr.co.adamstore.trotcollection,senior,트로트,15
+com.lwjlinhls.goldentrot,senior,트로트,16
+com.megastudio.k7080,senior,트로트,17
+kr.co.rumpus.silveri_tort,senior,트로트,18
+com.code404.mytrot,senior,트로트,19
+com.simsimmedia.oldk,senior,트로트,20
+com.yeoniyouni.trot,senior,트로트,21
+com.trotfan.trot,senior,트로트,22
+com.sun_ksh.my_trot_star,senior,트로트,23
+com.mustudio.trot,senior,트로트,24
+com.yeoniyouni.sound,senior,트로트,25
+kr.tlive.app,senior,트로트,26
+com.krtroat.togethersong,senior,트로트,27
+com.addict_trot,senior,트로트,28
+com.ktrot.oldtort,senior,트로트,29
+com.buna.trot,senior,트로트,30
+com.radio.fmradio,senior,라디오,1
+com.imbc.mini,senior,라디오,2
+com.appgate.gorealra,senior,라디오,3
+com.freeradio.streaming,senior,라디오,4
+com.aurora.worldradio,senior,라디오,5
+kr.co.kbs.kong,senior,라디오,6
+tunein.player,senior,라디오,7
+com.streema.simpleradio,senior,라디오,8
+com.stayfprod.awesomeradio.free,senior,라디오,9
+com.radio.pocketfm,senior,라디오,10
+com.droid.artes,senior,라디오,11
+com.arar557.am777,senior,라디오,12
+com.podcast.podcasts,senior,라디오,13
+fm.radiotune.global,senior,라디오,14
+co.spoonme,senior,라디오,15
+com.icecream.simplemediaplayer,senior,라디오,16
+com.digitalapps.worldradios,senior,라디오,17
+com.hv.replaio,senior,라디오,18
+com.inlive.android.radio,senior,라디오,19
+net.febc.radio,senior,라디오,20
+com.bambuna.podcastaddict,senior,라디오,21
+com.yournsoft.radioplayer,senior,라디오,22
+radiotime.player,senior,라디오,23
+com.yejit.ytnradio,senior,라디오,24
+myradio.radio.fmradio.liveradio.radiostation,senior,라디오,25
+com.makeshop.podbbang,senior,라디오,26
+com.airtouchmedia.radioclassique.phone,senior,라디오,27
+ru.bukharsky.radio,senior,라디오,28
+com.radioplayer.mobile,senior,라디오,29
+fm.castbox.audiobook.radio.podcast,senior,라디오,30
+com.neowiz.games.newmatgo,senior,고스톱,1
+com.NHNEnt.NDuelgo,senior,고스톱,2
+kr.encom.gostop_p,senior,고스톱,3
+com.neowiz.games.gostop2018,senior,고스톱,4
+com.sundaytoz.kakao.matgo.service,senior,고스톱,5
+com.neowiz.games.newmatgoKakao,senior,고스톱,6
+free.card.game.gostop2018.kitty,senior,고스톱,7
+com.neowiz.games.smg,senior,고스톱,8
+com.netmarble.mmatgo,senior,고스톱,9
+com.buzzpowder.gostop_basic,senior,고스톱,10
+com.qws.eightlight.gostopbattle,senior,고스톱,11
+free.card.game.gostop2018.premium.pro,senior,고스톱,12
+com.tnk.games.sgt,senior,고스톱,13
+free.card.game.gostop2018.puppy,senior,고스톱,14
+com.kr.freeunse,senior,오늘의 운세,1
+com.comprehensivefortune,senior,오늘의 운세,2
+com.kr.yg.unse,senior,오늘의 운세,3
+kr.co.appuniv.fortune,senior,오늘의 운세,4
+handasoft.mobile.divination,senior,오늘의 운세,5
+com.sajug.app,senior,오늘의 운세,6
+com.sisomobile.android.fortune,senior,오늘의 운세,7
+kr.co.byus.horoscopes,senior,오늘의 운세,8
+kr.co.apov.app,senior,오늘의 운세,9
+com.ipapas.unselite,senior,오늘의 운세,10
+com.unsin,senior,오늘의 운세,11
+com.nurungg.luckyfortune,senior,오늘의 운세,12
+com.ipapas.sajulite,senior,오늘의 운세,13
+com.dave.fortune,senior,오늘의 운세,14
+com.ipapas.newyear,senior,오늘의 운세,15
+handasoft.mobile.divination_pro,senior,오늘의 운세,16
+com.fortune.daily,senior,오늘의 운세,17
+com.novalabs.daily_saju,senior,오늘의 운세,18
+com.teamdown.todaytarot,senior,오늘의 운세,19
+com.dunami.zodiacfortune,senior,오늘의 운세,20
+com.cynicalkim.app.fortune,senior,오늘의 운세,21
+com.gkuer.dosa2,senior,오늘의 운세,22
+com.godn.sh.sinbiunsaju,senior,오늘의 운세,23
+com.bluecode.oneulun,senior,오늘의 운세,24
+com.todaysdestiny.app,senior,오늘의 운세,25
+com.music.singta,senior,오늘의 운세,26
+com.myeongin.sajuprompt.kr,senior,오늘의 운세,27
+com.water.sajutong,senior,오늘의 운세,28
+com.ohaasa.app,senior,오늘의 운세,29
+kr.go.kma.weatherapp,senior,날씨,1
+com.weather.nold.forecast,senior,날씨,2
+aplicacion.tiempo,senior,날씨,3
+com.weawow,senior,날씨,4
+wongi.weather,senior,날씨,5
+com.accuweather.android,senior,날씨,6
+com.windyty.android,senior,날씨,7
+life.channel.accurate.local.weather.forecast,senior,날씨,8
+com.lifeoverflow.app.weather,senior,날씨,9
+weather.forecast.rain.radar,senior,날씨,10
+kr.co.weatherstone,senior,날씨,11
+com.weather.Weather,senior,날씨,12
+live.weather.vitality.studio.forecast.widget,senior,날씨,13
+aplicacionpago.tiempo,senior,날씨,14
+com.coloros.weather.service,senior,날씨,15
+co.windyapp.android,senior,날씨,16
+de.wetteronline.wetterapp,senior,날씨,17
+com.yahoo.mobile.client.android.weather,senior,날씨,18
+com.forecasts.noaa.live.weather,senior,날씨,19
+com.airvisual,senior,날씨,20
+com.miui.weather2,senior,날씨,21
+com.inmobi.weather,senior,날씨,22
+de.mdiener.rain.usa,senior,날씨,23
+com.google.android.apps.weather,senior,날씨,24
+wni.WeathernewsTouch.jp,senior,날씨,25
+com.accurate.weather.forecast.live,senior,날씨,26
+com.studioeleven.windfinder,senior,날씨,27
+com.handmark.expressweather,senior,날씨,28
+com.wunderground.android.weather,senior,날씨,29
+com.weather.mjweather,senior,날씨,30
+com.sirma.mobile.bible.android,senior,성경,1
+com.godpeople.GPBIBLE,senior,성경,2
+kr.co.GoodTVBible,senior,성경,3
+com.soundbread.five,senior,성경,5
+com.oneclick.christianbible,senior,성경,6
+com.clsk.media,senior,성경,7
+org.wdprs.prsbible,senior,성경,8
+wonju.bible,senior,성경,9
+com.offline.bible,senior,성경,10
+kjv.bible.kingjamesbible,senior,성경,11
+com.bible.kids,senior,성경,12
+com.wafour.bible,senior,성경,13
+app.bible.lite.offline,senior,성경,14
+com.heavenlyspy.newfigtreebible,senior,성경,15
+com.bestweatherfor.bibleoffline_pt_ra,senior,성경,16
+com.dydbook.bible,senior,성경,17
+com.bible.studycommentary,senior,성경,18
+com.bns.bible.KBSBible,senior,성경,19
+com.duranno.bible,senior,성경,20
+com.logos.androidlogos,senior,성경,21
+kr.or.su.everydaybible,senior,성경,22
+com.faithcomesbyhearing.android.bibleis,senior,성경,23
+com.sugsukim.biblehymnplus,senior,성경,25
+com.jamsuni.coramdeo,senior,성경,26
+org.biblesearches.easybible,senior,성경,27
+com.newer.bibleitda,senior,성경,28
+com.coommark.dailybible,senior,성경,29
+kjv.holy.bible.kingjames,senior,성경,30
