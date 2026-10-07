@@ -16,10 +16,12 @@ python ml/collect/play_search.py ml/collect/queries.csv ml/collect/packages.csv
 
 ```bash
 tail -n +2 ml/collect/packages.csv | cut -d, -f1 > ml/data/apk_ids.csv
-apkeep -c ml/data/apk_ids.csv -d google-play -i ml/data/apkeep.ini --accept-tos \
-  -o locale=ko_KR,timezone=Asia/Seoul -s 1000 -r 2 ml/data/apk/
+script -qF ml/data/apkeep.log apkeep -c ml/data/apk_ids.csv -d google-play -i ml/data/apkeep.ini --accept-tos \
+  -o locale=ko_KR,timezone=Asia/Seoul -s 3000 -r 1 ml/data/apk/
 ```
 
+- apkeep은 실패 이유(`Invalid app response`, `An error has occurred … Skipping` 등)를 터미널일 때만 출력한다. 파이프나 리다이렉트로 저장하면 사라지므로 `script -F`(바로 기록)로 감싸 로그를 남긴다. 2026-10-07 기준 끝까지 안 받힌 61개는 전부 `Invalid app response`(유료·제조사 전용·Wear OS·기기 프로필 비호환 추정).
+- 공용 계정이라 연속으로 많이 받으면 일시적으로 막힌다(2026-10-07, `-s 1000 -r 2`로 400개쯤 받은 뒤 나머지 대부분 실패). 실패분은 시간을 두고 다시 받는다.
 - `ml/data/apkeep.ini`에 `[google]` 아래 `email`·`auth_token`을 둔다. 토큰은 레포에 넣지 않고, 만료되면 다시 받는다.
 - APK는 `ml/data/apk/`에만 두고 재배포하지 않는다. 공개하는 것은 특징값과 SHA-256뿐이다.
 - 지역 제한 앱은 한국 IP에서 받아야 한다.
