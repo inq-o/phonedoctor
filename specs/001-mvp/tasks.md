@@ -19,7 +19,8 @@
 - [x] T005 [P] MH-1M Figshare npz 다운로드(`~/data/mh1m`, md5 검증) + 라벨표 `ml/data_prep/mh1m_labels.py` → `ml/data/mh1m/labels.csv.gz` (2026-10-03)
   - npz 메타데이터에 VT 추천 위협 라벨이 있어 **Dataverse 라벨 12.3GB 불필요**. adware 58,067개(dowgin·kuguo·revmob·airpush 등 중국·구형 광고 SDK 위주, hiddenad 496) / 전체 악성 119,094 / 정상 1,221,421
   - inner npz 특징 11,961개 중 기기에서 뽑을 수 있는 건 **권한 166 + 인텐트 250**뿐(나머지 API 호출 11,545) → T020 스키마 어휘의 출발점
-- [ ] T006 [P] 할머니 폰 광고 원인 확인 (spec Q1) — 설치 앱 목록 + Chrome 사이트 알림 설정 화면 사진. 결과에 따라 FR-040 우선순위 조정
+- [ ] T006 [P] 할머니 폰 광고 원인 확인 (spec Q1) — 설치 앱 목록 + Chrome 사이트 알림 설정 화면 사진. 결과에 따라 US1·US10 우선순위 조정
+- [ ] T007 [P] 갤럭시 실기기에서 삼성 인터넷 사이트 알림 채널 구조 확인 (spec Q7) — 사이트 하나 알림 허용 후 `adb shell dumpsys notification`의 채널 ID
 
 ## 단계 1 — 결정 (막힘 해소)
 
@@ -68,6 +69,8 @@
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
 - [ ] T057 [P] 개인정보처리방침 GitHub Pages — 스토어 등록 필수
 - [ ] T058 [P] 공개 고지 화면 (O-S1, FR-041) + Data safety 신고 초안
+- [ ] T059 [US10] Chrome 사이트 광고 알림 끄기 — 알림 리스너(Chrome 외 알림 즉시 폐기) + 사이트별 기록 + 판정 + 채널 설정 화면 열기 (FR-050~054). 알림 접근 공개 고지는 T058에 포함
+- [ ] T059a [US10] 알림 접근 미허용 대체 안내 화면 (S6, FR-040)
 
 ## 단계 5 — 11주차 11/9~13 · 출시
 
@@ -91,6 +94,7 @@
 - [ ] T082 FR-042 AppFunctions — compileSdk 37 필요
 - [ ] T083 [US6] Gemini Nano 문장 다듬기
 - [ ] T084 [US9] 주간 리포트·구독
+- [ ] T085 [US10] Chrome 내장 팝업·리디렉션·침입 광고 차단 켜는 법 안내 (FR-055, 페이지 안 광고 대응)
 
 ## 의존 관계
 
