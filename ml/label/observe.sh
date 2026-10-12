@@ -9,8 +9,8 @@ PKG=$1
 SRC=$2
 mkdir -p "${3:-ml/data/observe}/$PKG"
 OUT=$(cd "${3:-ml/data/observe}/$PKG" && pwd)   # 에뮬레이터 캡처는 절대 경로가 필요
-USE_SECONDS=180
-BG_MINUTES=10
+USE_SECONDS=${USE_SECONDS:-180}
+BG_MINUTES=${BG_MINUTES:-10}
 SEED=20261012
 
 log() { echo "[$(date +%H:%M:%S)] $*" | tee -a "$OUT/run.log"; }
@@ -34,11 +34,27 @@ remove_app() {
   local admin
   admin=$(adb shell dumpsys device_policy | grep -o "$PKG/[^ }:]*" | head -1) || true
   if [ -n "$admin" ]; then adb shell dpm remove-active-admin "$admin" || true; fi
+  adb shell dumpsys deviceidle whitelist -"$PKG" > /dev/null || true
   adb uninstall "$PKG" > /dev/null
 }
-trap 'log "aborted"; adb emu screenrecord stop > /dev/null || true; adb shell pkill -f com.android.commands.monkey || true; remove_app' EXIT
+trap 'log "aborted"; adb emu screenrecord stop > /dev/null || true; adb shell pkill -f com.android.commands.monkey || true; adb shell cmd statusbar send-disable-flag none || true; remove_app' EXIT
 log "install $SRC"
 if [ -d "$SRC" ]; then adb install-multiple -r -g "$SRC"/*.apk; else adb install -r -g "$SRC"; fi
+
+# -g는 런타임 권한만 허용한다. 특수 권한은 설정 화면에서 켜야 하는데 monkey는 앱 밖으로 못 나가
+# "권한이 필요합니다" 창에서 맴돈다. 시니어가 요청을 대개 허용한다는 가정대로 앱이 선언한 것만 켠다.
+# 접근성·알림 접근·기기 관리자는 여러 단계 동의가 필요한 권한이라 켜지 않는다(앱이 요청하는지만 기록)
+DECLARED=$(adb shell dumpsys package "$PKG" | sed -n '/requested permissions:/,/install permissions:/p')
+for pair in MANAGE_EXTERNAL_STORAGE:MANAGE_EXTERNAL_STORAGE SYSTEM_ALERT_WINDOW:SYSTEM_ALERT_WINDOW \
+            PACKAGE_USAGE_STATS:GET_USAGE_STATS SCHEDULE_EXACT_ALARM:SCHEDULE_EXACT_ALARM \
+            WRITE_SETTINGS:WRITE_SETTINGS REQUEST_INSTALL_PACKAGES:REQUEST_INSTALL_PACKAGES; do
+  if grep -Eq "android\.permission\.${pair%%:*}(:|$)" <<< "$DECLARED"; then
+    adb shell appops set "$PKG" "${pair#*:}" allow && echo "${pair#*:}" >> "$OUT/granted.txt"
+  fi
+done
+if grep -Eq "android\.permission\.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS(:|$)" <<< "$DECLARED"; then
+  adb shell dumpsys deviceidle whitelist +"$PKG" > /dev/null && echo BATTERY_OPTIMIZATION_EXEMPT >> "$OUT/granted.txt"
+fi
 
 {
   echo "package=$PKG"
@@ -50,6 +66,7 @@ if [ -d "$SRC" ]; then adb install-multiple -r -g "$SRC"/*.apk; else adb install
 } > "$OUT/meta.txt"
 
 log "use ${USE_SECONDS}s"
+adb shell cmd statusbar send-disable-flag statusbar-expansion   # monkey가 알림창을 내려 그 안에 갇히지 않게
 adb emu screenrecord start --time-limit "$USE_SECONDS" --size 540x1200 --bit-rate 500000 "$OUT/use.webm" > /dev/null
 LAUNCHER=$(grep '^launcher=' "$OUT/meta.txt" | cut -d= -f2)
 if [[ $LAUNCHER == */* ]]; then adb shell am start -n "$LAUNCHER" > /dev/null; else log "no launcher activity"; fi
@@ -61,6 +78,7 @@ adb shell pkill -f com.android.commands.monkey || true
 wait || true
 shot use_99; focus use_end; windows use_end
 adb emu screenrecord stop > /dev/null || true
+adb shell cmd statusbar send-disable-flag none
 
 log "home, wait ${BG_MINUTES}m"
 adb shell input keyevent KEYCODE_HOME
