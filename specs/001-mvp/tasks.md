@@ -48,6 +48,9 @@
 - [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
 - [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `allow_entry`, `package_change_cursor`)
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
+- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로)
+- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거
+- [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
 
@@ -83,6 +86,7 @@
 - [ ] T071 사용성 관찰: 설치 대행자 3명 (SC-003), 시니어 1명 이상 (SC-004)
 - [ ] T072 Play 심사 제출 (14일 테스트 종료 후, 11/23 전후)
 - [ ] T073 최종보고서 (13주차, spec Q6 면제 여부 확인)
+- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱으로 FPR(FR-012 오탐). 오버레이형은 커버리지 한계로 명시
 
 ## 나중에 (P2·P3)
 
