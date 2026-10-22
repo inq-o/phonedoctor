@@ -3,6 +3,18 @@
 - 작성 2026-10-03. 9/29 기초 세팅 조사에 기획용 조사를 더한 것
 - 각 결정이 어디서 왔는지 추적하는 용도
 
+## 가족 사례의 관찰과 한계
+
+- **출처**: 사용자 설명, 2026-10-13·10-14. 기획안의 가족 사례에 대한 보충 설명.
+- **관찰**: 앱을 실행하지 않고 가만히 있어도 모바일 게임 중간 광고와 비슷한 전면 광고가 약 5초마다 또는 더 짧은 간격으로 나타났음. 특정 게임을 실행 중이었다는 진술은 아님.
+- **해결 경위**: 삼성 디바이스 케어를 **직접 실행해서** 해결됨. 디바이스 케어가 자동으로 잡아 주지 않았고, 설정 > 디바이스 케어까지 가는 동안에도 광고가 계속 떠 조작이 어려웠음. 원인 앱 이름·탐지 결과·광고 표시 방식은 현재 확인할 수 없음.
+- **가설**: 앱 진단으로 해결됐으므로 설치 앱이 원인일 가능성이 높음(사이트 알림은 앱 진단으로 꺼지지 않음). 탐지 결과 기록이 없어 확정하지는 않음.
+- **같은 현상의 다른 사례**: 삼성 고객지원이 "외부 앱 설치 후 원하지 않는 광고 팝업이 지속적으로 발생"하는 증상을 안내함 [14]. 리뷰에 "10초마다 팝업"이 남은 Google Play 앱 묶음(광고를 6초 간격으로 다시 요청) [15], 아이콘을 숨기고 다른 앱 위에 전면 광고를 띄운 Google Play 앱 331개(6천만 다운로드) [16]. 일반 사용자 질문에도 "10초에 한 번씩 광고, 비행모드에서도 뜸"이 있음 [17].
+- **기획에 주는 의미**: 직접 실행한 진단에서는 잡혔으므로 "기존 도구는 탐지하지 못한다"의 근거로는 쓰지 않음. 이 사례가 보여 주는 문제는 두 가지임.
+  1. 기기 자체 자동 탐지가 작동하지 않아 당사자가 직접 진단을 실행해야 했음. 삼성 안내도 "별도의 디바이스 케어 알림 없이 원치 않은 광고가 보이는" 경우 사용자가 직접 앱을 지우라고 함 [14]
+  2. 광고가 화면을 가려 해결 수단(설정 메뉴)까지 가기 어려웠음
+  - 따라서 차별점은 탐지 성능이 아니라 **사용자가 직접 실행하지 않아도 자동으로 점검**하고, **광고가 화면을 막아도 조치할 수 있는 경로**(보호자 승인, 알림 탭 한 번으로 삭제)임.
+
 ## 1. 경쟁·유사 서비스에서 가져온 것
 
 | 서비스 | 확인한 동작 | 가져온 것 | 다르게 한 것 |
@@ -12,6 +24,7 @@
 | 시티즌코난 | [악성앱 검사] 버튼 → 전화사기·원격제어·출처 불명 3분류 → 항목별 [삭제] [3] | 결과 분류를 사람 말로, 항목마다 삭제 버튼 | **사용자가 직접 실행할 필요 없음**, 광고 도배 앱 포함 |
 | Google Play Protect | 위험 앱 알림 → 탭 → [제거]. 위협 21종 문구, 그중 **Disruptive ads**: "앱 밖에서 광고, 쉽게 닫을 수 없음, 기기 기능 방해" [4] | 알림 → 탭 → 삭제 흐름, 광고 앱 분류 기준 문장 | 보호자 승인 단계, 판정 근거 공개 |
 | 삼성 Auto Blocker · One UI 9 | 사이드로딩 차단, 경찰청 목록 피싱 앱 설치·실행 차단 (계획서 [7][8]) | 설치 출처를 런타임 신호로 사용 | 스토어 통과 회색지대 앱이 대상 |
+| 삼성 디바이스 케어 | 불필요한 팝업·알림을 띄우는 앱을 스캔하면 자동으로 초절전 전환 후 알림(안드로이드 버전에 따라 알림이 안 뜰 수 있음). 알림 없이 광고가 보이면 사용자가 설정에서 앱 보안 진단을 직접 실행하거나 앱을 지워야 함 [14] | 탐지 알림 → 앱 목록 → 삭제 흐름 | 판정을 보호자에게도 보냄, 시니어는 설정 메뉴를 찾을 필요 없이 알림 탭 한 번으로 삭제 |
 | Life360 | 가족 전원이 같은 앱, 초대 코드로 연결 | 6자리 코드 + QR 연결 (ADR-0002 안 A) | 연결 후 시니어 확인 단계 추가 |
 | Android 고급 보호 모드 (AAPM) | Android 16, 사이드로딩 차단 등. `AdvancedProtectionManager.isAdvancedProtectionEnabled()`로 앱이 상태 확인 가능 [5] | 홈에 "고급 보호 켜짐" 표시, 켜져 있으면 `SIDELOADED` 신호 비중 낮춤 | — |
 
@@ -78,3 +91,7 @@
 11. Android Accessibility Help, 「Touch target size」, https://support.google.com/accessibility/android/answer/7101858
 12. Android Developers, 「Android 14 features」, https://developer.android.com/about/versions/14/features
 13. Toss Tech, 「토스의 8가지 라이팅 원칙들」, https://toss.tech/article/8-writing-principles-of-toss
+14. 삼성전자서비스, 「갤럭시, 외부 앱 설치 후 갑자기 광고가 보여지고, 기기가 느려지거나 멈춥니다.」(2026-06-30), https://www.samsungsvc.co.kr/solution/1017552
+15. Check Point, 「GhostAd: Hidden Google Play Adware Drains Devices and Disrupts Millions of Users」(2025-11-24), https://blog.checkpoint.com/research/ghostad-hidden-google-play-adware-drains-devices-and-disrupts-millions-of-users/
+16. Bitdefender, 「Hundreds of Malicious Google Play-Hosted Apps Bypassed Android 13 Security With Ease」(2025-03), https://www.bitdefender.com/en-us/blog/labs/malicious-google-play-apps-bypassed-android-security
+17. 아하, 「휴대폰에 갑자기 광고가 쉴새없이 뜨고 있어요.」(2025-07-19), https://www.a-ha.io/questions/4bda88f504052e0cbcb64eb94bf747ed
