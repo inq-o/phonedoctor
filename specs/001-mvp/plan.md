@@ -150,7 +150,7 @@ phonedoctor/
 | 데이터 | MH-1M(Figshare npz) 권한·인텐트 부분, CIC-AAGM2017, KronoDroid, 직접 수집 APK | `data/` (git 제외) |
 | 추출 | androguard 4.1.4 고정 / apk-info (변조 APK) | 특징 parquet (스키마 v1) |
 | 학습 | scikit-learn·LightGBM 베이스라인 → (Q4) MLP | 모델 + 학습 로그 |
-| 임계값 | 검증셋 FPR 5% 지점 | `thresholds.json` |
+| 임계값 | 검증셋에서 앱 단위 FPR ≤ 5%를 만족하는 최소 risk 임계값 (classifier.md §3) | `thresholds.json` |
 | 변환 | LiteRT 변환 + ai-edge-quantizer INT8 | `.tflite` ≤ 20MB |
 | 평가 | 별도 테스트셋 + 대조군(시티즌코난·Play Protect 수동 실행) | 비교표 (앱 단위 FPR). 증상 감지 평가는 T074 |
 

@@ -204,7 +204,9 @@ paths:
       description: |
         - `source = install_scan`: level = RISK 만 기본 전송. CAUTION은 보호자가 설정에서 켠 경우만 (FR-028)
         - `source = symptom`: 증상 감지 기준을 넘은 앱 (FR-010). `symptom` 근거 필수, `verdict`는 설치 시점 판정이 있으면 함께
-        - 출처와 상관없이 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200). 열린 요청의 횟수 갱신은 하지 않음 (v1)
+        - 출처와 상관없이 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
+          - 기존 요청에 없는 근거가 오면(예: `install_scan` 요청에 나중에 `symptom`) 그 근거를 붙이고 `updatedAt`을 갱신한 뒤 보호자 전원에게 ALERT_UPDATED 푸시. `source`는 처음 출처 그대로
+          - 이미 있는 근거는 덮어쓰지 않음 (열린 요청의 증상 횟수 갱신은 v1에서 안 함)
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -623,9 +625,10 @@ components:
     SymptomEvidence:
       type: object
       description: 증상 감지 근거 (FR-010). "○○ 앱이 오늘 N번" 문구의 값
-      required: [count, firstAt, lastAt, detectorVersion]
+      required: [date, count, firstAt, lastAt, detectorVersion]
       properties:
-        count: { type: integer, minimum: 1, description: '집계 구간(기기 현지 날짜 하루) 안에서 광고로 센 전환 수' }
+        date: { type: string, format: date, description: '집계한 날짜 (시니어 기기 현지 날짜). 보호자 문구의 "오늘"은 이 날짜가 오늘일 때만' }
+        count: { type: integer, minimum: 1, description: '그 날짜 하루 동안 광고로 센 전환 수' }
         firstAt: { type: string, format: date-time }
         lastAt: { type: string, format: date-time }
         detectorVersion: { type: string, example: 'usage-v1', description: '전환 분류 휴리스틱 버전 (FR-012)' }
@@ -686,6 +689,11 @@ components:
     Alert:
       type: object
       required: [alertId, linkIds, status, source, app, detectedAt, createdAt]
+      allOf:
+        - if: { properties: { source: { const: install_scan } } }
+          then: { required: [verdict] }
+        - if: { properties: { source: { const: symptom } } }
+          then: { required: [symptom] }
       properties:
         alertId: { type: string }
         protectedDevice: { $ref: '#/components/schemas/DeviceSummary' }
@@ -705,7 +713,7 @@ components:
             occurredAt: { type: string, format: date-time }
         detectedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: '결정·결과·근거 추가 시 갱신' }
         remindAt:
           type: string
           format: date-time

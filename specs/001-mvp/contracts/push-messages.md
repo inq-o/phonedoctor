@@ -24,12 +24,12 @@
 | `LINK_REVOKED` | 상대 기기 | normal | `link` | 연결 목록 |
 | `ALERT_CREATED` | 보호자 전원 | high | `alert` | 요청 상세 |
 | `ALERT_REMINDER` | 미응답 보호자 | high | `alert` | 요청 상세 |
-| `ALERT_UPDATED` | 다른 보호자 | normal | (알림 없음, 목록 갱신) | — |
+| `ALERT_UPDATED` | 다른 보호자(먼저 온 결정 반영), 보호자 전원(열린 요청에 근거 추가) | normal | (알림 없음, 목록·상세 갱신) | — |
 | `DECISION_MADE` | 시니어 | high | `alert` | 시니어 앱 상세 (삭제 유도) |
 | `ALERT_RESOLVED` | 보호자 전원 | normal | `result` | 요청 상세 |
 | `MODEL_UPDATED` | 시니어 | normal | (알림 없음) | WorkManager로 모델 받기 |
 
-- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom`이면 `symptomCount`도 담음 — 알림 문구를 고르는 용도 (ux-flows §6). 시각·근거 상세는 넣지 않음
+- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom`이면 `symptomCount`와 `symptomDate`(집계 날짜, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
 ## 3. 페이로드 예시
 
@@ -45,7 +45,8 @@
       "protectedName": "엄마",
       "appLabel": "초고속 클리너",
       "source": "symptom",
-      "symptomCount": "12"
+      "symptomCount": "12",
+      "symptomDate": "2026-10-23"
     }
   }
 }
