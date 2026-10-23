@@ -168,7 +168,7 @@ phonedoctor/
 | 계약 | 서버 응답이 openapi와 일치 | 서버 테스트에서 스키마 검증 |
 | UI | 시니어 화면 글꼴 200% | Compose UI Test, Roborazzi 스크린샷 |
 | 성능 | 판정 지연 | Microbenchmark (실기기) |
-| 종단 | F1′(증상)·F1(설치 시점) 전체 완주. 증상 감지 Recall(G2)은 평가 행(T074)에서 필수로 잼 | 에뮬레이터 2대 + 재현 앱·테스트 광고 앱 (quickstart.md) |
+| 종단 | F1′(증상)·F1(설치 시점) 전체 완주. 증상 감지 Recall(G2)은 T074 평가의 필수 측정 항목 | 에뮬레이터 2대 + 재현 앱·테스트 광고 앱 (quickstart.md) |
 
 ## 예외 기록 (Complexity Tracking)
 

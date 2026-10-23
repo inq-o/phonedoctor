@@ -555,12 +555,14 @@ components:
         lastSeenAt:
           type: string
           format: date-time
-          description: 서버가 시니어 기기의 요청을 마지막으로 받은 시각 (참고용)
+          description: 서버가 시니어 기기의 요청을 마지막으로 받은 시각 (참고용). 이 링크의 시니어 기기(Device) 값을 보여 줌
         lastCheckedAt:
           type: string
           format: date-time
           description: 시니어 기기가 `PUT /devices/{deviceId}/status`로 보고한 마지막 검사 완료 시각 (보호자 홈 "마지막 검사", 연락 끊김 판정 F6 기준)
-        protection: { $ref: '#/components/schemas/ProtectionState' }
+        protection:
+          $ref: '#/components/schemas/ProtectionState'
+          description: 이 링크의 시니어 기기(Device) 값. lastCheckedAt도 같음 — 저장은 Device에 한 번 (data-model §1)
 
     DeviceSummary:
       type: object
