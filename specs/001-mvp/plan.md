@@ -80,7 +80,7 @@ flowchart TB
 | 조회 | 설치 감지와 같은 WorkManager 주기 작업 + 앱 실행 시 `UsageStatsManager.queryEvents(usage_cursor, now)` | 포그라운드 서비스 없음. 시스템 이벤트 보관 기간 안에서만 커서로 이어 읽음(무손실 보장 아님). 보관 기간보다 오래 조회하지 못한 구간은 감지 공백으로 기록하고 이어서 진행. 지원 최대 지연은 실증에서 확인한 보관 기간으로 정함 |
 | 이벤트 | `ACTIVITY_RESUMED`(API 29+, 이전은 `MOVE_TO_FOREGROUND`) 중 폰주치의·런처·시스템 UI 제외 | 액티비티형 앱 밖 광고만 보임. 오버레이형은 FR-011 사전 경고로 보조 |
 | 분류 | 사용자 조작 직후 전환(직접 실행·알림 탭·앱 간 전환)과 조작 없는 전환을 가르는 규칙 (FR-012) | 🔵 쓸 이벤트 조합·시간 창·예외는 **UsageStats 실증 실험**에서 정함. `ACTIVITY_RESUMED` 하나로는 구분되지 않음 |
-| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, 앱별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 같은 앱·버전에 열린 `symptom` 요청이 있으면(`alert_local`) 다시 보내지 않음 — 근거는 처음 기준을 넘은 날짜 것 그대로, 재알림은 FR-026 일정대로 (v1) | 기준값은 실증·T074에서 정함 🔶 |
+| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, 앱별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 같은 (packageName, signingCertSha256, versionCode)에 열린 `symptom` 요청이 있으면(`alert_local`, 서버 Alert 식별 조건과 같음) 다시 보내지 않음 — 근거는 처음 기준을 넘은 날짜 것 그대로, 재알림은 FR-026 일정대로 (v1) | 기준값은 실증·T074에서 정함 🔶 |
 | 실패 조건 | 권한 거부·프로세스 종료·화면 꺼짐·Doze에서 감지 가능성과 지연 | 실증 실험에서 측정 |
 
 ### 설치 감지 설계 (FR-002, 보조 경로)

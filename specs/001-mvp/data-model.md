@@ -103,7 +103,7 @@ stateDiagram-v2
 | `symptom_event` | id PK, packageName, className, resumedAt, rule, detectorVersion. **고유 (packageName, className, resumedAt)** | 광고로 센 포그라운드 전환 (FR-009·010). 정상으로 본 전환은 저장하지 않음. 30일 보관 |
 | `usage_cursor` | id=1, lastEventTime | `queryEvents` 다음 조회 시작 시각. 시작 시각이 포함되므로 `lastEventTime`부터 다시 읽고(+1 안 함), 겹쳐 읽은 이벤트는 `symptom_event` 고유 제약으로 무시 (같은 시각 이벤트의 중복·누락 둘 다 막음) |
 | `allow_entry` | (packageName, signingCertSha256, versionCode) PK, allowedBy, createdAt | 보호자가 허용한 앱. 같은 버전은 다시 안 물음 |
-| `alert_local` | alertId PK, packageName, source, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정 |
+| `alert_local` | alertId PK, packageName, signingCertSha256, versionCode, source, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정 |
 | `outbox` | id PK, method, path, bodyJson, idempotencyKey, attempts, nextAttemptAt | 오프라인 중 쌓인 서버 호출 (WorkManager가 재전송) |
 | `package_change_cursor` | id=1, sequenceNumber, bootCount | `getChangedPackages` 순번 |
 

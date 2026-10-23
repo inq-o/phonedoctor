@@ -514,7 +514,7 @@ components:
       description: 폰주치의 자신의 권한 상태. 꺼진 항목은 보호자 홈에 "꺼져 있을 수 있어요"로 표시
       required: [notifications, usageAccess, notificationListener]
       properties:
-        notifications: { type: boolean, description: 'POST_NOTIFICATIONS 허용' }
+        notifications: { type: boolean, description: '앱 알림이 켜져 있음 — API 버전과 무관하게 NotificationManagerCompat.areNotificationsEnabled() 값 (API 33+ POST_NOTIFICATIONS 거부·설정에서 끔 모두 false)' }
         usageAccess: { type: boolean, description: '사용 기록 접근 허용 (증상 감지, US11)' }
         notificationListener: { type: boolean, description: '알림 접근 허용 (Chrome 사이트 알림, US10)' }
 
