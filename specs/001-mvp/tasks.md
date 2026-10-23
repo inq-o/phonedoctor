@@ -69,7 +69,7 @@
 - [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
 - [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`
-- [ ] T055a [US4] 연락 끊김 경고 (F6) — 시니어 `PATCH /devices/{id}` status 6시간 간격 보고 + 서버 `lastSeenAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
+- [ ] T055a [US4] 연락 끊김 경고 (F6) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
 - [ ] T057 [P] 개인정보처리방침 GitHub Pages — 스토어 등록 필수
 - [ ] T058 [P] 공개 고지 화면 (O-S1, FR-041) + Data safety 신고 초안
