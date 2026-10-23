@@ -29,7 +29,7 @@
 | `ALERT_RESOLVED` | 보호자 전원 | normal | `result` | 요청 상세 |
 | `MODEL_UPDATED` | 시니어 | normal | (알림 없음) | WorkManager로 모델 받기 |
 
-- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom`이면 `symptomCount`와 `symptomDate`(집계 날짜, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
+- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
 ## 3. 페이로드 예시
 
