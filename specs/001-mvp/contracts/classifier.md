@@ -3,6 +3,7 @@
 - 기기 앱(`core:classifier`)과 학습 파이프라인(`ml/`)이 **같은 입력·같은 출력**을 쓰기 위한 계약
 - 핵심 규칙: **학습 특징 = 기기에서 뽑을 수 있는 특징**. 기기에서 못 뽑는 특징(API 호출 그래프·옵코드 등)은 학습에 쓰지 않음
 - 모델 형식(GBDT vs MLP)은 미정(spec Q4). 이 계약은 형식과 무관
+- **역할: 보조 경로** ([ADR-0003](../../../docs/adr/0003-detection-approach.md)). 설치 즉시(실행 전) 사전 경고와 사용 기록에 안 남는 오버레이형의 보조 신호(`OVERLAY_PERMISSION`). 앱 밖 광고의 주 감지는 사용 기록 증상 감지(spec US11, plan "증상 감지 설계")이며 이 계약 밖
 
 ## 1. 판정 구조 — 2층
 
@@ -20,7 +21,7 @@
 
 - **층 1**: 공개 데이터셋(MH-1M 등)과 직접 수집 APK로 학습 가능한 정적 특징만
 - **층 2**: 데이터셋에 없는 기기 상태(기기 관리자 활성, 접근성 서비스 켜짐, 설치 출처 등). 학습이 아니라 규칙이라 **근거를 그대로 설명 가능**
-- 층 2 가중치는 검증셋에서 FPR 5%를 넘지 않는 범위로 조정하고 `ml/rules/runtime_bonus.yaml`에 버전 관리
+- 층 2 가중치는 검증셋에서 앱 단위 FPR 5%를 넘지 않는 범위로 조정하고 `ml/rules/runtime_bonus.yaml`에 버전 관리
 
 ## 2. 입력: 특징 스키마 v1 (`featureSchemaVersion = 1`)
 
@@ -69,7 +70,7 @@ data class Verdict(
 data class Reason(val code: ReasonCode, val weight: Float, val evidence: Map<String, String>)
 ```
 
-- 임계값: `score ≥ thresholds.risk` → RISK, `≥ thresholds.caution` → CAUTION. 값은 검증셋에서 **FPR ≤ 5%를 만족하는 최소 risk 임계값**으로 정함 (constitution I)
+- 임계값: `score ≥ thresholds.risk` → RISK, `≥ thresholds.caution` → CAUTION. 값은 검증셋에서 **앱 단위 FPR ≤ 5%를 만족하는 최소 risk 임계값**으로 정함 (constitution I, spec §4 지표 정의)
 - 근거 산출(v1): 이 앱에서 켜진 특징 그룹 중 **전역 SHAP 중요도 상위** + 층 2 규칙 적중 → 합쳐서 상위 3개. 앱별 정밀 기여도는 v2
 
 ## 4. 근거 코드 → 문구
