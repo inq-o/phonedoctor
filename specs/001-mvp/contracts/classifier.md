@@ -78,7 +78,7 @@ data class Reason(val code: ReasonCode, val weight: Float, val evidence: Map<Str
 | 코드 | 시니어 문구 (해요체·전문용어 없음) | 보호자 문구 (구체값 포함) |
 |---|---|---|
 | `AD_SDK_HEAVY` | 광고를 많이 띄우는 앱이에요 | 광고 SDK {n}개 포함 ({sdks}) |
-| `OVERLAY_PERMISSION` | 다른 앱 위에 화면을 띄울 수 있어요 | "다른 앱 위에 표시" 권한 요청 |
+| `OVERLAY_PERMISSION` | 다른 앱 위에 화면을 띄울 수 있어요 | "다른 앱 위에 표시"(`SYSTEM_ALERT_WINDOW`) 권한 요청 — FR-011 사전 경고 신호 |
 | `LAUNCHER_ICON_HIDDEN` | 앱 화면에 아이콘이 안 보이게 숨어 있어요 | 런처 아이콘 없음 (숨김 설치) |
 | `SIDELOADED` | 앱 마켓이 아닌 곳에서 설치됐어요 | 설치 출처: {source} |
 | `DEVICE_ADMIN` | 쉽게 지울 수 없게 막아 두었어요 | 기기 관리자 권한 활성 |

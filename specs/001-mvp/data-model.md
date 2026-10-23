@@ -1,7 +1,7 @@
 # 데이터 모델
 
 - 로컬(Room, 시니어·보호자 기기)과 서버(Neon Postgres, ADR-0001)로 나눔
-- **로컬에만 있는 것**: 설치 앱 스냅샷, 모든 판정 기록, 증상 감지 이벤트 → 서버로 안 감 (constitution III)
+- **로컬에만 있는 것**: 설치 앱 스냅샷, 설치 시점 판정 기록, 증상 감지 이벤트 → 서버로 안 감 (constitution III)
 - API 표현은 [contracts/openapi.yaml](contracts/openapi.yaml)
 
 ## 1. 관계도
