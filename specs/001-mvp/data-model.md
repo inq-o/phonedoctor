@@ -1,7 +1,8 @@
 # 데이터 모델
 
 - 로컬(Room, 시니어·보호자 기기)과 서버(Neon Postgres, ADR-0001)로 나눔
-- **로컬에만 있는 것**: 설치 앱 스냅샷, 설치 시점 판정 기록, 증상 감지 이벤트 → 서버로 안 감 (constitution III)
+- **로컬에만 있는 것**: 설치 앱 스냅샷, 설치 시점 판정 기록, 증상 감지 원본 이벤트(`symptom_event`) → 서버로 안 감 (constitution III)
+- 서버로 가는 증상 정보는 기준을 넘은 앱 1개의 집계값(`SymptomEvidence`: date, count, firstAt, lastAt, detectorVersion)뿐
 - API 표현은 [contracts/openapi.yaml](contracts/openapi.yaml)
 
 ## 1. 관계도
@@ -99,8 +100,8 @@ stateDiagram-v2
 |---|---|---|
 | `installed_app` | packageName PK, label, versionCode, signingCertSha256, installSource, firstInstallTime, lastUpdateTime, isSystem, lastScannedAt | 현재 설치 앱 스냅샷 |
 | `verdict` | id PK, packageName, versionCode, level, score, modelVersion, featureSchemaVersion, reasonsJson, latencyMs, createdAt | **모든 설치 시점 판정 기록** (constitution VII — 실험 로그 겸용) |
-| `symptom_event` | id PK, packageName, className, resumedAt, rule, detectorVersion | 광고로 센 포그라운드 전환 (FR-009·010). 정상으로 본 전환은 저장하지 않음. 30일 보관 |
-| `usage_cursor` | id=1, lastEventTime | `queryEvents` 다음 조회 시작 시각. 주기 작업이 늦어도 빈 구간 없이 이어 읽음 |
+| `symptom_event` | id PK, packageName, className, resumedAt, rule, detectorVersion. **고유 (packageName, className, resumedAt)** | 광고로 센 포그라운드 전환 (FR-009·010). 정상으로 본 전환은 저장하지 않음. 30일 보관 |
+| `usage_cursor` | id=1, lastEventTime | `queryEvents` 다음 조회 시작 시각. 시작 시각이 포함되므로 `lastEventTime`부터 다시 읽고(+1 안 함), 겹쳐 읽은 이벤트는 `symptom_event` 고유 제약으로 무시 (같은 시각 이벤트의 중복·누락 둘 다 막음) |
 | `allow_entry` | (packageName, signingCertSha256, versionCode) PK, allowedBy, createdAt | 보호자가 허용한 앱. 같은 버전은 다시 안 물음 |
 | `alert_local` | alertId PK, packageName, source, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정 |
 | `outbox` | id PK, method, path, bodyJson, idempotencyKey, attempts, nextAttemptAt | 오프라인 중 쌓인 서버 호출 (WorkManager가 재전송) |
