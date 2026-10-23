@@ -29,6 +29,8 @@
 | `ALERT_RESOLVED` | 보호자 전원 | normal | `result` | 요청 상세 |
 | `MODEL_UPDATED` | 시니어 | normal | (알림 없음) | WorkManager로 모델 받기 |
 
+- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom`이면 `symptomCount`도 담음 — 알림 문구를 고르는 용도 (ux-flows §6). 시각·근거 상세는 넣지 않음
+
 ## 3. 페이로드 예시
 
 ```json
@@ -42,7 +44,8 @@
       "alertId": "al_7Gx2",
       "protectedName": "엄마",
       "appLabel": "초고속 클리너",
-      "level": "RISK"
+      "source": "symptom",
+      "symptomCount": "12"
     }
   }
 }
