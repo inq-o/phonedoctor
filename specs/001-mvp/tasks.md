@@ -19,7 +19,8 @@
 - [x] T005 [P] MH-1M Figshare npz 다운로드(`~/data/mh1m`, md5 검증) + 라벨표 `ml/data_prep/mh1m_labels.py` → `ml/data/mh1m/labels.csv.gz` (2026-10-03)
   - npz 메타데이터에 VT 추천 위협 라벨이 있어 **Dataverse 라벨 12.3GB 불필요**. adware 58,067개(dowgin·kuguo·revmob·airpush 등 중국·구형 광고 SDK 위주, hiddenad 496) / 전체 악성 119,094 / 정상 1,221,421
   - inner npz 특징 11,961개 중 기기에서 뽑을 수 있는 건 **권한 166 + 인텐트 250**뿐(나머지 API 호출 11,545) → T020 스키마 어휘의 출발점
-- [ ] T006 [P] 할머니 폰 광고 원인 확인 (spec Q1) — 설치 앱 목록 + Chrome 사이트 알림 설정 화면 사진. 결과에 따라 US1·US10 우선순위 조정
+- [x] T006 [P] 할머니 폰 광고 원인 확인 (spec Q1) — **사후 확인 불가로 종료 (2026-10-14)**: 할머니 폰 광고는 디바이스 케어를 직접 실행해 이미 해결됨(자동 탐지는 작동 안 함). 앱 밖 전면 광고가 약 5초마다 또는 더 빠르게 나타났다는 관찰을 spec Q1·research.md에 기록. 원인 앱·표시 방식 확인 완료를 뜻하지 않으며, 원래 기기 재확인은 요구하지 않음.
+- [ ] T006a [P] 별도 광고 피해 사례의 원인·표시 방식 확인 — 설치 앱에 의한 반복 광고, 브라우저·사이트 알림 등 가능성을 구분해 기록. T025·T026 평가셋 및 US10·FR-040 범위에 반영
 - [ ] T007 [P] 갤럭시 실기기에서 삼성 인터넷 사이트 알림 채널 구조 확인 (spec Q7) — 사이트 하나 알림 허용 후 `adb shell dumpsys notification`의 채널 ID
 
 ## 단계 1 — 결정 (막힘 해소)
@@ -49,6 +50,9 @@
 - [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
 - [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `allow_entry`, `package_change_cursor`)
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
+- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로)
+- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거
+- [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
 
@@ -86,6 +90,7 @@
 - [ ] T071 사용성 관찰: 설치 대행자 3명 (SC-003), 시니어 1명 이상 (SC-004)
 - [ ] T072 Play 심사 제출 (14일 테스트 종료 후, 11/23 전후)
 - [ ] T073 최종보고서 (13주차, spec Q6 면제 여부 확인)
+- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱을 실제 실행해 정상 알림 탭·직접 실행 등 정상 `ACTIVITY_RESUMED` 이벤트를 라벨링하고 전체 정상 이벤트를 분모로 FPR(FR-012 오탐) 계산. 오버레이형은 커버리지 한계로 명시
 
 ## 나중에 (P2·P3)
 
@@ -106,6 +111,7 @@ flowchart LR
     T012 --> T054
     T020 --> T022 & T023
     T022 & T023 --> T024
+    T006a --> T025 & T026
     T025 --> T026 --> T040 --> T050
     T053 --> T054 --> T055 --> T056
     T050 & T056 & T057 & T058 --> T060
