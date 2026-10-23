@@ -24,8 +24,8 @@ erDiagram
       string fcmToken
       bool notifyCaution
       timestamp createdAt
-      timestamp lastSeenAt "서버가 마지막으로 요청을 받은 시각 (F6)"
-      timestamp lastCheckedAt "시니어 기기가 보고한 마지막 검사"
+      timestamp lastSeenAt "서버가 마지막으로 요청을 받은 시각 (참고)"
+      timestamp lastCheckedAt "상태 보고의 마지막 검사 (F6 기준)"
       json protection "ProtectionState (시니어)"
     }
     LINK {
@@ -122,7 +122,7 @@ stateDiagram-v2
 | `onboardingDone` | 공통 | false |
 | `disclosureAcceptedVersion` | 시니어 | 0 (고지 문구가 바뀌면 다시 받음) |
 | `usageAccessGranted` | 시니어 | false (증상 감지 주 경로, 꺼지면 설치 시점 판정만) |
-| `lastStatusReportAt` | 시니어 | 없음 (`PATCH /devices/{id}` status 6시간 간격) |
+| `lastStatusReportAt` | 시니어 | 없음 (`PUT /devices/{id}/status` 6시간 간격) |
 | `falsePositiveFeedback` | 공통 | true (US7, 끌 수 있음) |
 | `strongModeEnabled` | 시니어 | false (Device Owner일 때만 노출) |
 | `seniorTextScale` | 시니어 | 1.0 (시스템 글꼴 배율에 곱하는 추가 배율, 1.0~1.3) |

@@ -64,11 +64,7 @@ paths:
     patch:
       tags: [devices]
       operationId: updateDevice
-      summary: 푸시 토큰·앱 버전·표시 이름 갱신, (시니어) 보호 동작 상태 보고
-      description: |
-        - 시니어 기기는 주기 작업이 검사를 마칠 때 마지막 보고 후 6시간이 지났으면 `status`를 보냄 (위험 앱이 없는 날에도). 보호자 홈의 "마지막 검사"와 연락 끊김 판정(ux-flows F6)에 씀
-        - 서버는 시니어 기기의 인증된 요청을 받을 때마다 `lastSeenAt`을 갱신. F6 경고는 `lastSeenAt` 기준 48시간
-        - 같은 본문을 다시 보내도 결과가 같아 `Idempotency-Key`가 필요 없음
+      summary: 푸시 토큰·앱 버전·표시 이름 갱신
       requestBody:
         required: true
         content:
@@ -89,6 +85,31 @@ paths:
       responses:
         '204': { description: 삭제됨 }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /devices/{deviceId}/status:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    put:
+      tags: [devices]
+      operationId: putDeviceStatus
+      summary: (시니어) 검사 완료·보호 동작 상태 보고
+      description: |
+        - 시니어 기기는 주기 작업이 검사를 마칠 때 마지막 보고 후 6시간이 지났으면 보냄 (위험 앱이 없는 날에도)
+        - 서버는 `Link.lastCheckedAt`·`protection`을 이 보고로만 갱신. 보호자 홈의 "마지막 검사"와 연락 끊김 판정(ux-flows F6, 48시간)에 씀. 다른 API 호출은 `lastSeenAt`만 갱신해 검사가 멈춘 기기를 정상으로 보이게 하지 않음
+        - PUT이라 같은 본문 재전송 결과가 같아 `Idempotency-Key`가 필요 없음
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceStatus' }
+      responses:
+        '204': { description: 반영됨 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 내 기기가 아니거나 보호자 기기
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /pairing-codes:
     post:
@@ -479,7 +500,6 @@ components:
         notifyCaution:
           type: boolean
           description: (보호자) "주의" 판정도 받기 (FR-028)
-        status: { $ref: '#/components/schemas/DeviceStatus' }
 
     DeviceStatus:
       type: object
@@ -535,11 +555,11 @@ components:
         lastSeenAt:
           type: string
           format: date-time
-          description: 서버가 시니어 기기의 요청을 마지막으로 받은 시각. 연락 끊김 판정(F6) 기준
+          description: 서버가 시니어 기기의 요청을 마지막으로 받은 시각 (참고용)
         lastCheckedAt:
           type: string
           format: date-time
-          description: 시니어 기기가 보고한 마지막 검사 완료 시각 (보호자 홈 "마지막 검사")
+          description: 시니어 기기가 `PUT /devices/{deviceId}/status`로 보고한 마지막 검사 완료 시각 (보호자 홈 "마지막 검사", 연락 끊김 판정 F6 기준)
         protection: { $ref: '#/components/schemas/ProtectionState' }
 
     DeviceSummary:
