@@ -9,7 +9,7 @@
 | 항목 | 규칙 | 이유 |
 |---|---|---|
 | 우선순위 | 사람이 바로 봐야 하는 것만 `high` | high인데 알림을 안 띄우면 FCM이 우선순위를 낮춤 |
-| `onMessageReceived` | 받은 즉시 알림 표시, 네트워크 호출 금지. 상세는 알림 탭 후 화면에서 `GET /alerts/{id}` | Firebase 권고 |
+| `onMessageReceived` | 받은 즉시 알림 표시(§2에서 채널이 "알림 없음"인 `ALERT_UPDATED`·`MODEL_UPDATED`는 표시하지 않고 목록 갱신·작업 예약만), 네트워크 호출 금지. 상세는 알림 탭 후 화면에서 `GET /alerts/{id}` | Firebase 권고 |
 | 누락 대비 | 앱 실행·홈 진입 시 `GET /alerts?updatedSince=` 로 당겨오기 | 제조사 배터리 최적화로 FCM 누락 가능 |
 | 개인정보 | 페이로드에 앱 아이콘·근거 상세를 넣지 않음. ID와 짧은 표시 문구만 | 잠금화면 노출 최소화 |
 | TTL | 승인 요청 48시간, 나머지 24시간 | 무응답 처리(FR-026)와 맞춤 |

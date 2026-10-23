@@ -77,7 +77,7 @@ flowchart TB
 
 | 항목 | 내용 | 비고 |
 |---|---|---|
-| 조회 | 설치 감지와 같은 WorkManager 주기 작업 + 앱 실행 시 `UsageStatsManager.queryEvents(usage_cursor, now)` | 포그라운드 서비스 없음. 시스템이 이벤트를 보관하므로 늦게 돌아도 커서로 이어 읽음 (보관 기간은 실증에서 확인) |
+| 조회 | 설치 감지와 같은 WorkManager 주기 작업 + 앱 실행 시 `UsageStatsManager.queryEvents(usage_cursor, now)` | 포그라운드 서비스 없음. 시스템 이벤트 보관 기간 안에서만 커서로 이어 읽음(무손실 보장 아님). 보관 기간보다 오래 조회하지 못한 구간은 감지 공백으로 기록하고 이어서 진행. 지원 최대 지연은 실증에서 확인한 보관 기간으로 정함 |
 | 이벤트 | `ACTIVITY_RESUMED`(API 29+, 이전은 `MOVE_TO_FOREGROUND`) 중 폰주치의·런처·시스템 UI 제외 | 액티비티형 앱 밖 광고만 보임. 오버레이형은 FR-011 사전 경고로 보조 |
 | 분류 | 사용자 조작 직후 전환(직접 실행·알림 탭·앱 간 전환)과 조작 없는 전환을 가르는 규칙 (FR-012) | 🔵 쓸 이벤트 조합·시간 창·예외는 **UsageStats 실증 실험**에서 정함. `ACTIVITY_RESUMED` 하나로는 구분되지 않음 |
 | 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, 앱별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`) | 기준값은 실증·T074에서 정함 🔶 |
