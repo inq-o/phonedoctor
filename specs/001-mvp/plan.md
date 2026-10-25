@@ -80,7 +80,7 @@ flowchart TB
 | 조회 | 설치 감지와 같은 WorkManager 주기 작업 + 앱 실행 시 `UsageStatsManager.queryEvents(usage_cursor, now)` | 포그라운드 서비스 없음. 시스템 이벤트 보관 기간 안에서만 커서로 이어 읽음(무손실 보장 아님). 보관 기간보다 오래 조회하지 못한 구간은 감지 공백으로 기록하고 이어서 진행. 지원 최대 지연은 실증에서 확인한 보관 기간으로 정함 |
 | 이벤트 | `ACTIVITY_RESUMED`(API 29+, 이전은 `MOVE_TO_FOREGROUND`) 중 폰주치의·런처·시스템 UI 제외 | 액티비티형 앱 밖 광고만 보임. 오버레이형은 FR-011 사전 경고로 보조 |
 | 분류 | 사용자 조작 직후 전환(직접 실행·알림 탭·앱 간 전환)과 조작 없는 전환을 가르는 규칙 (FR-012) | 🔵 쓸 이벤트 조합·시간 창·예외는 **UsageStats 실증 실험**에서 정함. `ACTIVITY_RESUMED` 하나로는 구분되지 않음 |
-| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, (packageName, signingCertSha256, versionCode)별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 기준을 넘은 날 처음 넘을 때 `POST /alerts`, 같은 날 6시간 상태 보고 때 횟수가 늘었으면 다시 보냄. 같은 (packageName, signingCertSha256, versionCode)에 열린 요청이 있으면 서버가 근거만 최신 값으로 갱신(알림 없음, 재알림은 FR-026 일정대로). `days`는 그 요청이 열린 날부터 기준을 넘은 날 수. 허용 목록 앱이면 `kind: notice`로 보내되 그 조합에 notice를 보낸 적이 있으면(`alert_local`) 열린 notice 갱신만 함 | 기준값은 실증·T074에서 정함 🔶 |
+| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, (packageName, signingCertSha256, versionCode)별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 기준을 넘은 날 처음 넘을 때 `POST /alerts`, 같은 날 6시간 상태 보고 때 횟수가 늘었으면 다시 보냄. 같은 (packageName, signingCertSha256, versionCode)에 열린 요청이 있으면 서버가 근거만 최신 값으로 갱신(알림 없음, 재알림은 FR-026 일정대로, `kind: notice`는 재알림 없음). `days`는 그 요청이 열린 날부터 기준을 넘은 날 수. 허용 목록 앱이면 `kind: notice`로 보내되 그 조합에 notice를 보낸 적이 있으면(`alert_local`) 열린 notice 갱신만 함 | 기준값은 실증·T074에서 정함 🔶 |
 | 실패 조건 | 권한 거부·프로세스 종료·화면 꺼짐·Doze에서 감지 가능성과 지연 | 실증 실험에서 측정 |
 
 ### 설치 감지 설계 (FR-002, 보조 경로)

@@ -54,7 +54,8 @@ erDiagram
       json symptom "SymptomEvidence (symptom 필수, 열린 동안 최신 값으로 갱신)"
       timestamp detectedAt
       timestamp remindAt
-      timestamp expiresAt "생성+90일 삭제"
+      timestamp expiresAt "open이면 이 시각에 expired (생성+7일)"
+      timestamp deleteAt "생성+90일 삭제 (NFR-09)"
     }
     DECISION {
       string alertId PK, FK
