@@ -229,7 +229,7 @@ paths:
           - 기존 요청에 없는 근거가 오면(예: `install_scan` 요청에 나중에 `symptom`) 그 근거를 붙이고 `updatedAt`을 갱신한 뒤 보호자 전원에게 ALERT_UPDATED 푸시. `source`는 처음 출처 그대로
           - 이미 `symptom` 근거가 있으면 받은 값이 더 최신일 때만((date, count) 순서로 비교) 통째로 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED(알림 없음). 오래된 값(재전송 순서 뒤바뀜)은 무시. `verdict`는 덮어쓰지 않음
           - `kind`도 처음 값 그대로
-        - `kind = notice`: 보호자가 허용한 앱(FR-007)이 증상 기준을 넘음. `source = symptom`만. 보호자 전원에게 ALERT_CREATED 대신 ALERT_NOTICE 푸시, 재알림(`remindAt`) 없음, 7일 뒤 expired. 같은 앱·버전당 1번은 시니어 기기가 지킴
+        - `kind = notice`: 보호자가 허용한 앱(FR-007)이 증상 기준을 넘음. `source = symptom`만. 보호자 전원에게 ALERT_CREATED 대신 ALERT_NOTICE 푸시, 재알림(`remindAt`) 없음, 7일 뒤 expired. 같은 (packageName, signingCertSha256, versionCode) 조합당 1번(열린 요청 식별 조건과 같음)은 시니어 기기가 지킴
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:

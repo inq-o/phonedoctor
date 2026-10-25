@@ -76,7 +76,7 @@ sequenceDiagram
     alt 같은 앱의 열린 요청 없음 · 허용 목록 아님
         API-->>GP: FCM ALERT_CREATED (high)
         GP-->>보호자: 알림 "엄마 폰에서 ○○ 앱이 오늘 광고를 N번 띄웠어요"
-    else 같은 앱의 열린 요청 없음 · 허용 목록 앱 (앱·버전당 1번)
+    else 같은 앱의 열린 요청 없음 · 허용 목록 앱 ((pkg, cert, version) 조합당 1번)
         API-->>GP: FCM ALERT_NOTICE (normal)
         GP-->>보호자: 알림 "괜찮다고 하신 ○○ 앱이 오늘 광고를 N번 띄웠어요"
     else 같은 앱의 열린 요청 있음
