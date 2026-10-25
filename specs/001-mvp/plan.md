@@ -44,7 +44,7 @@ flowchart TB
         WM[WorkManager<br/>최소 주기 15분 + 앱 실행 시] --> US[core:usage<br/>queryEvents ACTIVITY_RESUMED]
         US --> SY[전환 분류<br/>FR-012 휴리스틱]
         SY --> SE[(Room: symptom_event)]
-        SY -->|기준 초과 & 허용목록 아님| OB
+        SY -->|"기준 초과: 허용목록 아님 → 승인 요청<br/>허용 앱 → notice(조합당 1번, alert_local)<br/>열린 요청 있음 → 근거 갱신"| OB
         WM --> CH[core:packages<br/>getChangedPackages]
         CH --> FX[core:classifier<br/>특징 추출]
         RULES[(LibChecker-Rules<br/>+ 광고 태그 DB)] --> FX
@@ -116,7 +116,7 @@ phonedoctor/
 │   ├── database/             # 있음  Room 엔티티를 data-model.md §3·4로 교체
 │   ├── datastore/            # NEW  설정 (data-model.md §5)
 │   ├── network/              # NEW  openapi 클라이언트, 인증 인터셉터, outbox 전송
-│   ├── notifications/        # NEW  채널 4종, FCM 서비스
+│   ├── notifications/        # NEW  채널 5종, FCM 서비스
 │   ├── packages/             # NEW  설치 앱 읽기·변화 감지 (PackageManager 래퍼)  ※NiA에 없음
 │   ├── usage/                # NEW  사용 기록 조회·전환 분류 (FR-009~012)       ※NiA에 없음
 │   ├── classifier/           # NEW  특징 추출 + LiteRT 실행 + 층2 규칙 (보조)  ※NiA에 없음

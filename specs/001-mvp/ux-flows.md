@@ -70,6 +70,7 @@ sequenceDiagram
     Note over 시니어,SP: 시니어가 조작하지 않는데<br/>설치된 앱이 전면 광고를 띄움
     Note over SP: 주기 작업(최소 15분, 실측 p95 ≤ 30분) / 앱 실행 시<br/>queryEvents로 조작 없는 전환을 앱에 귀속
     SP->>SP: symptom_event 기록 · 오늘 N번 → 기준 초과
+    Note over SP: 허용 목록 앱인데 이 조합에 notice를 보낸 적 있고(alert_local)<br/>그 요청이 이미 닫혔으면 여기서 끝 — POST 안 함 (FR-007 조합당 1번)
     SP-->>시니어: 알림 "확인이 필요한 앱이 있어요" (허용 목록 앱이거나 같은 앱 요청이 열려 있으면 생략)
     SP->>API: POST /alerts (source: symptom, 허용 목록 앱이면 kind: notice)
     alt 같은 앱의 열린 요청 없음 · 허용 목록 아님

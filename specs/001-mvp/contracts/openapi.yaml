@@ -324,6 +324,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Alert' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: 이미 결정됨
