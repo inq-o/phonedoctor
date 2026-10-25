@@ -28,7 +28,7 @@
 - [ ] T010 spec.md 검토 — 사용자 시나리오 우선순위·비목표 확인
 - [x] T011 ADR-0001 서버 방식 선택 → **B: Ktor + Cloud Run + Neon** (2026-10-03)
 - [x] T012 ADR-0002 보호자 앱 형태 선택 → **A: 한 앱 + 역할 선택** (2026-10-03)
-- [ ] T013 첫 git 커밋 (현재 스테이징만 된 상태) — 커밋 시점은 본인이 지정
+- [x] T013 첫 git 커밋 (2026-10-06, 이후 PR 단위로 병합)
 
 ## 단계 2 — 6~7주차 10/5~10/16 · 계획서 산출물 "데이터셋"
 
@@ -48,7 +48,7 @@
 앱 뼈대 (병행)
 - [ ] T030 [P] minSdk 23 → 26 `build-logic/.../KotlinAndroid.kt`
 - [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
-- [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `allow_entry`, `package_change_cursor`)
+- [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`)
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
 - [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로)
 - [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거
@@ -56,7 +56,7 @@
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
 
-- [ ] T040 [US1] 베이스라인 학습 1회 (LightGBM) + 임계값 FPR 5% 지점 기록 → spec Q4 판단 자료
+- [ ] T040 [US1] 베이스라인 학습 1회 (LightGBM) + 앱 단위 FPR ≤ 5%를 만족하는 최소 risk 임계값 기록 → spec Q4 판단 자료
 - 그 외 작업 없음 (시험 우선)
 
 ## 단계 4 — 9~10주차 10/26~11/6 · "온디바이스 모델" + 연결 흐름 앞당김
@@ -69,7 +69,7 @@
 - [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
 - [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`
-- [ ] T055a [US4] 연락 끊김 경고 (F6) — 서버 `lastSyncAt` 48시간 판정 + G1 경고 카드 + 보호자 알림 1회
+- [ ] T055a [US4] 연락 끊김 경고 (F6) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
 - [ ] T057 [P] 개인정보처리방침 GitHub Pages — 스토어 등록 필수
 - [ ] T058 [P] 공개 고지 화면 (O-S1, FR-041) + Data safety 신고 초안
@@ -90,7 +90,7 @@
 - [ ] T071 사용성 관찰: 설치 대행자 3명 (SC-003), 시니어 1명 이상 (SC-004)
 - [ ] T072 Play 심사 제출 (14일 테스트 종료 후, 11/23 전후)
 - [ ] T073 최종보고서 (13주차, spec Q6 면제 여부 확인)
-- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱을 실제 실행해 정상 알림 탭·직접 실행 등 정상 `ACTIVITY_RESUMED` 이벤트를 라벨링하고 전체 정상 이벤트를 분모로 FPR(FR-012 오탐) 계산. 오버레이형은 커버리지 한계로 명시
+- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱을 실제 실행해 정상 알림 탭·직접 실행 등 정상 `ACTIVITY_RESUMED` 이벤트를 라벨링하고 전체 정상 이벤트를 분모로 이벤트 단위 오탐률(FR-012) 계산, 같은 실행에서 기기·일당 오경고 수도 집계(spec §4 지표 정의). 오버레이형은 커버리지 한계로 명시
 
 ## 나중에 (P2·P3)
 

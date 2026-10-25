@@ -1,17 +1,17 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.1.0
+  version: 0.2.0
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
-    - 서버로 오는 앱 정보는 "위험" 판정 건뿐. 설치 앱 전체 목록은 받지 않음 (constitution III)
+    - 서버로 오는 앱 정보는 승인 요청 건뿐: 설치 시점 "위험" 판정(`install_scan`) 또는 증상 감지 기준 초과(`symptom`, ADR-0003). 설치 앱 전체 목록·사용 기록은 받지 않음 (constitution III)
     - 인증: 모든 요청에 Firebase ID 토큰(`Authorization: Bearer`) + App Check 토큰(`X-Firebase-AppCheck`)
       - 시니어 기기: Firebase 익명 인증 (로그인 화면 없음)
       - 보호자 기기: Google 로그인 (Credential Manager)
     - 오류 형식: RFC 9457 `application/problem+json`
-    - 생성 요청(POST)은 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비)
-    - 서버 구현 방식(Firebase Functions vs Cloud Run)은 docs/adr/0001-backend.md에서 결정. 이 계약은 둘 다에 적용
+    - POST는 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비). 예외는 익명 신고 `/feedback/false-positives` 하나 (해당 경로 설명)
+    - 서버 구현: Ktor + Cloud Run + Neon (docs/adr/0001-backend.md, Accepted)
   license:
     name: Proprietary
 servers:
@@ -30,7 +30,7 @@ tags:
   - name: pairing
     description: 연결 코드 발급·수락·확정·해제
   - name: alerts
-    description: 위험 앱 승인 요청과 응답
+    description: 승인 요청(설치 시점 판정 또는 증상 감지)과 응답
   - name: feedback
     description: 오탐 익명 신고
   - name: models
@@ -85,6 +85,31 @@ paths:
       responses:
         '204': { description: 삭제됨 }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /devices/{deviceId}/status:
+    parameters:
+      - $ref: '#/components/parameters/DeviceId'
+    put:
+      tags: [devices]
+      operationId: putDeviceStatus
+      summary: (시니어) 검사 완료·보호 동작 상태 보고
+      description: |
+        - 시니어 기기는 주기 작업이 검사를 마칠 때 마지막 보고 후 6시간이 지났으면 보냄 (위험 앱이 없는 날에도)
+        - 서버는 `Link.lastCheckedAt`·`protection`을 이 보고로만 갱신. 보호자 홈의 "마지막 검사"와 연락 끊김 판정(ux-flows F6, 48시간)에 씀. 다른 API 호출은 `lastSeenAt`만 갱신해 검사가 멈춘 기기를 정상으로 보이게 하지 않음
+        - PUT이라 같은 본문 재전송 결과가 같아 `Idempotency-Key`가 필요 없음
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceStatus' }
+      responses:
+        '204': { description: 반영됨 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 내 기기가 아니거나 보호자 기기
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /pairing-codes:
     post:
@@ -164,15 +189,19 @@ paths:
       tags: [pairing]
       operationId: confirmLink
       summary: (시니어) "연결할게요" — pending → active. 거절은 DELETE
+      description: |
+        - 이미 active인 링크를 다시 확정하면 200 + 현재 Link (응답 유실 뒤 outbox 재전송이 실패로 보이지 않게). LINK_ACTIVATED 푸시는 처음 한 번만
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
       responses:
         '200':
-          description: 연결됨, 보호자에게 LINK_ACTIVATED 푸시
+          description: 연결됨(또는 이미 연결돼 있음), 처음 확정 때만 보호자에게 LINK_ACTIVATED 푸시
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Link' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
-          description: 이미 active 또는 revoked
+          description: 이미 revoked
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -192,10 +221,13 @@ paths:
     post:
       tags: [alerts]
       operationId: createAlert
-      summary: (시니어) 위험 판정 보고 → 연결된 보호자 전원에게 ALERT_CREATED 푸시
+      summary: (시니어) 승인 요청 보고 → 연결된 보호자 전원에게 ALERT_CREATED 푸시
       description: |
-        - level = RISK 만 기본 전송. CAUTION은 보호자가 설정에서 켠 경우만 (FR-028)
-        - 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
+        - `source = install_scan`: level = RISK 만 기본 전송. CAUTION은 보호자가 설정에서 켠 경우만 (FR-028)
+        - `source = symptom`: 증상 감지 기준을 넘은 앱 (FR-010). `symptom` 근거 필수, `verdict`는 설치 시점 판정이 있으면 함께
+        - 출처와 상관없이 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
+          - 기존 요청에 없는 근거가 오면(예: `install_scan` 요청에 나중에 `symptom`) 그 근거를 붙이고 `updatedAt`을 갱신한 뒤 보호자 전원에게 ALERT_UPDATED 푸시. `source`는 처음 출처 그대로
+          - 이미 있는 근거는 덮어쓰지 않음 (열린 요청의 증상 횟수 갱신은 v1에서 안 함)
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -328,6 +360,8 @@ paths:
       tags: [feedback]
       operationId: reportFalsePositive
       summary: 오탐 익명 신고 (US7). 기기 ID를 저장하지 않음 — 서버는 집계만
+      description: |
+        - `Idempotency-Key` 공통 규칙의 예외: 키를 저장하면 기기를 묶을 수 있어 받지 않음. 기기는 보호자 [괜찮은 앱이에요] 1건당 한 번만 보내고(로컬 표시), 재전송으로 생긴 중복은 집계 오차로 받아들임
       security:
         - appCheck: []
       requestBody:
@@ -467,6 +501,23 @@ components:
           type: boolean
           description: (보호자) "주의" 판정도 받기 (FR-028)
 
+    DeviceStatus:
+      type: object
+      description: (시니어) 보호 동작 상태. 앱 목록·사용 기록 내용은 넣지 않음
+      required: [checkedAt, protection]
+      properties:
+        checkedAt: { type: string, format: date-time, description: 마지막 검사 완료 시각 }
+        protection: { $ref: '#/components/schemas/ProtectionState' }
+
+    ProtectionState:
+      type: object
+      description: 폰주치의 자신의 권한 상태. 꺼진 항목은 보호자 홈에 "꺼져 있을 수 있어요"로 표시
+      required: [notifications, usageAccess, notificationListener]
+      properties:
+        notifications: { type: boolean, description: '앱 알림이 켜져 있음 — API 버전과 무관하게 NotificationManagerCompat.areNotificationsEnabled() 값 (API 33+ POST_NOTIFICATIONS 거부·설정에서 끔 모두 false)' }
+        usageAccess: { type: boolean, description: '사용 기록 접근 허용 (증상 감지, US11)' }
+        notificationListener: { type: boolean, description: '알림 접근 허용 (Chrome 사이트 알림, US10)' }
+
     Device:
       type: object
       required: [deviceId, role, displayName, createdAt]
@@ -504,7 +555,14 @@ components:
         lastSeenAt:
           type: string
           format: date-time
-          description: 시니어 기기 마지막 동기화 시각 (보호자 홈 "마지막 검사")
+          description: 서버가 시니어 기기의 요청을 마지막으로 받은 시각 (참고용). 이 링크의 시니어 기기(Device) 값을 보여 줌
+        lastCheckedAt:
+          type: string
+          format: date-time
+          description: 시니어 기기가 `PUT /devices/{deviceId}/status`로 보고한 마지막 검사 완료 시각 (보호자 홈 "마지막 검사", 연락 끊김 판정 F6 기준)
+        protection:
+          $ref: '#/components/schemas/ProtectionState'
+          description: 이 링크의 시니어 기기(Device) 값. lastCheckedAt도 같음 — 저장은 Device에 한 번 (data-model §1)
 
     DeviceSummary:
       type: object
@@ -581,13 +639,36 @@ components:
           maxLength: 20000
           description: 96x96 PNG. 보호자가 앱을 알아보게 하는 용도
 
+    AlertSource:
+      type: string
+      description: 'install_scan = 설치 시점 분류기(보조, US1) / symptom = 실행 중 증상 감지(주, US11)'
+      enum: [install_scan, symptom]
+
+    SymptomEvidence:
+      type: object
+      description: 증상 감지 근거 (FR-010). "○○ 앱이 오늘 N번" 문구의 값
+      required: [date, count, firstAt, lastAt, detectorVersion]
+      properties:
+        date: { type: string, format: date, description: '집계한 날짜 (시니어 기기 현지 날짜). 보호자 문구의 "오늘"은 이 날짜가 오늘일 때만' }
+        count: { type: integer, minimum: 1, description: '그 날짜 하루 동안 광고로 센 전환 수' }
+        firstAt: { type: string, format: date-time }
+        lastAt: { type: string, format: date-time }
+        detectorVersion: { type: string, example: 'usage-v1', description: '전환 분류 휴리스틱 버전 (FR-012)' }
+
     AlertCreate:
       type: object
-      required: [app, verdict, detectedAt]
+      required: [source, app, detectedAt]
       properties:
+        source: { $ref: '#/components/schemas/AlertSource' }
         app: { $ref: '#/components/schemas/AppInfo' }
         verdict: { $ref: '#/components/schemas/Verdict' }
+        symptom: { $ref: '#/components/schemas/SymptomEvidence' }
         detectedAt: { type: string, format: date-time }
+      allOf:
+        - if: { properties: { source: { const: install_scan } } }
+          then: { required: [verdict] }
+        - if: { properties: { source: { const: symptom } } }
+          then: { required: [symptom] }
 
     AlertStatus:
       type: string
@@ -629,7 +710,12 @@ components:
 
     Alert:
       type: object
-      required: [alertId, linkIds, status, app, verdict, detectedAt, createdAt]
+      required: [alertId, linkIds, status, source, app, detectedAt, createdAt]
+      allOf:
+        - if: { properties: { source: { const: install_scan } } }
+          then: { required: [verdict] }
+        - if: { properties: { source: { const: symptom } } }
+          then: { required: [symptom] }
       properties:
         alertId: { type: string }
         protectedDevice: { $ref: '#/components/schemas/DeviceSummary' }
@@ -637,8 +723,10 @@ components:
           type: array
           items: { type: string }
         status: { $ref: '#/components/schemas/AlertStatus' }
+        source: { $ref: '#/components/schemas/AlertSource' }
         app: { $ref: '#/components/schemas/AppInfo' }
         verdict: { $ref: '#/components/schemas/Verdict' }
+        symptom: { $ref: '#/components/schemas/SymptomEvidence' }
         decision: { $ref: '#/components/schemas/Decision' }
         outcome:
           type: object
@@ -647,7 +735,7 @@ components:
             occurredAt: { type: string, format: date-time }
         detectedAt: { type: string, format: date-time }
         createdAt: { type: string, format: date-time }
-        updatedAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: '결정·결과·근거 추가 시 갱신' }
         remindAt:
           type: string
           format: date-time
@@ -655,8 +743,14 @@ components:
 
     FalsePositiveReport:
       type: object
-      required: [packageName, versionCode, signingCertSha256, modelVersion, score, reasonCodes]
+      required: [source, packageName, versionCode, signingCertSha256]
+      allOf:
+        - if: { properties: { source: { const: install_scan } } }
+          then: { required: [modelVersion, score, reasonCodes] }
+        - if: { properties: { source: { const: symptom } } }
+          then: { required: [detectorVersion] }
       properties:
+        source: { $ref: '#/components/schemas/AlertSource' }
         packageName: { type: string }
         versionCode: { type: integer, format: int64 }
         signingCertSha256: { type: string }
@@ -665,6 +759,7 @@ components:
         reasonCodes:
           type: array
           items: { $ref: '#/components/schemas/ReasonCode' }
+        detectorVersion: { type: string }
 
     ModelRelease:
       type: object
