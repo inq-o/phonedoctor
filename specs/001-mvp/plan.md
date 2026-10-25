@@ -8,7 +8,7 @@
 - 시니어 기기에서 두 경로를 오프라인으로 수행 ([ADR-0003](../../docs/adr/0003-detection-approach.md))
   - **주**: 사용 기록(UsageStats) 주기 조회 → 조작 없는 포그라운드 전환을 앱별로 귀속·횟수 기록 (FR-009~012)
   - **보조**: 설치 변화 감지 → 특징 추출 → 2층 판정(LiteRT 모델 + 공개 규칙) (FR-001~008)
-- 증상 기준 초과·"위험" 판정(보호자가 켰으면 "주의"도, FR-028)만 서버로 보내 보호자 승인. 허용 목록(FR-007)은 두 출처 모두에 적용 → 시니어가 시스템 삭제 확인창에서 삭제
+- 증상 기준 초과·"위험" 판정(보호자가 켰으면 "주의"도, FR-028)만 서버로 보내 보호자 승인. 허용 목록(FR-007)은 두 출처 모두에 적용(허용한 앱이 증상 기준을 넘으면 승인 대신 알림 전용 1번) → 시니어가 시스템 삭제 확인창에서 삭제
 - 앱은 현재 뼈대(Now in Android 구조)를 확장, 서버·학습 파이프라인은 같은 저장소의 별도 폴더
 
 ## 기술 맥락
@@ -80,7 +80,7 @@ flowchart TB
 | 조회 | 설치 감지와 같은 WorkManager 주기 작업 + 앱 실행 시 `UsageStatsManager.queryEvents(usage_cursor, now)` | 포그라운드 서비스 없음. 시스템 이벤트 보관 기간 안에서만 커서로 이어 읽음(무손실 보장 아님). 보관 기간보다 오래 조회하지 못한 구간은 감지 공백으로 기록하고 이어서 진행. 지원 최대 지연은 실증에서 확인한 보관 기간으로 정함 |
 | 이벤트 | `ACTIVITY_RESUMED`(API 29+, 이전은 `MOVE_TO_FOREGROUND`) 중 폰주치의·런처·시스템 UI 제외 | 액티비티형 앱 밖 광고만 보임. 오버레이형은 FR-011 사전 경고로 보조 |
 | 분류 | 사용자 조작 직후 전환(직접 실행·알림 탭·앱 간 전환)과 조작 없는 전환을 가르는 규칙 (FR-012) | 🔵 쓸 이벤트 조합·시간 창·예외는 **UsageStats 실증 실험**에서 정함. `ACTIVITY_RESUMED` 하나로는 구분되지 않음 |
-| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, (packageName, signingCertSha256, versionCode)별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 같은 (packageName, signingCertSha256, versionCode)에 열린 `symptom` 요청이 있으면(`alert_local`, 서버 Alert 식별 조건과 같음) 다시 보내지 않음 — 근거는 처음 기준을 넘은 날짜 것 그대로, 재알림은 FR-026 일정대로 (v1) | 기준값은 실증·T074에서 정함 🔶 |
+| 기록·기준 | 광고로 센 전환만 `symptom_event`에 저장, (packageName, signingCertSha256, versionCode)별 현지 날짜 하루 횟수가 기준을 넘으면 Alert(`source: symptom`). 기준을 넘은 날 처음 넘을 때 `POST /alerts`, 같은 날 6시간 상태 보고 때 횟수가 늘었으면 다시 보냄. 같은 (packageName, signingCertSha256, versionCode)에 열린 요청이 있으면 서버가 근거만 최신 값으로 갱신(알림 없음, 재알림은 FR-026 일정대로). `days`는 그 요청이 열린 날부터 기준을 넘은 날 수. 허용 목록 앱이면 `kind: notice`로 보내되 그 조합에 notice를 보낸 적이 있으면(`alert_local`) 열린 notice 갱신만 함 | 기준값은 실증·T074에서 정함 🔶 |
 | 실패 조건 | 권한 거부·프로세스 종료·화면 꺼짐·Doze에서 감지 가능성과 지연 | 실증 실험에서 측정 |
 
 ### 설치 감지 설계 (FR-002, 보조 경로)

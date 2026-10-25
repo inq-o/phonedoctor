@@ -48,9 +48,10 @@ erDiagram
       string protectedDeviceId FK
       enum status "open|decided|resolved|expired"
       enum source "install_scan|symptom"
+      enum kind "approval|notice"
       json app "AppInfo"
       json verdict "Verdict (install_scan 필수)"
-      json symptom "SymptomEvidence (symptom 필수)"
+      json symptom "SymptomEvidence (symptom 필수, 열린 동안 최신 값으로 갱신)"
       timestamp detectedAt
       timestamp remindAt
       timestamp expiresAt "생성+90일 삭제"
@@ -103,7 +104,7 @@ stateDiagram-v2
 | `symptom_event` | id PK, packageName, signingCertSha256, versionCode, className, resumedAt, rule, detectorVersion. **고유 (packageName, className, resumedAt)** | 광고로 센 포그라운드 전환 (FR-009·010). 서명·버전은 분류할 때의 `installed_app` 값으로 채움(조회 시점에 이미 지워진 앱이면 버림). 하루 횟수·허용 목록·Alert 식별은 (packageName, signingCertSha256, versionCode)로 묶음. 정상으로 본 전환은 저장하지 않음. 30일 보관 |
 | `usage_cursor` | id=1, lastEventTime | `queryEvents` 다음 조회 시작 시각. 시작 시각이 포함되므로 `lastEventTime`부터 다시 읽고(+1 안 함), 겹쳐 읽은 이벤트는 `symptom_event` 고유 제약으로 무시 (같은 시각 이벤트의 중복·누락 둘 다 막음) |
 | `allow_entry` | (packageName, signingCertSha256, versionCode) PK, allowedBy, createdAt | 보호자가 허용한 앱. 같은 버전은 다시 안 물음 |
-| `alert_local` | alertId PK, packageName, signingCertSha256, versionCode, source, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정 |
+| `alert_local` | alertId PK, packageName, signingCertSha256, versionCode, source, kind, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정. 허용 앱의 notice를 같은 조합에 1번만 보내는 판단도 여기서 |
 | `outbox` | id PK, method, path, bodyJson, idempotencyKey, attempts, nextAttemptAt | 오프라인 중 쌓인 서버 호출 (WorkManager가 재전송) |
 | `package_change_cursor` | id=1, sequenceNumber, bootCount | `getChangedPackages` 순번 |
 
@@ -112,7 +113,7 @@ stateDiagram-v2
 | 테이블 | 주요 열 | 용도 |
 |---|---|---|
 | `link_cache` | linkId PK, protectedName, status, lastSeenAt, lastCheckedAt, protectionJson | 홈 화면, 연락 끊김 경고 (F6) |
-| `alert_cache` | alertId PK, linkId, source, appLabel, iconPng, level, reasonsJson, symptomJson, status, decisionJson, outcomeJson, updatedAt | 요청 목록·상세 (오프라인 열람) |
+| `alert_cache` | alertId PK, linkId, source, kind, appLabel, iconPng, level, reasonsJson, symptomJson, status, decisionJson, outcomeJson, updatedAt | 요청 목록·상세 (오프라인 열람) |
 
 ## 5. 설정 (DataStore)
 
