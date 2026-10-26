@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.2.0
+  version: 0.3.0
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -227,7 +227,9 @@ paths:
         - `source = symptom`: 증상 감지 기준을 넘은 앱 (FR-010). `symptom` 근거 필수, `verdict`는 설치 시점 판정이 있으면 함께
         - 출처와 상관없이 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
           - 기존 요청에 없는 근거가 오면(예: `install_scan` 요청에 나중에 `symptom`) 그 근거를 붙이고 `updatedAt`을 갱신한 뒤 보호자 전원에게 ALERT_UPDATED 푸시. `source`는 처음 출처 그대로
-          - 이미 있는 근거는 덮어쓰지 않음 (열린 요청의 증상 횟수 갱신은 v1에서 안 함)
+          - 이미 `symptom` 근거가 있으면 받은 값이 더 최신일 때만((date, count) 순서로 비교) 통째로 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED(알림 없음). 오래된 값(재전송 순서 뒤바뀜)은 무시. `verdict`는 덮어쓰지 않음
+          - `kind`도 처음 값 그대로
+        - `kind = notice`: 보호자가 허용한 앱(FR-007)이 증상 기준을 넘음. `source = symptom`만. 보호자 전원에게 ALERT_CREATED 대신 ALERT_NOTICE 푸시, 재알림(`remindAt`) 없음, 7일 뒤 expired. 같은 (packageName, signingCertSha256, versionCode) 조합당 1번(열린 요청 식별 조건과 같음)은 시니어 기기가 지킴
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -308,6 +310,7 @@ paths:
       description: |
         - 성공 시 시니어 기기에 DECISION_MADE 푸시, 다른 보호자에게 ALERT_UPDATED 푸시
         - 이미 결정된 요청이면 409 + 기존 결정 반환 → 보호자 앱은 "△△님이 먼저 답했어요" 표시
+        - `kind = notice` 요청에는 `recommend_uninstall`만 (이미 허용한 앱이라 `allow`는 400)
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -321,6 +324,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Alert' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409':
           description: 이미 결정됨
@@ -644,13 +648,19 @@ components:
       description: 'install_scan = 설치 시점 분류기(보조, US1) / symptom = 실행 중 증상 감지(주, US11)'
       enum: [install_scan, symptom]
 
+    AlertKind:
+      type: string
+      description: 'approval = 승인 요청 / notice = 허용한 앱이 증상 기준을 넘었다는 알림 전용 (FR-007, 보호자 기록의 "경고 앱")'
+      enum: [approval, notice]
+
     SymptomEvidence:
       type: object
       description: 증상 감지 근거 (FR-010). "○○ 앱이 오늘 N번" 문구의 값
-      required: [date, count, firstAt, lastAt, detectorVersion]
+      required: [date, count, days, firstAt, lastAt, detectorVersion]
       properties:
-        date: { type: string, format: date, description: '집계한 날짜 (시니어 기기 현지 날짜). 보호자 문구의 "오늘"은 이 날짜가 오늘일 때만' }
-        count: { type: integer, minimum: 1, description: '그 날짜 하루 동안 광고로 센 전환 수' }
+        date: { type: string, format: date, description: '가장 최근에 기준을 넘은 날짜 (시니어 기기 현지 날짜). 보호자 문구의 "오늘"은 이 날짜가 오늘일 때만' }
+        count: { type: integer, minimum: 1, description: '그 날짜 하루 동안 광고로 센 전환 수 (보낸 시점까지)' }
+        days: { type: integer, minimum: 1, description: '요청이 열린 날부터 기준을 넘은 날 수 (첫날 포함, 연속 아니어도 셈)' }
         firstAt: { type: string, format: date-time }
         lastAt: { type: string, format: date-time }
         detectorVersion: { type: string, example: 'usage-v1', description: '전환 분류 휴리스틱 버전 (FR-012)' }
@@ -660,6 +670,9 @@ components:
       required: [source, app, detectedAt]
       properties:
         source: { $ref: '#/components/schemas/AlertSource' }
+        kind:
+          allOf: [{ $ref: '#/components/schemas/AlertKind' }]
+          default: approval
         app: { $ref: '#/components/schemas/AppInfo' }
         verdict: { $ref: '#/components/schemas/Verdict' }
         symptom: { $ref: '#/components/schemas/SymptomEvidence' }
@@ -669,6 +682,8 @@ components:
           then: { required: [verdict] }
         - if: { properties: { source: { const: symptom } } }
           then: { required: [symptom] }
+        - if: { properties: { kind: { const: notice } }, required: [kind] }
+          then: { properties: { source: { const: symptom } } }
 
     AlertStatus:
       type: string
@@ -710,12 +725,14 @@ components:
 
     Alert:
       type: object
-      required: [alertId, linkIds, status, source, app, detectedAt, createdAt]
+      required: [alertId, linkIds, status, source, kind, app, detectedAt, createdAt]
       allOf:
         - if: { properties: { source: { const: install_scan } } }
           then: { required: [verdict] }
         - if: { properties: { source: { const: symptom } } }
           then: { required: [symptom] }
+        - if: { properties: { kind: { const: notice } } }
+          then: { properties: { source: { const: symptom } } }
       properties:
         alertId: { type: string }
         protectedDevice: { $ref: '#/components/schemas/DeviceSummary' }
@@ -724,6 +741,7 @@ components:
           items: { type: string }
         status: { $ref: '#/components/schemas/AlertStatus' }
         source: { $ref: '#/components/schemas/AlertSource' }
+        kind: { $ref: '#/components/schemas/AlertKind' }
         app: { $ref: '#/components/schemas/AppInfo' }
         verdict: { $ref: '#/components/schemas/Verdict' }
         symptom: { $ref: '#/components/schemas/SymptomEvidence' }
@@ -739,7 +757,7 @@ components:
         remindAt:
           type: string
           format: date-time
-          description: 보호자 재알림 예정 (생성 + 24h, FR-026)
+          description: 보호자 재알림 예정 (생성 + 24h, FR-026). `kind = notice`면 없음
 
     FalsePositiveReport:
       type: object

@@ -24,12 +24,14 @@
 | `LINK_REVOKED` | 상대 기기 | normal | `link` | 연결 목록 |
 | `ALERT_CREATED` | 보호자 전원 | high | `alert` | 요청 상세 |
 | `ALERT_REMINDER` | 미응답 보호자 | high | `alert` | 요청 상세 |
-| `ALERT_UPDATED` | 다른 보호자(먼저 온 결정 반영), 보호자 전원(열린 요청에 근거 추가) | normal | (알림 없음, 목록·상세 갱신) | — |
+| `ALERT_NOTICE` | 보호자 전원 | normal | `notice` | 요청 상세 (승인 버튼 없음) |
+| `ALERT_UPDATED` | 다른 보호자(먼저 온 결정 반영), 보호자 전원(열린 요청에 근거 추가·갱신) | normal | (알림 없음, 목록·상세 갱신) | — |
 | `DECISION_MADE` | 시니어 | high | `alert` | 시니어 앱 상세 (삭제 유도) |
 | `ALERT_RESOLVED` | 보호자 전원 | normal | `result` | 요청 상세 |
 | `MODEL_UPDATED` | 시니어 | normal | (알림 없음) | WorkManager로 모델 받기 |
 
-- `ALERT_CREATED`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
+- `ALERT_NOTICE`: 보호자가 허용한 앱이 증상 기준을 넘었을 때(openapi `kind: notice`, FR-007). 승인 요청이 아니라서 `normal`·별도 채널 `notice`
+- `ALERT_CREATED`·`ALERT_NOTICE`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
 ## 3. 페이로드 예시
 
@@ -75,6 +77,7 @@
 |---|---|---|---|
 | `alert` | 위험한 앱 알림 | HIGH | 소리·진동. 시니어 기기에서는 끄기 전에 경고 |
 | `link` | 가족 연결 | DEFAULT | |
+| `notice` | 허용한 앱 소식 | DEFAULT | 보호자 기기만. `ALERT_NOTICE` (승인 요청 아님) |
 | `result` | 처리 결과 | LOW | |
 | `status` | 보호 중 표시 | MIN | 상시 표시 (스토커웨어 정책: 모니터링 사실 고지). 포그라운드 서비스 아님 |
 
