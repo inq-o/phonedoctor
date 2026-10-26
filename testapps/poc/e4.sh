@@ -11,8 +11,10 @@ now() { echo $(( $(adb shell date +%s%N | tr -d '\r') / 1000000 )); }
 wake() { sh input keyevent KEYCODE_WAKEUP; sleep 1; sh wm dismiss-keyguard; }
 
 sh am force-stop $PROBE
+sh am force-stop $BGAD   # 남은 알람·얼어 있는 프로세스 제거
 sh run-as $PROBE rm -f files/work.csv files/runs.csv shared_prefs/cursor.xml
 sh appops set $PROBE GET_USAGE_STATS allow
+sh am set-standby-bucket $PROBE active   # 화면 없는 앱은 NEVER(50) 버킷이라 주기 작업 할당량이 0. 설정 직후 한 번 열린 앱을 가정
 sh input keyevent KEYCODE_HOME
 adb logcat -c
 begin=$(now)
@@ -27,7 +29,10 @@ case $cond in
   noperm) sh appops set $PROBE GET_USAGE_STATS deny ;;
 esac
 count=$(( minutes * 60 / interval ))
-sh am start -n $BGAD/.MainActivity --es mode saw --ei count $count --ei intervalSec $interval --ei holdSec 3
+sh am start -W -n $BGAD/.MainActivity --es mode saw --ei count $count --ei intervalSec $interval --ei holdSec 3
+# 실행 직후 HOME을 누르면 onCreate 전에 묻혀 알람이 안 걸릴 수 있어 확인 후 진행
+for _ in 1 2 3 4 5 6 7 8 9 10; do adb logcat -d -s BGAD:I | grep -q "seq=0 inSec=$interval left=$count" && break; sleep 1; done
+adb logcat -d -s BGAD:I | grep -q "seq=0 inSec=$interval left=$count" || { echo "$cond: bgad 알람 등록 실패" >&2; exit 1; }
 sh input keyevent KEYCODE_HOME
 [ "$cond" = screen_off ] || [ "$cond" = doze ] && sh input keyevent KEYCODE_SLEEP
 sleep $(( minutes * 60 + 30 ))
