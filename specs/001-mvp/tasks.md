@@ -50,8 +50,8 @@
 - [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
 - [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`)
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
-- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로)
-- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007)
+- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로). 조회 전에 사용 기록 권한 확인(없으면 `SecurityException`, 상태 보고만), 런처 별칭은 `targetActivity`로 풀기, 마지막 화면 꺼짐·직전 화면을 실행 사이에 저장
+- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007)
 - [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
