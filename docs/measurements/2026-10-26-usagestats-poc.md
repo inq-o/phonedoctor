@@ -35,11 +35,11 @@ E2에서 정상 전환 8종을 10번씩 만들고(142개 `ACTIVITY_RESUMED`), E3
 
 | 코드 | 조건 |
 |---|---|
-| R1 | 시스템 앱이 아님 (`FLAG_SYSTEM`·`FLAG_UPDATED_SYSTEM_APP` 제외, 모르는 패키지도 제외) |
+| R1 | 시스템 앱이 아님 (`FLAG_SYSTEM`·`FLAG_UPDATED_SYSTEM_APP`). 설치된 앱 전체에서 판정하고, 목록에 없는 패키지는 사용자 앱으로 봄 (아이콘을 숨긴 앱도 셈) |
 | R2 | 같은 앱 안 전환이 아님. 직전 `ACTIVITY_RESUMED`가 같은 앱이고, 그 뒤 화면이 꺼진 적 없고, 그 앱의 직전 `ACTIVITY_PAUSED`에서 2초 안이면 같은 앱 안 전환 |
 | R3 | 직전 3초 안에 그 앱의 `USER_INTERACTION`(알림 탭 등)이 없음 |
 | R4 | 화면 켜짐·잠금 해제 3초 안에, 화면이 꺼지기 전 보던 화면(같은 앱·같은 액티비티)으로 돌아온 게 아님 |
-| R5 | 런처 아이콘이 여는 액티비티가 아님 (별칭이면 `ActivityInfo.targetActivity`로 풀어서 비교) |
+| R5 | 런처 아이콘이 여는 액티비티가 아님 (별칭이면 `ActivityInfo.targetActivity`로 풀어서 비교, 아이콘이 여러 개면 그중 하나) |
 
 결과
 
