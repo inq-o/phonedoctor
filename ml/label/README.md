@@ -57,15 +57,20 @@ ml/label/observe.sh <package> ml/data/apk_split/<package>[.apk]
 
 ## 3. 라벨 기록
 
-`test_v1_labels.csv` — 패키지마다 한 줄.
+`test_v1_labels.csv` — 패키지마다 한 줄. `csv.writer`로 쓰고(쉼표가 든 근거는 따옴표로 감쌈), 고친 뒤에는 검사한다.
+
+```bash
+python ml/label/check_labels.py ml/label/test_v1_labels.csv ml/label/test_v1.csv
+```
 
 | 열 | 값 |
 |---|---|
 | `package` | 패키지명 |
-| `label` | `adware` / `normal` / `excluded` |
-| `codes` | 해당 코드 `R1;R3` (정상이면 비움) |
+| `label` | `adware` / `normal` / `excluded` / `review`(판정 보류, 정답으로 쓰지 않음) |
+| `codes` | 해당 코드 `R1;R3`. `adware`·`review`만 쓰고, 해당 여부가 불확실하면 `R6?`처럼 `?`를 붙임(`review`에서만) |
+| `confidence` | 비움 또는 `weak`(관찰이 짧거나 화면이 막혀 근거가 약함). `weak`인 `normal`은 확정 음성 정답으로 섞지 않음 |
 | `evidence` | 근거 파일과 한 줄 설명 (예: `bg_04.png 홈 화면 전면 광고`) |
-| `observed` | 관찰 날짜 |
+| `observed` | 관찰 날짜 `YYYY-MM-DD` |
 
 ## 4. 테스트셋 규칙
 
