@@ -36,8 +36,12 @@ def errors(rows, sample):
             out.append(f"{n}행: {label}인데 codes {codes!r} 형식 아님")
         if label == "adware" and "?" in codes:
             out.append(f"{n}행: 불확실한 코드는 adware가 아니라 review")
-        if label in ("normal", "excluded") and codes:
-            out.append(f"{n}행: {label}인데 codes가 있음")
+        if label == "adware" and not set(codes.split(";")) - {"R6"}:
+            out.append(f"{n}행: R6(앱 안 광고)만으로는 adware가 아님")
+        if label == "normal" and codes not in ("", "R6"):
+            out.append(f"{n}행: normal에는 R6 표시만 가능")
+        if label == "excluded" and codes:
+            out.append(f"{n}행: excluded인데 codes가 있음")
         if not evidence.strip():
             out.append(f"{n}행: evidence 비어 있음")
         try:
@@ -66,6 +70,9 @@ def _check():
     assert errors([HEADER, ok[:4] + ["a", " b", "2026-10-12"]], {"p1"})  # 인용 안 된 쉼표
     assert errors([HEADER, ["p1", "adware", "R6?", "", "x", "2026-10-12"]], {"p1"})
     assert errors([HEADER, ["p1", "review", "R1?;R2", "", "x", "2026-10-12"]], {"p1"}) == []
+    assert errors([HEADER, ["p1", "adware", "R6", "", "x", "2026-10-12"]], {"p1"})  # 앱 안 광고만
+    assert errors([HEADER, ["p1", "normal", "R6", "", "x", "2026-10-12"]], {"p1"}) == []
+    assert errors([HEADER, ["p1", "normal", "R1", "", "x", "2026-10-12"]], {"p1"})
     assert errors([HEADER, ok, ok], {"p1"})  # 중복
 
 
