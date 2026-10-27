@@ -29,6 +29,12 @@ class AdActivity : Activity() {
         Log.i(AdReceiver.TAG, "RESUMED mode=${intent.getStringExtra("mode")} seq=${intent.getIntExtra("seq", 0)} t=${System.currentTimeMillis()}")
     }
 
+    override fun onPause() {
+        super.onPause()
+        // 유지 시간(표시→화면에서 내려감) 실측용 (adgap.py)
+        Log.i(AdReceiver.TAG, "PAUSED mode=${intent.getStringExtra("mode")} seq=${intent.getIntExtra("seq", 0)} t=${System.currentTimeMillis()}")
+    }
+
     companion object {
         fun intent(context: Context, mode: String, seq: Int, holdSec: Int): Intent =
             Intent(context, AdActivity::class.java)
