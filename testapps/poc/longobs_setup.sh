@@ -18,10 +18,17 @@ now() {
   echo $(( ms / 1000000 ))
 }
 
+# 같은 outDir로 두 번 시작하면 관측이 섞인다 → 새 관측은 새 outDir
+grep -q '^event=setup' "$out/log.txt" 2>/dev/null && die "$out 은 이미 관측 중(setup 기록 있음). 새 관측이면 다른 outDir"
+
 req install -r testapps/usageprobe/build/outputs/apk/debug/usageprobe-debug.apk
 req install -r -g testapps/bgad/build/outputs/apk/debug/bgad-debug.apk
+# 1회 명시적 초기화: install -r은 앱 데이터를 보존하므로 이전 실험의 작업 기록·커서가 남는다. 여기서만 지움(수집 단계는 지우지 않음)
+req shell am broadcast -f 32 -n $PROBE/.WorkReceiver --es action stop
+req shell run-as $PROBE rm -f files/work.csv files/runs.csv shared_prefs/cursor.xml
 req shell appops set $PROBE GET_USAGE_STATS allow
-req shell am start -W -n $PROBE/.MainActivity          # 실제 온보딩처럼 한 번 열기(버킷 NEVER 탈출)
+# 실제 온보딩처럼 한 번 열기(버킷 NEVER 탈출). am start는 실패해도 exit 0일 수 있어 Status로 확인
+adb shell am start -W -n $PROBE/.MainActivity 2>&1 | grep -q 'Status: ok' || die "시작 화면 열기 실패"
 req shell input keyevent KEYCODE_HOME
 req shell am broadcast -f 32 -n $PROBE/.WorkReceiver --es action start
 t=$(now) || die "시각 읽기 실패"                       # 부모에서 반환 상태 검사

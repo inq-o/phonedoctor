@@ -22,6 +22,8 @@ home() { adb shell input keyevent KEYCODE_HOME >/dev/null; sleep 1; }
 # am start 성공(Status: ok)을 확인하고, 실패하면 그 구간을 라벨하지 않음
 start_ok() { adb shell am start -W "$@" 2>&1 | grep -q 'Status: ok'; }
 win() { echo "$1,$2,$3,$(now)" >> "$truth"; }
+# 사용 기록 권한이 없으면 덤프가 비어 '정상 관측'과 구분이 안 됨 → 먼저 확인
+adb shell appops get $PROBE GET_USAGE_STATS 2>/dev/null | grep -q 'allow' || die "usageprobe 사용 기록 권한 없음(appops GET_USAGE_STATS)"
 
 begin=$(now)
 for i in $(seq 1 "$N"); do
@@ -29,12 +31,20 @@ for i in $(seq 1 "$N"); do
   home; start_ok -S -n $A || { echo "i=$i A 시작 실패, 건너뜀" >&2; continue; }; sleep 2
   s=$(now); start_ok -n $B && sleep 3 && win smoke_link $i $s || echo "i=$i B 시작 실패, link 미기록" >&2
   # smoke_return: A→B→A 복귀(am start, 실제 뒤로가기 아님)
-  home; start_ok -S -n $A || continue; sleep 2; start_ok -n $B && sleep 2 || true
+  home; start_ok -S -n $A || continue; sleep 2
+  start_ok -n $B || { echo "i=$i B 시작 실패, return 미기록" >&2; continue; }; sleep 2   # B 실패 시 복귀 구간 자체가 성립 안 함
   s=$(now); start_ok -n $A && sleep 3 && win smoke_return $i $s || echo "i=$i return 미기록" >&2
 done
 end=$(now)
 
+valid=$(( $(wc -l < "$truth") - 1 ))
+[ "$valid" -gt 0 ] || die "유효 구간 0개(모든 시작 실패 또는 N=0)"
+# 이전 실행의 덤프가 섞이지 않게 먼저 지우고(adb shell은 원격 종료 코드를 돌려줌), 새로 만든 뒤 읽는다
+adb shell run-as $PROBE rm -f files/userflows_smoke.csv || die "이전 덤프 삭제 실패"
 adb shell am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $end --es out userflows_smoke.csv >/dev/null; sleep 2
-adb exec-out run-as $PROBE cat files/userflows_smoke.csv > "$out/events.csv" 2>/dev/null || die "이벤트 덤프 실패"
-echo "userflows(합성 스모크) 완료: $out/windows.csv $out/events.csv"
+# adb exec-out은 원격 실패도 exit 0 → 원격 종료 코드를 sentinel로 받음
+o=$(adb exec-out run-as $PROBE sh -c "cat files/userflows_smoke.csv; echo __RC:\$?")
+[ "$(printf '%s\n' "$o" | tail -1)" = "__RC:0" ] || die "이벤트 덤프 읽기 실패(파일 미생성·접근 불가)"
+printf '%s\n' "$o" | sed '$d' > "$out/events.csv"
+echo "userflows(합성 스모크) 완료: 유효 구간 ${valid}개 — $out/windows.csv $out/events.csv"
 echo "⚠️ 이 자료는 파이프라인 확인용. 규칙 개발·평가 자료로 쓰지 말 것 — 실제 UI 흐름 관찰 수집이 따로 필요"
