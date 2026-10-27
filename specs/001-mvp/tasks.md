@@ -50,8 +50,8 @@
 - [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
 - [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`)
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
-- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로)
-- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007)
+- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로). 조회 전에 사용 기록 권한 확인(없으면 `SecurityException`, 상태 보고만), 런처 별칭은 `targetActivity`로 풀기, 마지막 화면 꺼짐·직전 화면을 실행 사이에 저장
+- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007)
 - [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
@@ -90,7 +90,7 @@
 - [ ] T071 사용성 관찰: 설치 대행자 3명 (SC-003), 시니어 1명 이상 (SC-004)
 - [ ] T072 Play 심사 제출 (14일 테스트 종료 후, 11/23 전후)
 - [ ] T073 최종보고서 (13주차, spec Q6 면제 여부 확인)
-- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱을 실제 실행해 정상 알림 탭·직접 실행 등 정상 `ACTIVITY_RESUMED` 이벤트를 라벨링하고 전체 정상 이벤트를 분모로 이벤트 단위 오탐률(FR-012) 계산, 같은 실행에서 기기·일당 오경고 수도 집계(spec §4 지표 정의). 오버레이형은 커버리지 한계로 명시
+- [ ] T074 [US11] 증상 감지 평가 (SC-002) — 앱 밖 광고 확인 앱으로 recall, T026 정상 앱을 실제 실행해 정상 알림 탭·직접 실행 등 정상 `ACTIVITY_RESUMED` 이벤트를 라벨링하고 전체 정상 이벤트를 분모로 이벤트 단위 오탐률(FR-012) 계산, 같은 실행에서 기기·일당 오경고 수도 집계(spec §4 지표 정의). 대기 버킷이 낮아지는 조건(rare 등)의 WorkManager 실행 간격과 감지 지연도 측정. 오버레이형은 커버리지 한계로 명시
 
 ## 나중에 (P2·P3)
 
