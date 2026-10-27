@@ -28,6 +28,7 @@ adb shell am start -a android.intent.action.DELETE -d package:$BGAD >/dev/null
 for _ in $(seq 10); do fg | grep -qi "packageinstaller\|uninstall" && break; sleep 1; done
 dialog_seen=0; fg | grep -qi "packageinstaller\|uninstall" && dialog_seen=1
 [ "$dialog_seen" = 1 ] || die "삭제창이 뜨지 않음(광고가 가로채거나 인텐트 실패)"
+dialog_at=$(now)   # 삭제창 뜬 시각 — 이후 광고 반복을 센다
 
 # 삭제창이 떠 있는 샘플만 분모로. 그 중 광고가 포커스를 가진 비율을 기록
 echo "at,foreground,dialog_present,ad_focus" > "$out/foreground.csv"
@@ -44,10 +45,20 @@ while [ "$(date +%s)" -lt "$end" ]; do
 done
 
 adb logcat -d -s BGAD:I > "$out/truth.log"
+adb shell am force-stop $BGAD
+
+# 전제 3: 삭제창을 연 뒤 광고가 '반복'됐는지. 삭제창 연 시각(dialog_at) 이후 RESUMED를 센다 (macOS awk 호환: 단순 비교)
+res_after=$(grep ' RESUMED mode=' "$out/truth.log" | sed -E 's/.* t=([0-9]+).*/\1/' | awk -v d="$dialog_at" '$1>=d{n++} END{print n+0}')
 removed=NA; pkgs=$(adb shell pm list packages 2>/dev/null) && { echo "$pkgs" | grep -q "$BGAD" && removed=설치됨 || removed=지워짐; }
 python3 testapps/poc/adgap.py "$out/truth.log" 2>/dev/null | sed -n '2,4p' || true
-adb shell am force-stop $BGAD
-echo "삭제창이 떠 있던 샘플: $dialog_samples / (위 분모로만 판정)"
-echo "그 중 광고가 포커스를 덮은 샘플: $covered"
+echo "삭제창 떠 있던 샘플: $dialog_samples (분모) · 광고가 포커스 덮음: $covered"
+echo "삭제창 연 뒤 광고 재개: ${res_after}회"
 echo "bgad 설치 여부: $removed  — 자동 삭제 아님, 시스템 확인창은 사람이 눌러야 함"
+# 반복 광고 방해 시험의 전제: 삭제창 샘플 ≥1, 삭제창 이후 재개 ≥2(실제 반복)
+if [ "$dialog_samples" -eq 0 ]; then
+  echo "⚠️ 무효: 관측 중 삭제창이 떠 있던 샘플 0 — 반복 광고 방해 근거 아님" >&2; exit 2
+fi
+if [ "${res_after:-0}" -lt 2 ]; then
+  echo "⚠️ 반복 광고 미구동(삭제창 이후 재개 <2회). 단일 광고·삭제창 관측 스모크로만 유효, 반복 광고 삭제 검증은 미실시" >&2; exit 2
+fi
 echo "⚠️ 포커스 샘플 ≠ 시각적 덮임, 기능 시연 ≠ 시니어 완주. 완주는 사용성 관찰로만 확인"

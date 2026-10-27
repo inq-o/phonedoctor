@@ -9,22 +9,23 @@ BGAD=io.github.inq_o.phonedoctor.testapps.bgad
 out=${1:-ml/data/poc/longobs}; mkdir -p "$out"
 
 die() { echo "setup 실패: $1" >&2; exit 1; }
-# 기기 1대 고정·연결 확인 (ANDROID_SERIAL 권장). 연결 실패를 성공으로 넘기지 않음
 [ "$(adb get-state 2>/dev/null)" = "device" ] || die "연결된 기기 없음(adb get-state). ANDROID_SERIAL로 기기를 고정하세요"
-req() { adb "$@" || die "명령 실패: adb $*"; }    # 필수 명령은 실패 시 중단
+req() { adb "$@" || die "명령 실패: adb $*"; }
+# now는 서브셸에서 돈다 → die 대신 return 1. 부모가 `|| die`로 받아야 중단됨
 now() {
-  local ms; ms=$(adb shell date +%s%N 2>/dev/null | tr -d '\r') || die "시각 읽기 실패"
-  [[ "$ms" =~ ^[0-9]+$ ]] || die "시각 형식 오류: $ms"
+  local ms; ms=$(adb shell date +%s%N 2>/dev/null | tr -d '\r') || return 1
+  [[ "$ms" =~ ^[0-9]+$ ]] || return 1
   echo $(( ms / 1000000 ))
 }
 
 req install -r testapps/usageprobe/build/outputs/apk/debug/usageprobe-debug.apk
 req install -r -g testapps/bgad/build/outputs/apk/debug/bgad-debug.apk
 req shell appops set $PROBE GET_USAGE_STATS allow
-# 실제 온보딩처럼 앱을 한 번 연다(대기 버킷을 NEVER에서 올림). 이후 다시 열지 않음
-req shell am start -W -n $PROBE/.MainActivity
+req shell am start -W -n $PROBE/.MainActivity          # 실제 온보딩처럼 한 번 열기(버킷 NEVER 탈출)
 req shell input keyevent KEYCODE_HOME
 req shell am broadcast -f 32 -n $PROBE/.WorkReceiver --es action start
+t=$(now) || die "시각 읽기 실패"                       # 부모에서 반환 상태 검사
 bucket=$(adb shell am get-standby-bucket $PROBE 2>/dev/null | tr -d '\r') || die "버킷 읽기 실패"
-printf 'event=setup\nat=%s\nbucket=%s\n' "$(now)" "$bucket" >> "$out/log.txt"
+[ -n "$bucket" ] || die "버킷 값 비어 있음"
+printf 'event=setup\nat=%s\nbucket=%s\n' "$t" "$bucket" >> "$out/log.txt"
 echo "setup 완료 (기기 $(adb get-serialno)): $out/log.txt. 이후 손대지 말고 longobs_collect.sh만 사용"
