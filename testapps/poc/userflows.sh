@@ -46,5 +46,8 @@ adb shell am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $e
 o=$(adb exec-out run-as $PROBE sh -c "cat files/userflows_smoke.csv; echo __RC:\$?")
 [ "$(printf '%s\n' "$o" | tail -1)" = "__RC:0" ] || die "이벤트 덤프 읽기 실패(파일 미생성·접근 불가)"
 printf '%s\n' "$o" | sed '$d' > "$out/events.csv"
+# 형식 확인: DumpReceiver 헤더로 시작하고, 기록한 구간이 있으니 이벤트 행이 1개 이상이어야 함
+head -1 "$out/events.csv" | grep -q '^queriedAt,timeStamp,type' || die "events.csv 형식 오류(헤더 없음)"
+[ "$(wc -l < "$out/events.csv")" -gt 1 ] || die "이벤트 0건(권한·수신기 확인) — 헤더만 있는 덤프를 결과로 쓰지 않음"
 echo "userflows(합성 스모크) 완료: 유효 구간 ${valid}개 — $out/windows.csv $out/events.csv"
 echo "⚠️ 이 자료는 파이프라인 확인용. 규칙 개발·평가 자료로 쓰지 말 것 — 실제 UI 흐름 관찰 수집이 따로 필요"

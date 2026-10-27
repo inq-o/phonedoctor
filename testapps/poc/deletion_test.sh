@@ -53,7 +53,9 @@ while [ "$(date +%s)" -lt "$end" ]; do
   sleep 1
 done
 
-adb logcat -d -s BGAD:I > "$out/truth.log"
+# 관측 중 기기 오류(연결 끊김 등)는 결과와 구분해 오류로 끝냄(exit 1). 창 기록·광고 로그가 빠진 결과를 판정에 쓰지 않음
+adb logcat -d -s BGAD:I > "$out/truth.log" 2>/dev/null && [ -s "$out/truth.log" ] || { echo "삭제 시험 오류: 광고 로그 수집 실패(기기 연결 확인)" >&2; exit 1; }
+if [ "$fail_samples" -gt 0 ]; then echo "삭제 시험 오류: 관측 중 창 목록 수집 실패 ${fail_samples}회 — 결과 무효(기기 연결 확인)" >&2; exit 1; fi
 
 # 전제 3: 삭제창을 연 뒤 광고가 '반복'됐는지. 삭제창 연 시각(dialog_at) 이후 RESUMED를 센다 (macOS awk 호환: 단순 비교)
 res_after=$(grep ' RESUMED mode=' "$out/truth.log" | sed -E 's/.* t=([0-9]+).*/\1/' | awk -v d="$dialog_at" '$1>=d{n++} END{print n+0}')
