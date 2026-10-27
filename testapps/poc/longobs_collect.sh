@@ -40,8 +40,10 @@ pull() {  # $1=파일명 → 상태 문자열 echo, 성공 시에만 스냅샷 �
   echo "$ls_out" | grep -qx "$name" || { echo "미생성"; return; }   # 작업이 아직 안 만듦
   remote "cat files/$name"
   [ "$RC_RC" = 0 ] || { echo "전송실패(rc=$RC_RC)"; return; }         # 오류 텍스트를 CSV로 저장하지 않음
-  local f="$out/snap/${name%.csv}_$t.csv"
-  printf '%s\n' "$RC_OUT" > "$f" || { rm -f "$f"; echo "저장실패"; return; }   # 디스크·권한 문제로 불완전한 스냅샷을 남기지 않음
+  local f="$out/snap/${name%.csv}_$t.csv" tmp
+  # 임시 파일에 다 쓴 뒤 교체: 실패해도 불완전한 파일이나 기존 스냅샷 삭제가 생기지 않음
+  tmp=$(mktemp "$out/snap/.${name}.XXXXXX") || { echo "저장실패"; return; }
+  { printf '%s\n' "$RC_OUT" > "$tmp" && mv "$tmp" "$f"; } || { rm -f "$tmp"; echo "저장실패"; return; }
   echo "수집($(printf '%s' "$RC_OUT" | grep -c . || true)행)"
 }
 runs_st=$(pull runs.csv)
