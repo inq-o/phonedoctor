@@ -51,4 +51,5 @@ adb exec-out run-as $PROBE cat files/runs.csv > "$out/runs.csv" 2>/dev/null
 sh am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $end --es out e4_$cond.csv; sleep 2
 adb exec-out run-as $PROBE cat files/e4_$cond.csv > "$out/events.csv"
 sh am broadcast -f 32 -n $PROBE/.WorkReceiver --es action stop
+printf 'cond=%s\nbegin=%s\nend=%s\n' "$cond" "$begin" "$end" > "$out/meta.txt"  # lag.py obs_end (작업 실행에서 추정 금지)
 echo "$cond: SHOW=$(grep -c ' SHOW ' "$out/truth.log") RESUMED=$(grep -c ' RESUMED ' "$out/truth.log") runs=$(wc -l < "$out/runs.csv" 2>/dev/null || echo 0) begin=$begin end=$end"
