@@ -45,10 +45,10 @@ case $cond in
   noperm) sh appops set $PROBE GET_USAGE_STATS allow ;;
 esac
 adb logcat -d -s BGAD:I USAGEPROBE:I WM-WorkerWrapper:I > "$out/logcat.txt"
-grep " SHOW " "$out/logcat.txt" > "$out/truth.log" || true
+grep -E " SHOW | RESUMED " "$out/logcat.txt" > "$out/truth.log" || true
 adb exec-out run-as $PROBE cat files/work.csv > "$out/work.csv" 2>/dev/null
 adb exec-out run-as $PROBE cat files/runs.csv > "$out/runs.csv" 2>/dev/null
 sh am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $end --es out e4_$cond.csv; sleep 2
 adb exec-out run-as $PROBE cat files/e4_$cond.csv > "$out/events.csv"
 sh am broadcast -f 32 -n $PROBE/.WorkReceiver --es action stop
-echo "$cond: SHOW=$(wc -l < "$out/truth.log") runs=$(wc -l < "$out/runs.csv" 2>/dev/null || echo 0) begin=$begin end=$end"
+echo "$cond: SHOW=$(grep -c ' SHOW ' "$out/truth.log") RESUMED=$(grep -c ' RESUMED ' "$out/truth.log") runs=$(wc -l < "$out/runs.csv" 2>/dev/null || echo 0) begin=$begin end=$end"
