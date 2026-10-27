@@ -45,7 +45,8 @@ adb shell am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $e
 # adb exec-out은 원격 실패도 exit 0 → 원격 종료 코드를 sentinel로 받음
 o=$(adb exec-out run-as $PROBE sh -c "cat files/userflows_smoke.csv; echo __RC:\$?")
 [ "$(printf '%s\n' "$o" | tail -1)" = "__RC:0" ] || die "이벤트 덤프 읽기 실패(파일 미생성·접근 불가)"
-printf '%s\n' "$o" | sed '$d' > "$out/events.csv"
+rm -f "$out/events.csv"   # 이전 결과가 남아 아래 형식 확인을 통과하지 않게
+printf '%s\n' "$o" | sed '$d' > "$out/events.csv" || die "events.csv 쓰기 실패"
 # 형식 확인: DumpReceiver 헤더로 시작하고, 기록한 구간이 있으니 이벤트 행이 1개 이상이어야 함
 head -1 "$out/events.csv" | grep -q '^queriedAt,timeStamp,type' || die "events.csv 형식 오류(헤더 없음)"
 [ "$(wc -l < "$out/events.csv")" -gt 1 ] || die "이벤트 0건(권한·수신기 확인) — 헤더만 있는 덤프를 결과로 쓰지 않음"

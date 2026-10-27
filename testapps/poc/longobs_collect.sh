@@ -40,7 +40,8 @@ pull() {  # $1=파일명 → 상태 문자열 echo, 성공 시에만 스냅샷 �
   echo "$ls_out" | grep -qx "$name" || { echo "미생성"; return; }   # 작업이 아직 안 만듦
   remote "cat files/$name"
   [ "$RC_RC" = 0 ] || { echo "전송실패(rc=$RC_RC)"; return; }         # 오류 텍스트를 CSV로 저장하지 않음
-  printf '%s\n' "$RC_OUT" > "$out/snap/${name%.csv}_$t.csv"
+  local f="$out/snap/${name%.csv}_$t.csv"
+  printf '%s\n' "$RC_OUT" > "$f" || { rm -f "$f"; echo "저장실패"; return; }   # 디스크·권한 문제로 불완전한 스냅샷을 남기지 않음
   echo "수집($(printf '%s' "$RC_OUT" | grep -c . || true)행)"
 }
 runs_st=$(pull runs.csv)
@@ -49,10 +50,10 @@ work_st=$(pull work.csv)
 if adb logcat -d -s USAGEPROBE:I WM-WorkerWrapper:I BGAD:I > "$out/snap/logcat_$t.txt" 2>/dev/null; then log_st=ok; else log_st=실패; rm -f "$out/snap/logcat_$t.txt"; fi
 
 # 전송 실패가 하나라도 있으면 그 회차를 부분 실패로 표시(정상 수집으로 확정 안 함)
-status=ok; case "$runs_st$work_st" in *전송실패*) status=부분실패;; esac
+status=ok; case "$runs_st$work_st" in *전송실패*|*저장실패*) status=부분실패;; esac
 [ "$log_st" = 실패 ] && status=부분실패
 printf 'event=collect\nat=%s\nstatus=%s\nbucket=%s\nperm=%s\nruns=%s\nwork=%s\nlogcat=%s\nbattery=%s\n---\n' \
-  "$t" "$status" "$bucket" "$perm" "$runs_st" "$work_st" "$log_st" "$plugged" >> "$out/log.txt"
+  "$t" "$status" "$bucket" "$perm" "$runs_st" "$work_st" "$log_st" "$plugged" >> "$out/log.txt" || die "log.txt 기록 실패(스냅샷은 snap/에 있음)"
 echo "collect at=$t status=$status bucket=$bucket runs=$runs_st work=$work_st perm=$perm"
 echo "  battery: $plugged"
 [ "$runs_st" = "미생성" ] && echo "  (runs.csv 미생성: 작업이 아직 한 번도 안 돎 — 수집 실패와 다름)"

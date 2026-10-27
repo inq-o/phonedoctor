@@ -26,11 +26,13 @@ adb shell input keyevent KEYCODE_HOME
 for _ in $(seq $((interval + 15))); do adb logcat -d -s BGAD:I | grep -q ' RESUMED ' && break; sleep 1; done
 adb logcat -d -s BGAD:I | grep -q ' RESUMED ' || die "광고가 재개되지 않음(알람 빈도 제한 가능)"
 
+# 삭제창 식별: 전제 확인·샘플링이 같은 조건을 쓴다(넓히면 다른 창을 삭제창으로 오인해 소멸을 가림)
+DIALOG_RE=packageinstaller
 # 삭제창 열기
 adb shell am start -a android.intent.action.DELETE -d package:$BGAD >/dev/null
 # 전제 2: 삭제창(packageinstaller)이 실제로 떴는지
-for _ in $(seq 10); do fg | grep -qi "packageinstaller\|uninstall" && break; sleep 1; done
-dialog_seen=0; fg | grep -qi "packageinstaller\|uninstall" && dialog_seen=1
+for _ in $(seq 10); do fg | grep -qi "$DIALOG_RE" && break; sleep 1; done
+dialog_seen=0; fg | grep -qi "$DIALOG_RE" && dialog_seen=1
 [ "$dialog_seen" = 1 ] || die "삭제창이 뜨지 않음(광고가 가로채거나 인텐트 실패)"
 dialog_at=$(now)   # 삭제창 뜬 시각 — 이후 광고 반복을 센다
 
@@ -43,7 +45,7 @@ while [ "$(date +%s)" -lt "$end" ]; do
   # 창 목록 수집 자체가 실패하면 '창 없음'으로 세지 않고 수집 실패(NA)로 남김
   wl=$(adb shell dumpsys window windows 2>/dev/null)
   if [ -z "$wl" ]; then d=NA; fail_samples=$((fail_samples+1))
-  elif echo "$wl" | grep -qi "packageinstaller"; then d=1; else d=0; fi
+  elif echo "$wl" | grep -qi "$DIALOG_RE"; then d=1; else d=0; fi
   a=0; echo "$f" | grep -q "$BGAD/.*AdActivity" && a=1
   ts=$(now)
   [ "$d" = 1 ] && { dialog_samples=$((dialog_samples+1)); [ "$a" = 1 ] && covered=$((covered+1)); }
