@@ -71,11 +71,11 @@ def ad_metrics(truth_log, e1_csv, launchers, system_filter=True, window=2000):
     """광고 지표를 단위별로 나눠 센다. 분모를 섞지 않으려고 네 수를 따로 돌려준다.
 
     - shows: 표시 '시도'(재현기 SHOW 로그). 실제 노출과 같지 않음
-    - displayed: 표시 '확인'(재현기 AdActivity RESUMED 로그가 남은 광고 건 = 화면에 실제로 올라옴). 광고 건 단위 분모
+    - displayed: 액티비티 재개 확인(재현기 AdActivity onResume 로그가 남은 광고 건). 생명주기 확인이지 화면 관찰은 아님. 광고 건 단위 분모
     - observed: displayed 중 SHOW 시각 기준 window 안에 사용 기록 ACTIVITY_RESUMED가 남은 광고 건 수
     - classified: observed 중 규칙이 광고로 센 건 수 (조건부 분류율의 분자)
 
-    광고 1건에 RESUMED가 여러 개 남아도(화면 꺼짐) 1건으로 집계. SHOW만 있고 표시 확인(RESUMED)이
+    광고 1건에 RESUMED가 여러 개 남아도(화면 꺼짐) 1건으로 집계. SHOW만 있고 재개 확인(RESUMED)이
     없으면 displayed 분모에 넣지 않는다. 사용 기록 매칭은 SHOW 시각을 기준으로 함 — 재현기의 RESUMED
     로그 시각은 onResume(=시스템 이벤트 직후)이라 창 시작점으로 쓰면 바로 앞 이벤트를 놓친다."""
     shows = {m[1]: int(m[2]) for m in (re.search(r" SHOW mode=\w+ seq=(\d+) t=(\d+)", l) for l in open(truth_log)) if m}
@@ -83,7 +83,7 @@ def ad_metrics(truth_log, e1_csv, launchers, system_filter=True, window=2000):
     e1 = list(csv.DictReader(open(e1_csv)))
     f1 = flags(e1, launchers, system_filter)
     near = lambda s: [i for i in f1 if 0 <= int(e1[i]["timeStamp"]) - s <= window and "bgad" in e1[i]["package"]]
-    displayed = [shows[seq] for seq in displayed_seq if seq in shows]  # 표시 확인된 광고의 SHOW 시각
+    displayed = [shows[seq] for seq in displayed_seq if seq in shows]  # 재개 확인된 광고의 SHOW 시각
     observed = [s for s in displayed if near(s)]
     classified = sum(any(not f1[i] for i in near(s)) for s in observed)
     return {"shows": len(shows), "displayed": len(displayed), "observed": len(observed), "classified": classified}
@@ -125,7 +125,7 @@ def _check():
 
 
 def _check_metrics():
-    """광고 지표 분모 회귀 검사. 표시 시도(SHOW)·표시 확인(RESUMED)·이벤트 관측·분류를
+    """광고 지표 분모 회귀 검사. 표시 시도(SHOW)·재개 확인(RESUMED)·이벤트 관측·분류를
     섞지 않는지 임시 파일로 확인한다."""
     import tempfile, os
     L = {"bgad.app": {"resolved": set(), "system": False}}
@@ -136,8 +136,8 @@ def _check_metrics():
         with open(ep, "w", newline="") as f:
             w = csv.writer(f); w.writerow(["timeStamp", "type", "package", "class"]); w.writerows(ev_rows)
         return ad_metrics(tp, ep, L)
-    # 1) 표시 확인 2건 중 이벤트 1건만 남고 그 1건을 규칙이 잡음
-    #    → 조건부 분류율 1/1, 광고 건 단위 탐지율 1/2. SHOW(3)는 표시 확인(2)과 다름
+    # 1) 재개 확인 2건 중 이벤트 1건만 남고 그 1건을 규칙이 잡음
+    #    → 조건부 분류율 1/1, 광고 건 단위 탐지율 1/2. SHOW(3)는 재개 확인(2)과 다름
     truth = (" SHOW mode=saw seq=0 t=1000\n SHOW mode=saw seq=1 t=5000\n SHOW mode=saw seq=2 t=9000\n"
              " RESUMED mode=saw seq=0 t=1000\n RESUMED mode=saw seq=1 t=5000\n")
     m = run(truth, [["1010", RESUMED, "bgad.app", "Ad"]])  # seq0 SHOW(1000) 뒤 10ms에 이벤트
@@ -146,7 +146,7 @@ def _check_metrics():
     truth2 = " SHOW mode=saw seq=0 t=1000\n RESUMED mode=saw seq=0 t=1000\n"
     m2 = run(truth2, [["1010", RESUMED, "bgad.app", "Ad"], ["1900", RESUMED, "bgad.app", "Ad"]])
     assert m2 == {"shows": 1, "displayed": 1, "observed": 1, "classified": 1}, m2
-    # 3) SHOW만 있고 표시 확인(RESUMED) 없음 → displayed 분모에 안 들어감
+    # 3) SHOW만 있고 재개 확인(RESUMED) 없음 → displayed 분모에 안 들어감
     m3 = run(" SHOW mode=saw seq=0 t=1000\n", [["1010", RESUMED, "bgad.app", "Ad"]])
     assert m3 == {"shows": 1, "displayed": 0, "observed": 0, "classified": 0}, m3
 
@@ -156,11 +156,11 @@ if __name__ == "__main__":
     a = [x for x in sys.argv[1:] if not x.startswith("--")]
     m, per = evaluate(load_launchers(a[0]), *a[1:5], system_filter="--no-system-filter" not in sys.argv)
     sh, disp, obs, cl = m["shows"], m["displayed"], m["observed"], m["classified"]
-    # 분모를 섞지 않음: 표시 시도≠표시 확인≠이벤트 관측. 전체 탐지율이라고 부르지 않는다
-    print(f"표시 시도(SHOW) {sh} · 표시 확인(RESUMED) {disp}")
-    print(f"  이벤트 관측률(표시 확인 중 사용 기록 이벤트 있음): {obs}/{disp}" + (f" = {obs/disp:.1%}" if disp else ""))
+    # 분모를 섞지 않음: 표시 시도≠재개 확인≠이벤트 관측. 전체 탐지율이라고 부르지 않는다
+    print(f"표시 시도(SHOW) {sh} · 액티비티 재개 확인(RESUMED) {disp}")
+    print(f"  이벤트 관측률(재개 확인 중 사용 기록 이벤트 있음): {obs}/{disp}" + (f" = {obs/disp:.1%}" if disp else ""))
     print(f"  조건부 분류율(관측된 광고 중 규칙이 잡음): {cl}/{obs}" + (f" = {cl/obs:.1%}" if obs else ""))
-    print(f"  광고 건 단위 탐지율(표시 확인 전체 중 잡음): {cl}/{disp}" + (f" = {cl/disp:.1%}" if disp else ""))
+    print(f"  광고 건 단위 탐지율(재개 확인 전체 중 잡음): {cl}/{disp}" + (f" = {cl/disp:.1%}" if disp else ""))
     print("  주의: 재현 앱 1종 반복 결과 — 앱 단위 재현율(G2)·대표 실제 앱 탐지율은 미평가")
     n = sum(d[0] for d in per.values()); fp = sum(d[1] for d in per.values())
     for k, (cnt, bad, what) in per.items():

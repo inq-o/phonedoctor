@@ -12,6 +12,8 @@
 
 obs_end는 **실제 실험 종료 시각**을 넘겨야 한다. 작업 실행 시각(runs.csv)에서 추정하지 않는다 —
 작업이 멈춘 채 40분을 관찰한 경우와 관찰 자체가 일찍 끝난 경우가 섞이기 때문.
+obs_end 뒤의 작업 실행은 세지 않는다 — 조건 복원(예: rare→active) 직후 실행이 밀린 광고를 몰아 읽은 것을
+그 조건의 조회로 넣지 않기 위함.
 
 사용: python3 testapps/poc/lag.py <truth.log> <work.csv> [obs_end_ms | meta.txt(begin=/end= 포함)]
 """
@@ -24,6 +26,8 @@ TARGET_MS = 30 * 60 * 1000
 
 def classify(show_times, work, obs_end, window=2000, target_ms=TARGET_MS):
     out = []
+    if obs_end is not None:   # 관찰 종료(조건 복원) 뒤 실행은 그 조건의 조회가 아님
+        work = [r for r in work if int(r["runAt"]) <= obs_end]
     for s in show_times:
         runs = [int(r["runAt"]) for r in work if "bgad" in r["package"] and 0 <= int(r["timeStamp"]) - s <= window]
         if runs:
@@ -68,6 +72,9 @@ def _check():
     assert classify([0], [], obs_end=600000)[0]["deadline"] == "pending"
     # obs_end 모름 → unknown
     assert classify([0], [], obs_end=None)[0]["deadline"] == "unknown"
+    # 관찰 종료 뒤 실행(조건 복원 직후)은 세지 않음 → 40분 관찰 중 미조회 = missed
+    late_run = [{"runAt": "2500000", "timeStamp": "10", "package": "x.bgad"}]
+    assert classify([0], late_run, obs_end=2400000)[0] == {"lag": None, "deadline": "missed"}
 
 
 if __name__ == "__main__":
