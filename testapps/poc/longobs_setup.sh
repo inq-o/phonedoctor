@@ -20,6 +20,8 @@ now() {
 
 # 같은 outDir로 두 번 시작하면 관측이 섞인다 → 새 관측은 새 outDir
 grep -q '^event=setup' "$out/log.txt" 2>/dev/null && die "$out 은 이미 관측 중(setup 기록 있음). 새 관측이면 다른 outDir"
+# 기록을 못 남기면 위 재시작 차단이 안 걸린다 → 기기 상태를 지우기 전에 쓰기 가능부터 확인
+: >> "$out/log.txt" || die "$out/log.txt 에 쓸 수 없음(초기화 전 중단)"
 
 req install -r testapps/usageprobe/build/outputs/apk/debug/usageprobe-debug.apk
 req install -r -g testapps/bgad/build/outputs/apk/debug/bgad-debug.apk
@@ -34,5 +36,5 @@ req shell am broadcast -f 32 -n $PROBE/.WorkReceiver --es action start
 t=$(now) || die "시각 읽기 실패"                       # 부모에서 반환 상태 검사
 bucket=$(adb shell am get-standby-bucket $PROBE 2>/dev/null | tr -d '\r') || die "버킷 읽기 실패"
 [ -n "$bucket" ] || die "버킷 값 비어 있음"
-printf 'event=setup\nat=%s\nbucket=%s\n' "$t" "$bucket" >> "$out/log.txt"
+printf 'event=setup\nat=%s\nbucket=%s\n' "$t" "$bucket" >> "$out/log.txt" || die "log.txt 기록 실패 — 작업은 이미 시작됨. 이 outDir로 재실행하지 말 것"
 echo "setup 완료 (기기 $(adb get-serialno)): $out/log.txt. 이후 손대지 말고 longobs_collect.sh만 사용"
