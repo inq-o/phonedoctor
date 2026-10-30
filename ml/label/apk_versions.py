@@ -2,10 +2,12 @@
 
 - 특징 입력: ml/data/apk/<package>.apk. 그 SHA-256이 특징 파일(ml/data/apk_features.csv.gz)의 sha256과 같은지
 - 관찰: 관찰한 base APK(ml/data/apk_split/<package>/<package>.apk 또는 <package>.apk)의 SHA-256과 versionCode.
-  관찰 기록(ml/data/observe/<package>/meta.txt)에 apk_sha256이 있으면 지금 파일이 관찰 당시와 같은지도 확인
+  관찰 기록(ml/data/observe/<package>/meta.txt)의 apk_sha256과 지금 파일이 같은지. 기록이 없으면(2026-10-30 전 관찰)
+  관찰 당시 APK와 같다고 확인할 수 없어 ok=unverified
 - versionCode는 aapt2로 읽는다 (AAPT2 환경 변수, 없으면 Android SDK build-tools의 마지막 판)
 
-하나라도 다르면 exit 1. 판이 다른 앱의 라벨은 같은 판을 다시 받아 특징을 뽑기 전까지 설치 시점 분류기 평가에 쓰지 않는다.
+ok가 yes가 아닌 앱이 있으면 exit 1. yes가 아닌 앱의 라벨은 설치 시점 분류기 평가에 쓰지 않는다
+(no = 같은 판을 다시 받아 특징을 뽑을 때까지, unverified = SHA-256을 기록하며 다시 관찰할 때까지).
 사용: python ml/label/apk_versions.py ml/label/test_v1_labels.csv
 """
 import csv
@@ -59,9 +61,12 @@ def compare(pkg, feature_sha, aapt2):
            "feature_file": "same" if fs and fs == feature_sha else "diff",          # 특징 파일이 이 APK에서 나왔는지
            "observed_apk": "same" if fs and fs == os_ else "diff",                  # 관찰한 base APK가 특징 입력과 같은 파일인지
            "observation_record": "none" if rec is None else ("same" if rec == os_ else "diff")}
-    row["ok"] = "yes" if (row["feature_version"] and row["feature_version"] == row["observed_version"]
-                          and row["feature_file"] == row["observed_apk"] == "same"
-                          and row["observation_record"] != "diff") else "no"
+    files_same = (row["feature_version"] and row["feature_version"] == row["observed_version"]
+                  and row["feature_file"] == row["observed_apk"] == "same")
+    if not files_same or row["observation_record"] == "diff":
+        row["ok"] = "no"
+    else:
+        row["ok"] = "yes" if row["observation_record"] == "same" else "unverified"
     return row
 
 
@@ -82,7 +87,8 @@ def main(labels_path):
     w.writeheader()
     w.writerows(rows)
     bad = [x["package"] for x in rows if x["ok"] != "yes"]
-    print(f"{len(rows)}개 중 판이 다르거나 확인 못 한 앱 {len(bad)}개", file=sys.stderr)
+    n = {k: sum(x["ok"] == k for x in rows) for k in ("yes", "no", "unverified")}
+    print(f"{len(rows)}개: 확인 {n['yes']}, 판 다름 {n['no']}, 관찰 기록 없음 {n['unverified']}", file=sys.stderr)
     return 1 if bad else 0
 
 
