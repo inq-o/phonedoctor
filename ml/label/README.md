@@ -78,7 +78,7 @@ python ml/label/check_labels.py ml/label/test_v1_labels.csv ml/label/test_v1.csv
 
 라벨은 **관찰한 판**의 정답이다(`meta.txt`의 `version_code`·`apk_sha256`). 특징을 뽑은 APK(`ml/data/apk/`)는 먼저 받은 것이라 판이 다를 수 있다. 설치 시점 분류기 평가에 쓰기 전에 아래 세 가지를 대조한다: 특징 파일의 SHA-256과 특징 입력 APK, 특징 입력 APK와 관찰한 base APK(SHA-256·versionCode), 관찰 기록의 SHA-256과 지금 파일. 다른 앱은 같은 판을 다시 받아 특징을 뽑거나 평가에서 뺀다. 입력 APK를 바꾸면 MH-1M 대조(§4)도 새 입력으로 다시 한다.
 
-`ok`가 `yes`인 라벨만 설치 시점 분류기 평가에 쓴다. 관찰 기록에 SHA-256이 없으면 지금 파일이 맞아도 관찰 당시 APK와 같다고 확인할 수 없어 `unverified`로 두고, SHA-256을 기록하며 다시 관찰할 때까지 평가에서 뺀다.
+`ok`가 `yes`인 라벨만 설치 시점 분류기 평가에 쓴다. 관찰 기록은 분할 APK 세트 전체를 대조하고, 라벨이 그 관찰에서 나왔는지(끝까지 마친 관찰, 관찰 날짜 = 라벨 `observed`)도 확인한다. 같은 앱을 다시 관찰하면 이전 라벨은 `no`가 되므로 새 증거로 라벨을 다시 붙인다. 관찰 기록에 SHA-256이 없으면 지금 파일이 맞아도 관찰 당시 APK와 같다고 확인할 수 없어 `unverified`로 두고, SHA-256을 기록하며 다시 관찰할 때까지 평가에서 뺀다.
 
 v1 라벨 40행(2026-10-30): 7개가 `no`(versionCode가 다른 5개, versionCode는 같은데 base APK 파일이 다른 2개), 나머지 33개는 SHA-256 기록 전에 관찰해 `unverified`다. 지금은 설치 시점 평가에 쓸 수 있는 v1 라벨이 없다.
 
