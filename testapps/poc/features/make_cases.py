@@ -197,47 +197,85 @@ add("14b", "4일 동안 조회 못 함: 공백 구간, 직전 RESUMED 무효라 
 q16 = {"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": [[90000, "RESUMED", "app.a", ".Main"]]}
 r16 = {"wall_to": 60000, "elapsed": 10000, "boot_count": 2, "events": [[52000, "RESUMED", "ad.x", ".AdActivity"]]}
 add("16", "검토 반례: 재부팅하면서 시계도 뒤로 감 → 옛 부팅이 앞 조회(100000) 뒤 꺼질 때까지 남긴 기록의 끝을 모름 → "
-          "옛 부팅의 SHUTDOWN이 보일 때까지 행을 만들지 않음 (120000 옛 부팅 기록도 버림). 옛 부팅에서 본 기록이 없어 옛 부팅 시작부터 SHUTDOWN을 찾음",
+          "행을 만들지 않음 (120000 옛 부팅 기록도 버림). 새 부팅 시작부터 읽음",
     [{"target": [52000, "ad.x", ".AdActivity"], "rows": 0}, {"target": [70000, "ad.x", ".AdActivity"], "rows": 0},
      {"target": [120000, "ad.x", ".OldBoot"], "rows": 0}],
     init=init, segments=[], counts={"segments_boot_clock": 0, "uncertain_discarded": 3},
-    queries=[{"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": []}, {**r16, "range": [-600000, 60000]},
+    queries=[{"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": []}, {**r16, "range": [50000, 60000]},
              {"wall_to": 80000, "elapsed": 30000, "boot_count": 2, "events": [[70000, "RESUMED", "ad.x", ".AdActivity"]]},
              {"wall_to": 130000, "elapsed": 80000, "boot_count": 2, "events": [[120000, "RESUMED", "ad.x", ".OldBoot"]]}])
-add("16b", "16에서 옛 부팅의 SHUTDOWN(105000)이 보임 → 옛 부팅 기록은 거기까지, 그 뒤부터 새 구간 (끝을 아는 격리)",
+q16b = [q16, r16, {"wall_to": 80000, "elapsed": 30000, "boot_count": 2, "events": [[70000, "RESUMED", "ad.x", ".AdActivity"]]},
+        {"wall_to": 130000, "elapsed": 80000, "boot_count": 2,
+         "events": [[105000, "SHUTDOWN", "android", ""], [110000, "RESUMED", "ad.x", ".AdActivity"]]}]
+add("16a", "기본: 16에서 옛 부팅의 SHUTDOWN(105000)이 보여도 닫지 않음 (그 SHUTDOWN이 옛 부팅의 끝인지 입증 못 함, 16g)",
+    [{"target": [90000, "app.a", ".Main"], "rows": 1}, {"target": [52000, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [110000, "ad.x", ".AdActivity"], "rows": 0}],
+    init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 4},
+    queries=[q16b[0], {**q16b[1], "range": [50000, 60000]}, q16b[2], {**q16b[3], "range": [75000, 130000]}])
+add("16b", "[SHUTDOWN 해제, 분석용] 16에서 옛 부팅의 SHUTDOWN(105000)이 보임 → 옛 부팅 기록은 거기까지, 그 뒤부터 새 구간",
     [{"target": [90000, "app.a", ".Main"], "rows": 1}, {"target": [52000, "ad.x", ".AdActivity"], "rows": 0},
      {"target": [110000, "ad.x", ".AdActivity"], "features": full(o(4999), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False)), "rule_v0t": AD()}],
-    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3},
-    queries=[q16, {**r16, "range": [50000, 60000]},
-             {"wall_to": 80000, "elapsed": 30000, "boot_count": 2, "events": [[70000, "RESUMED", "ad.x", ".AdActivity"]]},
-             {"wall_to": 130000, "elapsed": 80000, "boot_count": 2,
-              "events": [[105000, "SHUTDOWN", "android", ""], [110000, "RESUMED", "ad.x", ".AdActivity"]]}])
-add("16c", "옛 부팅의 SHUTDOWN(45000)이 새 부팅 시작(50000)보다 앞: 커서 앞이라 옛 부팅의 마지막 기록(40000)부터 읽어 찾고, 새 부팅 시작부터 바로 판정",
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3}, recover="shutdown",
+    queries=[q16b[0], {**q16b[1], "range": [50000, 60000]}, q16b[2], {**q16b[3], "range": [75000, 130000]}])
+add("16c", "[SHUTDOWN 해제, 분석용] 옛 부팅의 SHUTDOWN(45000)이 새 부팅 시작(50000)보다 앞: 커서 앞이라 옛 부팅의 마지막 기록(40000)부터 읽어 찾고, 새 부팅 시작부터 바로 판정",
     [{"target": [52000, "ad.x", ".AdActivity"], "features": full(o(2000), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False)),
       "rule_v0t": HOLD(["R3", "R4"])}],
     init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 0, "pre_cursor_ignored": 1},
+    recover="shutdown",
     queries=[{**q16, "events": [[40000, "RESUMED", "app.a", ".Main"]]},
              {**r16, "range": [40000, 60000], "events": [[45000, "SHUTDOWN", "android", ""], [50000, "STARTUP", "android", ""],
                                                          [52000, "RESUMED", "ad.x", ".AdActivity"]]}])
-add("16f", "열린 격리: 앞 조회에서 안 보이던 옛 부팅 SHUTDOWN(100000)이 커서(125000) 앞에 늦게 보여도 닫음 "
-           "(닫을 수 있는 동안은 기준 시각 90000부터 다시 읽음)",
-    [{"target": [150000, "ad.x", ".AdActivity"], "features": F(F0=o(49999)), "rule_v0t": AD()}],
+add("16f", "[SHUTDOWN 해제, 분석용] 앞 조회에서 안 보이던 옛 부팅 SHUTDOWN(100000)이 커서(125000) 앞에 늦게 보여도 닫음 "
+           "(닫을 수 있는 동안은 기준 시각 90000부터 다시 읽음). 커서 앞은 격리 중 버렸으므로 새 구간은 커서(125000)부터",
+    [{"target": [150000, "ad.x", ".AdActivity"], "features": F(F0=o(25000)), "rule_v0t": AD()}],
     init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 0, "pre_cursor_ignored": 1},
+    recover="shutdown",
     queries=[q16, {**r16, "events": []}, {"wall_to": 130000, "elapsed": 80000, "boot_count": 2, "events": [], "range": [55000, 130000]},
              {"wall_to": 160000, "elapsed": 110000, "boot_count": 2, "range": [90000, 160000],
               "events": [[100000, "SHUTDOWN", "android", ""], [150000, "RESUMED", "ad.x", ".AdActivity"]]}])
-add("16d", "한계: 열린 격리 중 다시 재부팅 → 어느 SHUTDOWN이 그 옛 부팅의 끝인지 가를 수 없어 계속 버림",
+add("16h", "[SHUTDOWN 해제, 분석용] 검토 반례: 격리 중 버린 상호작용(124000)이 닫은 뒤 커서 앞으로 다시 보임 → "
+           "새 구간을 SHUTDOWN(100000) 뒤가 아니라 커서(125000)부터 열어 3초 창을 못 채움 → HOLD",
+    [{"target": [125500, "ad.x", ".Ad"], "features": F(F1=nc), "rule_v0t": {"outcome": "HOLD"}}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 1, "pre_cursor_ignored": 2},
+    recover="shutdown",
+    queries=[q16, {**r16, "events": []}, {"wall_to": 130000, "elapsed": 80000, "boot_count": 2,
+                                          "events": [[124000, "USER_INTERACTION", "ad.x", ""]]},
+             {"wall_to": 131000, "elapsed": 81000, "boot_count": 2, "range": [90000, 131000],
+              "events": [[100000, "SHUTDOWN", "android", ""], [124000, "USER_INTERACTION", "ad.x", ""],
+                         [125500, "RESUMED", "ad.x", ".Ad"]]}])
+q16g = [q16, {"wall_to": 120000, "elapsed": 70000, "boot_count": 2, "range": [50000, 120000],
+              "events": [[50000, "STARTUP", "android", ""], [52000, "RESUMED", "ad.x", ".NewBoot"],
+                         [105000, "SHUTDOWN", "android", ""], [106000, "STARTUP", "android", ""],
+                         [110000, "RESUMED", "ad.x", ".OldTail"]]}]
+add("16g", "검토 반례: 격리를 여는 조회에 옛 부팅의 런타임 재시작(SHUTDOWN 105000, STARTUP 106000)이 함께 옴, "
+           "옛 부팅의 실제 끝은 조회 뒤 → 기본은 닫지 않아 옛 기록(110000)을 판정하지 않음",
+    [{"target": [52000, "ad.x", ".NewBoot"], "rows": 0}, {"target": [110000, "ad.x", ".OldTail"], "rows": 0}],
+    init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 5}, queries=q16g)
+add("16g-S", "[SHUTDOWN 해제, 분석용] 한계: 16g에서 런타임 재시작의 SHUTDOWN으로 닫아 옛 기록(110000)을 AD로 판정",
+    [{"target": [52000, "ad.x", ".NewBoot"], "rows": 0}, {"target": [110000, "ad.x", ".OldTail"], "rule_v0t": {"outcome": "AD"}}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1}, recover="shutdown", queries=q16g)
+add("16i", "[SHUTDOWN 해제, 분석용] 열린 격리 중 시계 후퇴: 시계 변경으로 버리기로 한 [145000, 210000)은 "
+           "그보다 앞의 SHUTDOWN(100000)으로 닫아도 줄이지 않음",
+    [{"target": [160000, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [230000, "ad.x", ".AdActivity"], "features": F(F0=o(20000)), "rule_v0t": AD()}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1}, recover="shutdown",
+    queries=[q16, {**r16, "events": []}, {"wall_to": 200000, "elapsed": 150000, "boot_count": 2, "events": []},
+             {"wall_to": 150000, "elapsed": 160000, "boot_count": 2, "events": []},
+             {"wall_to": 250000, "elapsed": 260000, "boot_count": 2, "range": [90000, 250000],
+              "events": [[100000, "SHUTDOWN", "android", ""], [160000, "RESUMED", "ad.x", ".AdActivity"],
+                         [230000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("16d", "[SHUTDOWN 해제, 분석용] 한계: 열린 격리 중 다시 재부팅 → 어느 SHUTDOWN이 그 옛 부팅의 끝인지 가를 수 없어 계속 버림",
     [{"target": [110000, "ad.x", ".AdActivity"], "rows": 0}],
-    init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 2},
+    init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 2}, recover="shutdown",
     queries=[q16, {**r16, "events": []}, {"wall_to": 90000, "elapsed": 5000, "boot_count": 3, "events": []},
              {"wall_to": 130000, "elapsed": 45000, "boot_count": 3,
               "events": [[105000, "SHUTDOWN", "android", ""], [110000, "RESUMED", "ad.x", ".AdActivity"]]}])
-add("16e", "열린 격리 중 시계 1000초 전진, OS가 기록을 옮김: 더 앞 부팅의 SHUTDOWN(990000 → 1990000)이 보여도 닫지 않고, "
+add("16e", "[SHUTDOWN 해제, 분석용] 열린 격리 중 시계 1000초 전진, OS가 기록을 옮김: 더 앞 부팅의 SHUTDOWN(990000 → 1990000)이 보여도 닫지 않고, "
            "옛 부팅의 SHUTDOWN(1960000 → 2960000)에서 닫음",
     [{"target": [1992000, "ad.x", ".AdActivity"], "rows": 0},
      {"target": [2970000, "ad.x", ".AdActivity"], "features": F(F0=o(9999)), "rule_v0t": AD()}],
     segment={"start": 1000000, "kind": "install"}, init={"wall": 1000000, "elapsed": 0, "boot_count": 1},
-    segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3},
+    segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3}, recover="shutdown",
     queries=[{"wall_to": 2000000, "elapsed": 1000000, "boot_count": 1, "events": [[1950000, "RESUMED", "app.a", ".Main"]]},
              {"wall_to": 100000, "elapsed": 10000, "boot_count": 2, "events": [], "range": [90000, 100000]},
              {"wall_to": 1120000, "elapsed": 30000, "boot_count": 2, "events": []},
@@ -272,7 +310,7 @@ add("18", "조회가 null (사용자 잠금 해제 전): 커서를 옮기지 않
               "events": [[30000, "PAUSED", "app.a", ".Main"], [30500, "RESUMED", "app.a", ".Detail"]]}])
 
 spec = {"schema": "fx0-draft",
-        "note": "기대값은 추출기 실행 전에 손으로 계산. 시각 ms. segment 기본값 {start:-600000, kind:install}(CAP 이상 관측). events 사례는 검사기가 한 번 조회·모든 묶음 경계 두 조회 분할·조회마다 저장 실패 재실행·같은 ms 순서 바꾸기(뒤집기, 돌리기)를 함께 확인. queries 사례는 적힌 조회 그대로에 저장 실패 재실행·같은 ms 순서 바꾸기를 확인하고, range가 있으면 query_range 결과도 확인. order_assume이 있는 사례([생명주기 가정])는 분석용 모드",
+        "note": "기대값은 추출기 실행 전에 손으로 계산. 시각 ms. segment 기본값 {start:-600000, kind:install}(CAP 이상 관측). events 사례는 검사기가 한 번 조회·모든 묶음 경계 두 조회 분할·조회마다 저장 실패 재실행·같은 ms 순서 바꾸기(뒤집기, 돌리기)를 함께 확인. queries 사례는 적힌 조회 그대로에 저장 실패 재실행·같은 ms 순서 바꾸기를 확인하고, range가 있으면 query_range 결과도 확인. order_assume이 있는 사례([생명주기 가정])는 분석용 모드. recover가 있는 사례([SHUTDOWN 해제, 분석용])는 열린 격리를 옛 부팅의 SHUTDOWN으로 닫는 분석용 모드",
         "launchers": {"app.a": {"resolved": [".Main"], "system": False}, "app.b": {"resolved": [".Main"], "system": False},
                       "ad.x": {"resolved": [".Splash"], "system": False}},
         "cases": cases}

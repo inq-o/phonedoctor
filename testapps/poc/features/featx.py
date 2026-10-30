@@ -10,7 +10,9 @@
   규칙 결과가 다르면 HOLD. order_assume="lifecycle"이면 생명주기 가정으로 순서를 줄임 (분석용, 확정 판정에 안 씀)
 - 관측 구간(segment): 재부팅·시계 변경·긴 공백이면 상태를 비우고 새 구간. 어느 시계·부팅의 기록인지 가를 수 없는
   시각 범위는 행을 만들지 않고 개수만 셈 (uncertain_discarded). 버릴 범위는 합치기만 하고 줄이지 않음.
-  재부팅하면서 시계가 뒤로 가면 버릴 범위의 끝을 모름 → 옛 부팅의 SHUTDOWN이 보일 때까지 행을 만들지 않음
+  재부팅하면서 시계가 뒤로 가면 버릴 범위의 끝을 모름 → 기본은 계속 행을 만들지 않음(열린 격리).
+  recover="shutdown"이면 옛 부팅의 SHUTDOWN이 보일 때 닫음 (분석용, 확정 판정에 안 씀: 옛 부팅의 런타임 재시작 SHUTDOWN과 못 가름)
+- 개수(counts)는 조회에서 만난 횟수. 같은 기록을 다시 조회하면 다시 셈 (pre_cursor_ignored 등은 고유 이벤트 수가 아님)
 - 시계 변경 때 OS가 저장된 기록의 시각을 옮기는 경우(AOSP 15 UsageStatsDatabase.onTimeChanged, 2초 넘게 어긋날 때)와
   옮기지 않는 경우를 모두 가정하고, 어느 쪽이든 섞일 수 있는 범위를 버림
 - 판정: rule_v0t = 규칙 v0를 특징으로 다시 쓴 시간 기준 판. 3값 논리(참·거짓·모름), 모름이 남으면 HOLD
@@ -55,9 +57,9 @@ def empty_world(assume=None):
     return w
 
 
-def init_state(start, kind="install", wall=None, elapsed=None, boot_count=None, order_assume=None):
+def init_state(start, kind="install", wall=None, elapsed=None, boot_count=None, order_assume=None, recover=None):
     """수집 시작. wall/elapsed는 시작 시점 기준값 (없으면 start, 0)"""
-    return {"schema": SCHEMA, "order_assume": order_assume, "cursor": start, "skip_until": start,
+    return {"schema": SCHEMA, "order_assume": order_assume, "recover": recover, "cursor": start, "skip_until": start,
             "seg": {"id": 1, "start": start, "kind": kind}, "worlds": [empty_world(order_assume)], "pending": [],
             "uncertain": [], "open_q": None, "boot_max_ts": None,
             "last": {"wall": start if wall is None else wall, "elapsed": 0 if elapsed is None else elapsed,
@@ -78,7 +80,7 @@ def _reset(state, start, kind):
 def _uncertain(state, frm, to, kind, after=None):
     """시계 기준이 바뀜. frm부터 다시 읽되 [frm, to)는 옛 시계 기록과 섞일 수 있어 쓰지 않고, 새 구간은 그 끝에서 시작.
     앞서 버리기로 한 범위가 남아 있으면 합침 (줄이면 옛 기록이 다시 판정됨).
-    to=None이면 끝을 모름(열린 격리): 시각이 after 이상인 SHUTDOWN이 보일 때까지 행을 만들지 않음 (_close_open)"""
+    to=None이면 끝을 모름(열린 격리): 행을 만들지 않음. recover="shutdown"이면 after 이상인 SHUTDOWN에서 닫음 (_close_open)"""
     state["cursor"] = frm
     state["pending"] = []   # 옛 시계 기준 부팅 경계는 버림
     state["uncertain"] = (state["uncertain"] + [[frm, to, kind]])[-20:]
@@ -96,17 +98,19 @@ def _uncertain(state, frm, to, kind, after=None):
 
 
 def _close_open(state, events):
-    """열린 격리를 옛 부팅의 SHUTDOWN으로 닫음. AOSP는 부팅 때 옛 부팅의 마지막 저장 시각으로 SHUTDOWN을 기록하므로
-    옛 부팅 기록은 그 시각까지만 있음 [갤럭시 미확인]. 그보다 앞 부팅의 SHUTDOWN과 섞이지 않게 after 이상만 봄.
-    OS가 기록을 옮겼다면 after도 같이 옮겨졌으므로 앞으로 옮긴 만큼(shift > 0) 올려서 봄"""
+    """recover="shutdown"(분석용)일 때만: 열린 격리를 옛 부팅의 SHUTDOWN으로 닫음. AOSP는 부팅 때 옛 부팅의
+    max(lastTimeSaved, endTime)으로 SHUTDOWN을 기록하므로 옛 부팅 기록은 그 시각까지만 있다고 봄 [갤럭시 미확인].
+    그보다 앞 부팅의 SHUTDOWN과 섞이지 않게 after 이상만 봄. OS가 기록을 옮겼다면 after도 같이 옮겨졌으므로 앞으로 옮긴
+    만큼(shift > 0) 올려서 봄. 커서 앞은 격리 중 버린 기록이라 새 구간은 커서보다 앞에서 시작하지 않음.
+    한계: 옛 부팅이 앞 조회 뒤 런타임 재시작을 했다면 그 SHUTDOWN에서 닫아 옛 기록을 판정함"""
     q = state["open_q"]
-    if q is None or not q["closable"]:
+    if state["recover"] != "shutdown" or q is None or not q["closable"]:
         return
     th = q["after"] + max(0, q["shift"])
     sd = [e["ts"] for e in events if e["type"] == SHUTDOWN and e["ts"] >= th]
     if sd:
         state["open_q"] = None
-        state["skip_until"] = max(q["floor"], max(sd) + 1)
+        state["skip_until"] = max(q["floor"], max(sd) + 1, state["cursor"])
         _reset(state, state["skip_until"], q["kind"])
 
 
@@ -139,7 +143,8 @@ def _rebase(state, wall, el, bc, events):
     if abs(drift) > CLOCK_TOL_MS:
         # 어느 이벤트가 바뀌기 전 시계인지 모름 → 이번 조회분은 버림. 버릴 범위의 끝은 두 경우 중 늦은 쪽:
         # 기록을 옮기지 않으면 옛 시계 기록이 last.wall + elapsed 경과까지, 옮기면 이미 처리한 기록(커서 앞)이 앞으로 옮겨져
-        # 다시 보일 수 있는 끝(OS가 옮긴 양은 앱이 본 차이와 OS 기준 2배까지 다를 수 있음)
+        # 다시 보일 수 있는 끝. OS가 옮긴 양과 앱이 본 차이는 두 기준점에서 각각 OS 기준(2초)까지 어긋날 수 있어 4초를 더함
+        # (조건부 가정: 조회 때 잰 wall·elapsed와 OS 보정 시점의 차이·OEM 동작은 미확인, 제품의 안전 상한 아님)
         _bump(state, "clock_discarded", len(events))
         if state["open_q"] is not None:
             state["open_q"]["shift"] += drift
@@ -157,7 +162,8 @@ def query_range(state, wall, elapsed, boot_count):
     _rebase(st, wall, elapsed, boot_count, [])
     begin = min(state["cursor"], st["cursor"], wall)
     q = st["open_q"]
-    if q is not None and q["closable"]:   # 닫을 SHUTDOWN이 커서 앞에 늦게 보이거나 시계 변경으로 건너뛴 구간에 있을 수 있음
+    if st["recover"] == "shutdown" and q is not None and q["closable"]:
+        # 분석용: 닫을 SHUTDOWN이 커서 앞에 늦게 보이거나 시계 변경으로 건너뛴 구간에 있을 수 있음. 조회마다 과거를 다시 읽음
         begin = min(begin, q["after"] + max(0, q["shift"]))
     return begin, wall
 
@@ -353,7 +359,8 @@ def _row(state, e, query_id, f, rule_worlds, meta_validity):
            "source_seq": e["seq"], "ts": e["ts"], "pkg": e["pkg"], "cls": e["cls"],
            "features": {k: list(v) for k, v in f.items()}, "meta_validity": meta_validity,
            "rule_v0t": {"outcome": outs.pop() if len(outs) == 1 else "HOLD", "failed": failed, "unknown": unknown},
-           "order_basis": "lifecycle_assumed" if state["order_assume"] else "none", "schema": SCHEMA}
+           "order_basis": "lifecycle_assumed" if state["order_assume"] else "none",
+           "recover_basis": "shutdown_assumed" if state["recover"] else "none", "schema": SCHEMA}
     state["next_ingest"] += 1
     return row
 
@@ -487,10 +494,11 @@ def check_cases(path=os.path.join(HERE, "cases.json"), verbose=True):
         snap = snap_from({**base_launchers, **case.get("launchers", {})})
         seg = case.get("segment", {"start": -CAP_MS, "kind": "install"})
         assume = case.get("order_assume")
+        mode = {"order_assume": assume, "recover": case.get("recover")}
         msgs = []
         if "queries" in case:
             qs = [{**q, "events": None if q["events"] is None else [_ev(e) for e in q["events"]]} for q in case["queries"]]
-            st0 = init_state(seg["start"], seg["kind"], order_assume=assume, **case.get("init", {}))
+            st0 = init_state(seg["start"], seg["kind"], **mode, **case.get("init", {}))
             rows, st = run(qs, snap, copy.deepcopy(st0))
             ref = _comparable(rows)
             s = copy.deepcopy(st0)
@@ -510,8 +518,7 @@ def check_cases(path=os.path.join(HERE, "cases.json"), verbose=True):
         else:
             flat = [_ev(e) for e in case["events"]]
             qs = _single(flat, seg["start"])
-            mk = lambda: init_state(seg["start"], seg["kind"], wall=seg["start"], elapsed=1_000_000, boot_count=1,
-                                    order_assume=assume)
+            mk = lambda: init_state(seg["start"], seg["kind"], wall=seg["start"], elapsed=1_000_000, boot_count=1, **mode)
             rows, st = run(qs, snap, mk())
             ref = _comparable(rows)
             for b, qs2 in _splits(flat, seg["start"]):
