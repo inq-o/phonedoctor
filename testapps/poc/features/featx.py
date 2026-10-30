@@ -156,8 +156,9 @@ def query_range(state, wall, elapsed, boot_count):
     st = copy.deepcopy(state)
     _rebase(st, wall, elapsed, boot_count, [])
     begin = min(state["cursor"], st["cursor"], wall)
-    if st["open_q"] is not None and state["open_q"] is None:   # 이번에 열리는 격리: 닫을 SHUTDOWN이 커서 앞에 있을 수 있음
-        begin = min(begin, st["open_q"]["after"])
+    q = st["open_q"]
+    if q is not None and q["closable"]:   # 닫을 SHUTDOWN이 커서 앞에 늦게 보이거나 시계 변경으로 건너뛴 구간에 있을 수 있음
+        begin = min(begin, q["after"] + max(0, q["shift"]))
     return begin, wall
 
 

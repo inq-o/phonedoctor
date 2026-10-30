@@ -219,6 +219,13 @@ add("16c", "옛 부팅의 SHUTDOWN(45000)이 새 부팅 시작(50000)보다 앞:
     queries=[{**q16, "events": [[40000, "RESUMED", "app.a", ".Main"]]},
              {**r16, "range": [40000, 60000], "events": [[45000, "SHUTDOWN", "android", ""], [50000, "STARTUP", "android", ""],
                                                          [52000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("16f", "열린 격리: 앞 조회에서 안 보이던 옛 부팅 SHUTDOWN(100000)이 커서(125000) 앞에 늦게 보여도 닫음 "
+           "(닫을 수 있는 동안은 기준 시각 90000부터 다시 읽음)",
+    [{"target": [150000, "ad.x", ".AdActivity"], "features": F(F0=o(49999)), "rule_v0t": AD()}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 0, "pre_cursor_ignored": 1},
+    queries=[q16, {**r16, "events": []}, {"wall_to": 130000, "elapsed": 80000, "boot_count": 2, "events": [], "range": [55000, 130000]},
+             {"wall_to": 160000, "elapsed": 110000, "boot_count": 2, "range": [90000, 160000],
+              "events": [[100000, "SHUTDOWN", "android", ""], [150000, "RESUMED", "ad.x", ".AdActivity"]]}])
 add("16d", "한계: 열린 격리 중 다시 재부팅 → 어느 SHUTDOWN이 그 옛 부팅의 끝인지 가를 수 없어 계속 버림",
     [{"target": [110000, "ad.x", ".AdActivity"], "rows": 0}],
     init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 2},

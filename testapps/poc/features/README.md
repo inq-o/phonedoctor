@@ -8,7 +8,7 @@
 ## 실행
 
 ```bash
-python3 testapps/poc/features/featx.py          # 검증 사례 46개
+python3 testapps/poc/features/featx.py          # 검증 사례 47개
 python3 testapps/poc/features/mutate.py         # 변형 시험 (코드를 한 곳씩 망가뜨려 사례가 잡는지)
 python3 testapps/poc/features/make_cases.py testapps/poc/features/cases.json   # 사례 다시 만들기
 python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/data/poc -name '*events.csv')
@@ -35,7 +35,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 | `events` (한 번 조회) | 모든 묶음 경계에서 두 조회로 나누기, 조회마다 저장 실패 뒤 재실행, 같은 ms 묶음의 조회 순서 바꾸기(뒤집기·한 칸 돌리기) |
 | `queries` (조회를 직접 적음) | 조회마다 저장 실패 뒤 재실행, 같은 ms 순서 바꾸기, `range`가 있으면 `query_range` 결과 |
 
-`mutate.py`의 변형 39개 중 38개가 잡힌다. 남은 하나("오래된 상태 정리 끔")는 결과가 같아야 맞는 변형이다.
+`mutate.py`의 변형 40개 중 39개가 잡힌다. 남은 하나("오래된 상태 정리 끔")는 결과가 같아야 맞는 변형이다.
 
 ## 가정과 미확인 사항
 
@@ -48,7 +48,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 | OS의 기록 시각 보정 | 옮기는 경우와 옮기지 않는 경우를 모두 가정 | AOSP 15 원문(`android-15.0.0_r1`, `frameworks/base/services/usage/`): 같은 부팅에서 시계가 2초 넘게 어긋나면 저장된 기록 파일의 기준 시각을 그 차이만큼 옮긴다(`UserUsageStatsService.checkAndGetTimeLocked`, `UsageStatsDatabase.onTimeChanged`). 부팅할 때는 지금 시각보다 늦게 시작한 기록 파일을 지우고, 옛 부팅의 마지막 저장 시각으로 SHUTDOWN을, 지금 시각으로 STARTUP을 기록한다(`UsageStatsDatabase.init`, `UserUsageStatsService.init`). **갤럭시 펌웨어에서 같은지 미확인** |
 | 시계 변경 | 벽시계 경과와 elapsed 경과가 1초 넘게 어긋나면 그 조회분을 버리고 새 시계 기준으로 커서를 다시 잡음 | 허용 오차를 OS 기준(2초)보다 작게 둬, OS가 기록을 옮겼는데 앱은 못 알아채는 경우를 줄인다(사례 8d). 버릴 범위의 끝은 두 경우 중 늦은 쪽이다: 옮기지 않으면 옛 시계 기록이 있을 수 있는 `앞 조회 시각 + elapsed 경과`, 옮기면 이미 처리한 기록이 앞으로 옮겨져 다시 보일 수 있는 `앞 커서 + 전진 폭 + 4초`. 버릴 범위가 겹치면 합치고 줄이지 않는다(사례 8c). 조회 사이에 시계가 여러 번 바뀌어 앱이 본 차이와 OS가 옮긴 양이 4초 넘게 다르면 놓칠 수 있다(**미해결**) |
 | 재부팅 | `BOOT_COUNT` 변화, elapsed 감소, 앞 조회 뒤에 기록된 STARTUP 중 하나 | `BOOT_COUNT`를 일반 앱이 읽을 수 있는지 **미확인.** STARTUP은 API 29부터다 |
-| 재부팅 + 시계 후퇴 | 부팅 시작(`wall − elapsed`)이 앞 조회보다 이르면 끝을 모르는 격리를 연다. 새 부팅 시작부터 다시 읽되 행을 만들지 않고, 옛 부팅의 SHUTDOWN이 보이면 그 시각까지만 버리고 새 구간을 연다(사례 16·16b·16c) | 옛 부팅이 앞 조회 뒤 꺼질 때까지 남긴 기록의 끝은 지금 시각만으로 알 수 없다. SHUTDOWN은 옛 부팅에서 본 마지막 기록 이후 것만 쓴다(더 앞 부팅의 SHUTDOWN과 섞지 않게). OS가 기록을 앞으로 옮겼으면 그만큼 기준도 올린다(사례 16e). **한계:** 격리 중 다시 재부팅하거나 런타임 재시작이 보이면 닫지 않는다(사례 16d, 상태를 새로 시작해야 함). 옛 부팅이 앞 조회 뒤 런타임 재시작을 했다면 그 재시작의 SHUTDOWN에서 먼저 닫을 수 있다(**미해결**). 재부팅과 시계 전진이 겹치면 꺼져 있던 시간으로 보고 구분하지 못한다 |
+| 재부팅 + 시계 후퇴 | 부팅 시작(`wall − elapsed`)이 앞 조회보다 이르면 끝을 모르는 격리를 연다. 새 부팅 시작부터 다시 읽되 행을 만들지 않고, 옛 부팅의 SHUTDOWN이 보이면 그 시각까지만 버리고 새 구간을 연다(사례 16·16b·16c). 닫을 수 있는 동안은 커서 앞에 늦게 보이는 SHUTDOWN도 찾도록 기준 시각부터 다시 읽는다(사례 16f) | 옛 부팅이 앞 조회 뒤 꺼질 때까지 남긴 기록의 끝은 지금 시각만으로 알 수 없다. SHUTDOWN은 옛 부팅에서 본 마지막 기록 이후 것만 쓴다(더 앞 부팅의 SHUTDOWN과 섞지 않게). OS가 기록을 앞으로 옮겼으면 그만큼 기준도 올린다(사례 16e). **한계:** 격리 중 다시 재부팅하거나 런타임 재시작이 보이면 닫지 않는다(사례 16d, 상태를 새로 시작해야 함). 옛 부팅이 앞 조회 뒤 런타임 재시작을 했다면 그 재시작의 SHUTDOWN에서 먼저 닫을 수 있다(**미해결**). 재부팅과 시계 전진이 겹치면 꺼져 있던 시간으로 보고 구분하지 못한다 |
 | 런타임 재시작 | elapsed가 이어지는 STARTUP은 새 구간을 열되 "없음"을 확정하지 않음 | 공식 문서상 STARTUP은 런타임 재시작에도 기록될 수 있다. 재시작과 시계 변경이 겹치면 재부팅으로 잘못 볼 수 있다 |
 | null 조회 | 커서와 시각 기준을 그대로 둠 | Android R부터 사용자 잠금 해제 전에는 null일 수 있다(공식 문서) |
 
