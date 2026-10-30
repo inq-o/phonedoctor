@@ -61,5 +61,20 @@ for d in ml/data/apk_split ml/data/apk_split/r2 ./ml/data/../data/apk_split; do
   [ -e "$T/ml/data/apk_split/a.pkg.apk" ] || got="입력 APK가 지워짐"
   expect "출력 폴더가 APK 입력 폴더 안($d): 시작 전 중단" 2 "$got" ""
 done
+for d in out-alias out-alias/r2 alias-parent/apk_split; do   # 심볼릭 링크를 거쳐 입력 폴더나 그 안으로 들어감
+  setup; ln -s ml/data/apk_split "$T/out-alias"; ln -s ml/data "$T/alias-parent"
+  got=$(OUT_DIR=$d run env)
+  [ -e "$T/ml/data/apk_split/a.pkg.apk" ] || got="입력 APK가 지워짐"
+  expect "출력 폴더가 링크로 APK 입력 폴더 안($d): 시작 전 중단" 2 "$got" ""
+done
+setup; mkdir -p "$T/elsewhere"; ln -s elsewhere "$T/out-link"
+got=$(OUT_DIR=out-link run env)
+[ -f "$T/elsewhere/b.pkg/run.log" ] && [ -e "$T/ml/data/apk_split/a.pkg.apk" ] || got="링크 대상에 기록 없음 또는 입력 APK가 지워짐"
+expect "출력 폴더가 입력 밖을 가리키는 링크: 정상 관찰" 0 "$got" "a.pkg b.pkg "
+setup; mkdir -p "$T/ml/data/apk_store"; mv "$T/ml/data/apk_split/"* "$T/ml/data/apk_store/"; rmdir "$T/ml/data/apk_split"
+ln -s apk_store "$T/ml/data/apk_split"
+got=$(OUT_DIR=ml/data/apk_store run env)
+[ -e "$T/ml/data/apk_store/a.pkg.apk" ] || got="입력 APK가 지워짐"
+expect "입력 폴더가 링크, 출력이 그 실제 폴더: 시작 전 중단" 2 "$got" ""
 
 [ $fails -eq 0 ] && echo "모두 통과" || { echo "실패 ${fails}개"; exit 1; }
