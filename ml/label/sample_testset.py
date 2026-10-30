@@ -6,6 +6,7 @@
 """
 import csv
 import random
+import re
 import sys
 from pathlib import Path
 
@@ -25,6 +26,9 @@ def sample(rows, quota=QUOTA, seed=SEED):
 def main(packages_path, apk_dir, out_path):
     if Path(out_path).exists():
         sys.exit(f"{out_path} 이미 있음: 동결한 테스트셋은 덮어쓰지 않는다. 새 버전 파일명을 쓸 것")
+    others = [p.name for p in Path(out_path).parent.glob("test_v*.csv") if re.fullmatch(r"test_v\d+\.csv", p.name)]
+    if others:   # 같은 시드로 다시 뽑으면 v1과 같은 앱이 나옴
+        sys.exit(f"{', '.join(others)} 있음: 추가분은 이전 버전 앱을 뺀 모집단에서 뽑아야 하는데 아직 지원하지 않음")
     have = {p.stem for p in Path(apk_dir).glob("*.apk")}
     with open(packages_path, encoding="utf-8") as f:
         rows = [r for r in csv.DictReader(f) if r["package"] in have]

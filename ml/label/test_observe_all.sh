@@ -40,6 +40,7 @@ expect() {  # 이름, 기대 exit, 실제 exit, 기대 관찰 목록
 
 setup; expect "모두 성공" 0 "$(run env)" "a.pkg b.pkg "
 setup; expect "기기 응답에 CR" 0 "$(run env CR=$'\r')" "a.pkg b.pkg "
+setup; rm "$T/test.csv"; expect "표본 목록을 못 읽음" 2 "$(run env)" ""
 setup; expect "처음부터 연결 끊김" 2 "$(run env FAIL_AFTER=1)" ""
 setup; expect "목록이 빔(package:android 없음)" 2 "$(run env EMPTY=1)" ""
 setup; echo package:b.pkg > "$T/installed"; expect "시작 전 표본 앱이 남음" 2 "$(run env)" ""
