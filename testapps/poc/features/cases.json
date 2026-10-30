@@ -2590,6 +2590,266 @@
    ]
   },
   {
+   "id": "8c",
+   "title": "검토 반례: 시계 후퇴가 두 번 겹침 → 앞서 버리기로 한 [85000, 160000)을 줄이지 않음 (합치면 [75000, 160000))",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    3
+   ],
+   "counts": {
+    "segments_clock": 2,
+    "uncertain_discarded": 1
+   },
+   "queries": [
+    {
+     "wall_to": 100000,
+     "elapsed": 700000,
+     "boot_count": 1,
+     "events": [
+      [
+       1000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       50000,
+       "USER_INTERACTION",
+       "app.a",
+       ""
+      ]
+     ]
+    },
+    {
+     "wall_to": 90000,
+     "elapsed": 760000,
+     "boot_count": 1,
+     "events": []
+    },
+    {
+     "wall_to": 80000,
+     "elapsed": 770000,
+     "boot_count": 1,
+     "events": [],
+     "range": [
+      75000,
+      80000
+     ]
+    },
+    {
+     "wall_to": 140000,
+     "elapsed": 830000,
+     "boot_count": 1,
+     "events": [
+      [
+       120000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    },
+    {
+     "wall_to": 200000,
+     "elapsed": 890000,
+     "boot_count": 1,
+     "events": [
+      [
+       170000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      120000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    },
+    {
+     "target": [
+      170000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "features": {
+      "F0": [
+       10000,
+       "OBSERVED"
+      ],
+      "F1": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F2": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F3": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F4": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F5": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F6": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F7": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F8": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F9": [
+       false,
+       "OBSERVED"
+      ],
+      "F10": [
+       false,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "AD",
+      "failed": [],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
+   "id": "8d",
+   "title": "시계 3초 전진, OS가 기록도 옮김 (AOSP는 2초 넘게 어긋나면 옮김, 옮긴 양은 앱이 본 차이와 OS 기준 2배까지 다를 수 있음): 이미 처리한 94600이 101600으로 옮겨져 다시 보여도 두 번 처리하지 않음",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    1,
+    2
+   ],
+   "counts": {
+    "segments_clock": 1,
+    "clock_discarded": 1,
+    "uncertain_discarded": 1
+   },
+   "queries": [
+    {
+     "wall_to": 100000,
+     "elapsed": 700000,
+     "boot_count": 1,
+     "events": [
+      [
+       1000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       94600,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    },
+    {
+     "wall_to": 104000,
+     "elapsed": 701000,
+     "boot_count": 1,
+     "events": [
+      [
+       101600,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ],
+     "range": [
+      95000,
+      104000
+     ]
+    },
+    {
+     "wall_to": 130000,
+     "elapsed": 727000,
+     "boot_count": 1,
+     "events": [
+      [
+       101600,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ],
+      [
+       120000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      94600,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 1
+    },
+    {
+     "target": [
+      101600,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    },
+    {
+     "target": [
+      120000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "features": {
+      "F0": [
+       18000,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "AD",
+      "failed": [],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
    "id": "9",
    "title": "같은 튜플 두 번: 키로 거르지 않고 두 행 (같은 액티비티라 조회 순서 유지), 둘 다 광고",
    "events": [
@@ -3449,18 +3709,16 @@
   },
   {
    "id": "16",
-   "title": "검토 반례: 재부팅하면서 시계도 뒤로 감 → 옛 커서 95000을 버리고 새 부팅 시작(50000)부터 읽음, 앞 조회 시각(100000)까지는 버림",
+   "title": "검토 반례: 재부팅하면서 시계도 뒤로 감 → 옛 부팅이 앞 조회(100000) 뒤 꺼질 때까지 남긴 기록의 끝을 모름 → 옛 부팅의 SHUTDOWN이 보일 때까지 행을 만들지 않음 (120000 옛 부팅 기록도 버림). 옛 부팅에서 본 기록이 없어 옛 부팅 시작부터 SHUTDOWN을 찾음",
    "init": {
     "wall": -600000,
     "elapsed": 0,
     "boot_count": 1
    },
-   "segments": [
-    2
-   ],
+   "segments": [],
    "counts": {
-    "segments_boot_clock": 1,
-    "uncertain_discarded": 2
+    "segments_boot_clock": 0,
+    "uncertain_discarded": 3
    },
    "queries": [
     {
@@ -3468,6 +3726,107 @@
      "elapsed": 700000,
      "boot_count": 1,
      "events": []
+    },
+    {
+     "wall_to": 60000,
+     "elapsed": 10000,
+     "boot_count": 2,
+     "events": [
+      [
+       52000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ],
+     "range": [
+      -600000,
+      60000
+     ]
+    },
+    {
+     "wall_to": 80000,
+     "elapsed": 30000,
+     "boot_count": 2,
+     "events": [
+      [
+       70000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    },
+    {
+     "wall_to": 130000,
+     "elapsed": 80000,
+     "boot_count": 2,
+     "events": [
+      [
+       120000,
+       "RESUMED",
+       "ad.x",
+       ".OldBoot"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      52000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    },
+    {
+     "target": [
+      70000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    },
+    {
+     "target": [
+      120000,
+      "ad.x",
+      ".OldBoot"
+     ],
+     "rows": 0
+    }
+   ]
+  },
+  {
+   "id": "16b",
+   "title": "16에서 옛 부팅의 SHUTDOWN(105000)이 보임 → 옛 부팅 기록은 거기까지, 그 뒤부터 새 구간 (끝을 아는 격리)",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    2
+   ],
+   "counts": {
+    "segments_boot_clock": 1,
+    "uncertain_discarded": 3
+   },
+   "queries": [
+    {
+     "wall_to": 100000,
+     "elapsed": 700000,
+     "boot_count": 1,
+     "events": [
+      [
+       90000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ]
+     ]
     },
     {
      "wall_to": 60000,
@@ -3505,6 +3864,12 @@
      "boot_count": 2,
      "events": [
       [
+       105000,
+       "SHUTDOWN",
+       "android",
+       ""
+      ],
+      [
        110000,
        "RESUMED",
        "ad.x",
@@ -3516,15 +3881,15 @@
    "expect": [
     {
      "target": [
-      52000,
-      "ad.x",
-      ".AdActivity"
+      90000,
+      "app.a",
+      ".Main"
      ],
-     "rows": 0
+     "rows": 1
     },
     {
      "target": [
-      70000,
+      52000,
       "ad.x",
       ".AdActivity"
      ],
@@ -3538,7 +3903,7 @@
      ],
      "features": {
       "F0": [
-       10000,
+       4999,
        "OBSERVED"
       ],
       "F1": [
@@ -3579,6 +3944,321 @@
       ],
       "F10": [
        false,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "AD",
+      "failed": [],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
+   "id": "16c",
+   "title": "옛 부팅의 SHUTDOWN(45000)이 새 부팅 시작(50000)보다 앞: 커서 앞이라 옛 부팅의 마지막 기록(40000)부터 읽어 찾고, 새 부팅 시작부터 바로 판정",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    2
+   ],
+   "counts": {
+    "segments_boot_clock": 1,
+    "uncertain_discarded": 0,
+    "pre_cursor_ignored": 1
+   },
+   "queries": [
+    {
+     "wall_to": 100000,
+     "elapsed": 700000,
+     "boot_count": 1,
+     "events": [
+      [
+       40000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ]
+     ]
+    },
+    {
+     "wall_to": 60000,
+     "elapsed": 10000,
+     "boot_count": 2,
+     "events": [
+      [
+       45000,
+       "SHUTDOWN",
+       "android",
+       ""
+      ],
+      [
+       50000,
+       "STARTUP",
+       "android",
+       ""
+      ],
+      [
+       52000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ],
+     "range": [
+      40000,
+      60000
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      52000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "features": {
+      "F0": [
+       2000,
+       "OBSERVED"
+      ],
+      "F1": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F2": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F3": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F4": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F5": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F6": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F7": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F8": [
+       null,
+       "NOT_COVERED"
+      ],
+      "F9": [
+       false,
+       "OBSERVED"
+      ],
+      "F10": [
+       false,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "HOLD",
+      "failed": [],
+      "unknown": [
+       "R3",
+       "R4"
+      ]
+     }
+    }
+   ]
+  },
+  {
+   "id": "16d",
+   "title": "한계: 열린 격리 중 다시 재부팅 → 어느 SHUTDOWN이 그 옛 부팅의 끝인지 가를 수 없어 계속 버림",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1
+   ],
+   "counts": {
+    "segments_boot_clock": 0,
+    "uncertain_discarded": 2
+   },
+   "queries": [
+    {
+     "wall_to": 100000,
+     "elapsed": 700000,
+     "boot_count": 1,
+     "events": [
+      [
+       90000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ]
+     ]
+    },
+    {
+     "wall_to": 60000,
+     "elapsed": 10000,
+     "boot_count": 2,
+     "events": []
+    },
+    {
+     "wall_to": 90000,
+     "elapsed": 5000,
+     "boot_count": 3,
+     "events": []
+    },
+    {
+     "wall_to": 130000,
+     "elapsed": 45000,
+     "boot_count": 3,
+     "events": [
+      [
+       105000,
+       "SHUTDOWN",
+       "android",
+       ""
+      ],
+      [
+       110000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      110000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    }
+   ]
+  },
+  {
+   "id": "16e",
+   "title": "열린 격리 중 시계 1000초 전진, OS가 기록을 옮김: 더 앞 부팅의 SHUTDOWN(990000 → 1990000)이 보여도 닫지 않고, 옛 부팅의 SHUTDOWN(1960000 → 2960000)에서 닫음",
+   "segment": {
+    "start": 1000000,
+    "kind": "install"
+   },
+   "init": {
+    "wall": 1000000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    2
+   ],
+   "counts": {
+    "segments_boot_clock": 1,
+    "uncertain_discarded": 3
+   },
+   "queries": [
+    {
+     "wall_to": 2000000,
+     "elapsed": 1000000,
+     "boot_count": 1,
+     "events": [
+      [
+       1950000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ]
+     ]
+    },
+    {
+     "wall_to": 100000,
+     "elapsed": 10000,
+     "boot_count": 2,
+     "events": [],
+     "range": [
+      90000,
+      100000
+     ]
+    },
+    {
+     "wall_to": 1120000,
+     "elapsed": 30000,
+     "boot_count": 2,
+     "events": []
+    },
+    {
+     "wall_to": 2000000,
+     "elapsed": 910000,
+     "boot_count": 2,
+     "events": [
+      [
+       1990000,
+       "SHUTDOWN",
+       "android",
+       ""
+      ],
+      [
+       1992000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    },
+    {
+     "wall_to": 3000000,
+     "elapsed": 1910000,
+     "boot_count": 2,
+     "events": [
+      [
+       2960000,
+       "SHUTDOWN",
+       "android",
+       ""
+      ],
+      [
+       2970000,
+       "RESUMED",
+       "ad.x",
+       ".AdActivity"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      1992000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "rows": 0
+    },
+    {
+     "target": [
+      2970000,
+      "ad.x",
+      ".AdActivity"
+     ],
+     "features": {
+      "F0": [
+       9999,
        "OBSERVED"
       ]
      },

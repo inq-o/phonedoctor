@@ -139,6 +139,25 @@ add("8b", "시계 전진: 그 조회분은 어느 시계 기준인지 몰라 버
     init=init, counts={"segments_clock": 1, "clock_discarded": 1},
     queries=[q8, {"wall_to": 400000, "elapsed": 760000, "boot_count": 1, "events": [[120000, "RESUMED", "ad.x", ".AdActivity"]]},
              {"wall_to": 430000, "elapsed": 790000, "boot_count": 1, "events": [[410000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("8c", "검토 반례: 시계 후퇴가 두 번 겹침 → 앞서 버리기로 한 [85000, 160000)을 줄이지 않음 (합치면 [75000, 160000))",
+    [{"target": [120000, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [170000, "ad.x", ".AdActivity"], "features": full(o(10000), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False)), "rule_v0t": AD()}],
+    init=init, segments=[1, 3], counts={"segments_clock": 2, "uncertain_discarded": 1},
+    queries=[q8, {"wall_to": 90000, "elapsed": 760000, "boot_count": 1, "events": []},
+             {"wall_to": 80000, "elapsed": 770000, "boot_count": 1, "events": [], "range": [75000, 80000]},
+             {"wall_to": 140000, "elapsed": 830000, "boot_count": 1, "events": [[120000, "RESUMED", "ad.x", ".AdActivity"]]},
+             {"wall_to": 200000, "elapsed": 890000, "boot_count": 1, "events": [[170000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("8d", "시계 3초 전진, OS가 기록도 옮김 (AOSP는 2초 넘게 어긋나면 옮김, 옮긴 양은 앱이 본 차이와 OS 기준 2배까지 다를 수 있음): "
+          "이미 처리한 94600이 101600으로 옮겨져 다시 보여도 두 번 처리하지 않음",
+    [{"target": [94600, "ad.x", ".AdActivity"], "rows": 1}, {"target": [101600, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [120000, "ad.x", ".AdActivity"], "features": F(F0=o(18000)), "rule_v0t": AD()}],
+    init=init, segments=[1, 1, 2], counts={"segments_clock": 1, "clock_discarded": 1, "uncertain_discarded": 1},
+    queries=[{"wall_to": 100000, "elapsed": 700000, "boot_count": 1,
+              "events": [[1000, "RESUMED", "app.a", ".Main"], [94600, "RESUMED", "ad.x", ".AdActivity"]]},
+             {"wall_to": 104000, "elapsed": 701000, "boot_count": 1, "events": [[101600, "RESUMED", "ad.x", ".AdActivity"]],
+              "range": [95000, 104000]},
+             {"wall_to": 130000, "elapsed": 727000, "boot_count": 1,
+              "events": [[101600, "RESUMED", "ad.x", ".AdActivity"], [120000, "RESUMED", "ad.x", ".AdActivity"]]}])
 add("9", "같은 튜플 두 번: 키로 거르지 않고 두 행 (같은 액티비티라 조회 순서 유지), 둘 다 광고",
     [{"target": [2000, "ad.x", ".AdActivity"], "rows": 2, "features": F(F5=o(False), F4=none), "rule_v0": [], "rule_v0t": AD()}],
     events=[[1000, "RESUMED", "app.a", ".Main"], [2000, "RESUMED", "ad.x", ".AdActivity"], [2000, "RESUMED", "ad.x", ".AdActivity"]])
@@ -175,15 +194,50 @@ add("14b", "4일 동안 조회 못 함: 공백 구간, 직전 RESUMED 무효라 
              {"wall_to": 345610000, "elapsed": 346210000, "boot_count": 1,
               "events": [[345000000, "PAUSED", "app.a", ".Main"], [345000500, "RESUMED", "app.a", ".Detail"]]}])
 
-nc8 = full(o(10000), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False))
-add("16", "검토 반례: 재부팅하면서 시계도 뒤로 감 → 옛 커서 95000을 버리고 새 부팅 시작(50000)부터 읽음, 앞 조회 시각(100000)까지는 버림",
+q16 = {"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": [[90000, "RESUMED", "app.a", ".Main"]]}
+r16 = {"wall_to": 60000, "elapsed": 10000, "boot_count": 2, "events": [[52000, "RESUMED", "ad.x", ".AdActivity"]]}
+add("16", "검토 반례: 재부팅하면서 시계도 뒤로 감 → 옛 부팅이 앞 조회(100000) 뒤 꺼질 때까지 남긴 기록의 끝을 모름 → "
+          "옛 부팅의 SHUTDOWN이 보일 때까지 행을 만들지 않음 (120000 옛 부팅 기록도 버림). 옛 부팅에서 본 기록이 없어 옛 부팅 시작부터 SHUTDOWN을 찾음",
     [{"target": [52000, "ad.x", ".AdActivity"], "rows": 0}, {"target": [70000, "ad.x", ".AdActivity"], "rows": 0},
-     {"target": [110000, "ad.x", ".AdActivity"], "features": nc8, "rule_v0t": AD()}],
-    init=init, segments=[2], counts={"segments_boot_clock": 1, "uncertain_discarded": 2},
-    queries=[{"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": []},
-             {"wall_to": 60000, "elapsed": 10000, "boot_count": 2, "events": [[52000, "RESUMED", "ad.x", ".AdActivity"]], "range": [50000, 60000]},
+     {"target": [120000, "ad.x", ".OldBoot"], "rows": 0}],
+    init=init, segments=[], counts={"segments_boot_clock": 0, "uncertain_discarded": 3},
+    queries=[{"wall_to": 100000, "elapsed": 700000, "boot_count": 1, "events": []}, {**r16, "range": [-600000, 60000]},
              {"wall_to": 80000, "elapsed": 30000, "boot_count": 2, "events": [[70000, "RESUMED", "ad.x", ".AdActivity"]]},
-             {"wall_to": 130000, "elapsed": 80000, "boot_count": 2, "events": [[110000, "RESUMED", "ad.x", ".AdActivity"]]}])
+             {"wall_to": 130000, "elapsed": 80000, "boot_count": 2, "events": [[120000, "RESUMED", "ad.x", ".OldBoot"]]}])
+add("16b", "16에서 옛 부팅의 SHUTDOWN(105000)이 보임 → 옛 부팅 기록은 거기까지, 그 뒤부터 새 구간 (끝을 아는 격리)",
+    [{"target": [90000, "app.a", ".Main"], "rows": 1}, {"target": [52000, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [110000, "ad.x", ".AdActivity"], "features": full(o(4999), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False)), "rule_v0t": AD()}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3},
+    queries=[q16, {**r16, "range": [50000, 60000]},
+             {"wall_to": 80000, "elapsed": 30000, "boot_count": 2, "events": [[70000, "RESUMED", "ad.x", ".AdActivity"]]},
+             {"wall_to": 130000, "elapsed": 80000, "boot_count": 2,
+              "events": [[105000, "SHUTDOWN", "android", ""], [110000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("16c", "옛 부팅의 SHUTDOWN(45000)이 새 부팅 시작(50000)보다 앞: 커서 앞이라 옛 부팅의 마지막 기록(40000)부터 읽어 찾고, 새 부팅 시작부터 바로 판정",
+    [{"target": [52000, "ad.x", ".AdActivity"], "features": full(o(2000), nc, nc, nc, nc, nc, nc, nc, nc, o(False), o(False)),
+      "rule_v0t": HOLD(["R3", "R4"])}],
+    init=init, segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 0, "pre_cursor_ignored": 1},
+    queries=[{**q16, "events": [[40000, "RESUMED", "app.a", ".Main"]]},
+             {**r16, "range": [40000, 60000], "events": [[45000, "SHUTDOWN", "android", ""], [50000, "STARTUP", "android", ""],
+                                                         [52000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("16d", "한계: 열린 격리 중 다시 재부팅 → 어느 SHUTDOWN이 그 옛 부팅의 끝인지 가를 수 없어 계속 버림",
+    [{"target": [110000, "ad.x", ".AdActivity"], "rows": 0}],
+    init=init, segments=[1], counts={"segments_boot_clock": 0, "uncertain_discarded": 2},
+    queries=[q16, {**r16, "events": []}, {"wall_to": 90000, "elapsed": 5000, "boot_count": 3, "events": []},
+             {"wall_to": 130000, "elapsed": 45000, "boot_count": 3,
+              "events": [[105000, "SHUTDOWN", "android", ""], [110000, "RESUMED", "ad.x", ".AdActivity"]]}])
+add("16e", "열린 격리 중 시계 1000초 전진, OS가 기록을 옮김: 더 앞 부팅의 SHUTDOWN(990000 → 1990000)이 보여도 닫지 않고, "
+           "옛 부팅의 SHUTDOWN(1960000 → 2960000)에서 닫음",
+    [{"target": [1992000, "ad.x", ".AdActivity"], "rows": 0},
+     {"target": [2970000, "ad.x", ".AdActivity"], "features": F(F0=o(9999)), "rule_v0t": AD()}],
+    segment={"start": 1000000, "kind": "install"}, init={"wall": 1000000, "elapsed": 0, "boot_count": 1},
+    segments=[1, 2], counts={"segments_boot_clock": 1, "uncertain_discarded": 3},
+    queries=[{"wall_to": 2000000, "elapsed": 1000000, "boot_count": 1, "events": [[1950000, "RESUMED", "app.a", ".Main"]]},
+             {"wall_to": 100000, "elapsed": 10000, "boot_count": 2, "events": [], "range": [90000, 100000]},
+             {"wall_to": 1120000, "elapsed": 30000, "boot_count": 2, "events": []},
+             {"wall_to": 2000000, "elapsed": 910000, "boot_count": 2,
+              "events": [[1990000, "SHUTDOWN", "android", ""], [1992000, "RESUMED", "ad.x", ".AdActivity"]]},
+             {"wall_to": 3000000, "elapsed": 1910000, "boot_count": 2,
+              "events": [[2960000, "SHUTDOWN", "android", ""], [2970000, "RESUMED", "ad.x", ".AdActivity"]]}])
 q17 = {"wall_to": 60000, "elapsed": 10000, "boot_count": None, "range": [0, 60000],
        "events": [[50000, "STARTUP", "android", ""], [52000, "RESUMED", "ad.x", ".AdActivity"]]}
 i17 = {"wall": 10000, "elapsed": 1000, "boot_count": None}

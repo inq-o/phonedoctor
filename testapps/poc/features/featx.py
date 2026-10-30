@@ -8,8 +8,11 @@
   확정된 시각 묶음은 다시 처리하지 않으므로 키 집합 중복 제거가 없음 (같은 튜플 두 개는 두 행)
 - 같은 ms 묶음의 순서는 모름 → 가능한 순서를 모두 계산 ("세계" 여러 개). 특징 값이 세계마다 다르면 TIED,
   규칙 결과가 다르면 HOLD. order_assume="lifecycle"이면 생명주기 가정으로 순서를 줄임 (분석용, 확정 판정에 안 씀)
-- 관측 구간(segment): 재부팅·시계 변경·긴 공백이면 상태를 비우고 새 구간. 어느 시계 기록인지 가를 수 없는
-  시각 범위는 행을 만들지 않고 개수만 셈 (uncertain_discarded)
+- 관측 구간(segment): 재부팅·시계 변경·긴 공백이면 상태를 비우고 새 구간. 어느 시계·부팅의 기록인지 가를 수 없는
+  시각 범위는 행을 만들지 않고 개수만 셈 (uncertain_discarded). 버릴 범위는 합치기만 하고 줄이지 않음.
+  재부팅하면서 시계가 뒤로 가면 버릴 범위의 끝을 모름 → 옛 부팅의 SHUTDOWN이 보일 때까지 행을 만들지 않음
+- 시계 변경 때 OS가 저장된 기록의 시각을 옮기는 경우(AOSP 15 UsageStatsDatabase.onTimeChanged, 2초 넘게 어긋날 때)와
+  옮기지 않는 경우를 모두 가정하고, 어느 쪽이든 섞일 수 있는 범위를 버림
 - 판정: rule_v0t = 규칙 v0를 특징으로 다시 쓴 시간 기준 판. 3값 논리(참·거짓·모름), 모름이 남으면 HOLD
 
 사용:
@@ -26,7 +29,8 @@ import sys
 SCHEMA = "fx0-draft"
 CAP_MS = 600_000            # 경과 시간 특징의 관측 창이자 값 상한 (동결 전 결정)
 SETTLE_MS = 5_000           # 워터마크 여유: 기록 지연이 이보다 짧다고 가정 [실기기 미확인]
-CLOCK_TOL_MS = 5_000        # 벽시계 경과와 elapsed 경과의 허용 차이
+CLOCK_TOL_MS = 1_000        # 벽시계 경과와 elapsed 경과의 허용 차이. OS가 기록을 옮기는 기준(OS_SHIFT_MS)보다 작게
+OS_SHIFT_MS = 2_000         # AOSP 15 UsageStatsService.TIME_CHANGE_THRESHOLD_MILLIS [갤럭시 미확인]
 RETENTION_SAFE_MS = 3 * 86_400_000  # 이보다 오래 조회를 못 하면 공백 구간 [실기기 미확인: 보존 기간]
 MAX_TIE = 6                 # 같은 ms 묶음에서 순서를 모르는 이벤트 수 상한 (6! = 720가지)
 MAX_WORLDS = 64
@@ -55,7 +59,7 @@ def init_state(start, kind="install", wall=None, elapsed=None, boot_count=None, 
     """수집 시작. wall/elapsed는 시작 시점 기준값 (없으면 start, 0)"""
     return {"schema": SCHEMA, "order_assume": order_assume, "cursor": start, "skip_until": start,
             "seg": {"id": 1, "start": start, "kind": kind}, "worlds": [empty_world(order_assume)], "pending": [],
-            "uncertain": [],
+            "uncertain": [], "open_q": None, "boot_max_ts": None,
             "last": {"wall": start if wall is None else wall, "elapsed": 0 if elapsed is None else elapsed,
                      "boot_count": boot_count},
             "next_query": 1, "next_ingest": 1, "counts": {}}
@@ -71,13 +75,39 @@ def _reset(state, start, kind):
     _bump(state, "segments_" + kind)
 
 
-def _uncertain(state, frm, to, kind):
-    """시계 기준이 바뀜. frm부터 다시 읽되 [frm, to)는 옛 시계 기록과 섞일 수 있어 쓰지 않고, 새 구간은 to에서 시작"""
-    to = max(frm, to)
-    state["cursor"], state["skip_until"] = frm, to
+def _uncertain(state, frm, to, kind, after=None):
+    """시계 기준이 바뀜. frm부터 다시 읽되 [frm, to)는 옛 시계 기록과 섞일 수 있어 쓰지 않고, 새 구간은 그 끝에서 시작.
+    앞서 버리기로 한 범위가 남아 있으면 합침 (줄이면 옛 기록이 다시 판정됨).
+    to=None이면 끝을 모름(열린 격리): 시각이 after 이상인 SHUTDOWN이 보일 때까지 행을 만들지 않음 (_close_open)"""
+    state["cursor"] = frm
     state["pending"] = []   # 옛 시계 기준 부팅 경계는 버림
     state["uncertain"] = (state["uncertain"] + [[frm, to, kind]])[-20:]
-    _reset(state, to, kind)
+    q = state["open_q"]
+    if q is not None:   # 이미 열린 격리: 닫을 때 지킬 하한만 올림. 구간은 닫을 때 새로 엶
+        q["floor"] = max(q["floor"], frm if to is None else to)
+        q["closable"] = q["closable"] and to is not None
+        return
+    if to is None:
+        state["open_q"] = {"after": after, "shift": 0, "floor": max(state["skip_until"], frm), "closable": True, "kind": kind}
+        state["skip_until"] = None
+        return
+    state["skip_until"] = max(state["skip_until"], frm, to)
+    _reset(state, state["skip_until"], kind)
+
+
+def _close_open(state, events):
+    """열린 격리를 옛 부팅의 SHUTDOWN으로 닫음. AOSP는 부팅 때 옛 부팅의 마지막 저장 시각으로 SHUTDOWN을 기록하므로
+    옛 부팅 기록은 그 시각까지만 있음 [갤럭시 미확인]. 그보다 앞 부팅의 SHUTDOWN과 섞이지 않게 after 이상만 봄.
+    OS가 기록을 옮겼다면 after도 같이 옮겨졌으므로 앞으로 옮긴 만큼(shift > 0) 올려서 봄"""
+    q = state["open_q"]
+    if q is None or not q["closable"]:
+        return
+    th = q["after"] + max(0, q["shift"])
+    sd = [e["ts"] for e in events if e["type"] == SHUTDOWN and e["ts"] >= th]
+    if sd:
+        state["open_q"] = None
+        state["skip_until"] = max(q["floor"], max(sd) + 1)
+        _reset(state, state["skip_until"], q["kind"])
 
 
 def _rebase(state, wall, el, bc, events):
@@ -88,22 +118,34 @@ def _rebase(state, wall, el, bc, events):
     drift = (wall - last["wall"]) - (el - last["elapsed"])
     starts = sorted({e["ts"] for e in events if e["type"] == STARTUP and e["ts"] >= last["wall"]})   # 앞 조회 뒤 기록
     rebooted = el < last["elapsed"] or (bc is not None and last["boot_count"] is not None and bc != last["boot_count"])
+    if state["open_q"] is not None and (rebooted or starts):
+        # 열린 격리 중 재부팅·런타임 재시작: 새 SHUTDOWN이 생겨 어느 것이 그 옛 부팅의 끝인지 가를 수 없음
+        state["open_q"]["closable"] = False
     if not rebooted and starts and abs(drift) <= CLOCK_TOL_MS:
         # elapsed가 이어지는 STARTUP: 런타임 재시작. 기기가 꺼져 있던 게 아니라 "없음"을 확정하지 않음
         state["pending"] += [{"start": s, "kind": "restart"} for s in starts]
         return True
     if rebooted or any(s >= base - CLOCK_TOL_MS for s in starts):   # 뒤쪽은 앞 조회의 elapsed가 더 작았던 재부팅
+        old_max, state["boot_max_ts"] = state["boot_max_ts"], None
         if base < last["wall"] - CLOCK_TOL_MS:
-            # 앞 조회보다 먼저 부팅했을 수 없음 → 재부팅하면서 시계도 뒤로 감. 옛 부팅 기록이 앞 조회 시각까지는 있음
-            _uncertain(state, base, last["wall"], "boot_clock")
+            # 앞 조회보다 먼저 부팅했을 수 없음 → 재부팅하면서 시계도 뒤로 감. 옛 부팅은 앞 조회 뒤 꺼질 때까지 기록을 남겼을 수
+            # 있고 그 끝은 지금 시각만으로 알 수 없음 → 열린 격리. 옛 부팅의 SHUTDOWN은 옛 부팅에서 본 마지막 기록 이후
+            old_base = last["wall"] - last["elapsed"]
+            _uncertain(state, base, None, "boot_clock", old_base if old_max is None else max(old_base, old_max))
             return True
         bounds = {s for s in starts if s >= base - CLOCK_TOL_MS} or {base}
         state["pending"] += [{"start": s, "kind": "boot"} for s in sorted(bounds | set(starts))]
         return True
     if abs(drift) > CLOCK_TOL_MS:
-        # 어느 이벤트가 바뀌기 전 시계인지 모름 → 이번 조회분은 버림. 옛 시계 기록은 last.wall + elapsed 경과까지 있을 수 있음
+        # 어느 이벤트가 바뀌기 전 시계인지 모름 → 이번 조회분은 버림. 버릴 범위의 끝은 두 경우 중 늦은 쪽:
+        # 기록을 옮기지 않으면 옛 시계 기록이 last.wall + elapsed 경과까지, 옮기면 이미 처리한 기록(커서 앞)이 앞으로 옮겨져
+        # 다시 보일 수 있는 끝(OS가 옮긴 양은 앱이 본 차이와 OS 기준 2배까지 다를 수 있음)
         _bump(state, "clock_discarded", len(events))
-        _uncertain(state, wall - SETTLE_MS, last["wall"] + (el - last["elapsed"]), "clock")
+        if state["open_q"] is not None:
+            state["open_q"]["shift"] += drift
+        keep = last["wall"] + (el - last["elapsed"])
+        moved = state["cursor"] + drift + 2 * OS_SHIFT_MS if drift > 0 else keep
+        _uncertain(state, wall - SETTLE_MS, max(keep, moved), "clock")
         return False
     return True
 
@@ -113,7 +155,10 @@ def query_range(state, wall, elapsed, boot_count):
     STARTUP으로만 알 수 있는 재부팅을 놓치지 않게 옛 커서와 새 커서 중 앞쪽부터 읽음"""
     st = copy.deepcopy(state)
     _rebase(st, wall, elapsed, boot_count, [])
-    return min(state["cursor"], st["cursor"], wall), wall
+    begin = min(state["cursor"], st["cursor"], wall)
+    if st["open_q"] is not None and state["open_q"] is None:   # 이번에 열리는 격리: 닫을 SHUTDOWN이 커서 앞에 있을 수 있음
+        begin = min(begin, st["open_q"]["after"])
+    return begin, wall
 
 
 def _apply(w, e):
@@ -323,15 +368,25 @@ def process_query(state, q, snap, system_filter=True):
     events = [dict(ts=int(e[0]), type=e[1], pkg=e[2], cls=e[3] if len(e) > 3 else "", seq=i)
               for i, e in enumerate(q["events"])]
     rows = []
-    if not _rebase(state, wall, q["elapsed"], q.get("boot_count"), events):
+    ok = _rebase(state, wall, q["elapsed"], q.get("boot_count"), events)
+    ts = [e["ts"] for e in events] + ([] if state["boot_max_ts"] is None else [state["boot_max_ts"]])
+    if ts:   # 이 부팅에서 본 가장 늦은 기록. 재부팅하면서 시계가 뒤로 가면 옛 부팅의 SHUTDOWN을 가르는 기준
+        state["boot_max_ts"] = max(ts)
+    if not ok:
         return rows
+    _close_open(state, events)
     if wall - state["cursor"] > RETENTION_SAFE_MS:
         start = wall - RETENTION_SAFE_MS
         _bump(state, "gap_discarded", sum(state["cursor"] <= e["ts"] < start for e in events))
-        state["cursor"] = state["skip_until"] = start
-        _reset(state, start, "gap")
+        state["cursor"] = start
+        if state["open_q"] is not None:
+            state["open_q"]["floor"] = max(state["open_q"]["floor"], start)
+        else:
+            state["skip_until"] = max(state["skip_until"], start)
+            _reset(state, state["skip_until"], "gap")
     fin = wall - SETTLE_MS
-    cur, skip = state["cursor"], state["skip_until"]
+    cur = state["cursor"]
+    skip = fin if state["skip_until"] is None else state["skip_until"]   # 열린 격리면 이번 조회분 전부
     _bump(state, "pre_cursor_ignored", sum(e["ts"] < cur for e in events))
     _bump(state, "uncertain_discarded", sum(cur <= e["ts"] < min(skip, fin) for e in events))
     todo = sorted((e for e in events if max(cur, skip) <= e["ts"] < fin), key=lambda e: e["ts"])
