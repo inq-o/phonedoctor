@@ -25,11 +25,11 @@ EOF
 echo "$1" >> "$T/observed"
 [ "$1" = "${LEAVE_PKG:-}" ] && echo "package:$1" >> "$T/installed"
 [ "$1" = "${FAIL_PKG:-}" ] && exit 7
-mkdir -p "ml/data/observe/$1" && echo "[00:00:00] done" > "ml/data/observe/$1/run.log"
+mkdir -p "${3:?}/$1" && echo "[00:00:00] done" > "$3/$1/run.log"
 EOF
   chmod +x "$T/bin/adb" "$T/ml/label/observe.sh"
 }
-run() { (cd "$T" && PATH="$T/bin:$PATH" T="$T" "$@" bash "$TARGET" test.csv > "$T/out" 2>&1); echo $?; }
+run() { (cd "$T" && PATH="$T/bin:$PATH" T="$T" "$@" bash "$TARGET" test.csv ${OUT_DIR:-} > "$T/out" 2>&1); echo $?; }
 observed() { tr '\n' ' ' 2>/dev/null < "$T/observed"; }
 expect() {  # 이름, 기대 exit, 실제 exit, 기대 관찰 목록
   local got; got=$(observed)
@@ -52,5 +52,9 @@ setup; expect "마지막 앱 뒤 제거 확인만 실패" 2 "$(run env FAIL_AFTE
 setup; rm "$T/ml/data/apk_split/a.pkg.apk"; expect "APK 없음" 1 "$(run env)" "b.pkg "
 setup; run env FAIL_PKG=a.pkg > /dev/null; rm "$T/observed"
 expect "다시 실행하면 실패한 앱만" 0 "$(run env)" "a.pkg "
+setup; run env > /dev/null; rm "$T/observed"
+got=$(OUT_DIR=ml/data/observe_runs/r2 run env)
+[ -f "$T/ml/data/observe/a.pkg/run.log" ] && [ -f "$T/ml/data/observe_runs/r2/b.pkg/run.log" ] || got="기존 기록 사라짐 또는 새 폴더에 없음"
+expect "새 출력 폴더: 기존 기록을 건드리지 않고 전부 다시" 0 "$got" "a.pkg b.pkg "
 
-[ $fails -eq 0 ] && echo "모두 통과" || { echo "실패 $fails개"; exit 1; }
+[ $fails -eq 0 ] && echo "모두 통과" || { echo "실패 ${fails}개"; exit 1; }

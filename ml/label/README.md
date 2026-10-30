@@ -48,7 +48,7 @@ ml/label/observe.sh <package> ml/data/apk_split/<package>[.apk]
 - 홈 대기 10분: 1분마다 화면·현재 포커스 창·대상 앱 소유 창 기록. 끝에 잠금화면 캡처, 알림·기기 관리자·앱 권한(appops) 덤프.
 - 기기 관리자를 해제하고 앱을 지운다.
 
-표본 전체는 `ml/label/observe_all.sh ml/label/test_v1.csv`로 차례로 관찰한다. 앱이 기기에 남아 있거나 남았는지 확인하지 못하면(연결 끊김 등) 다음 앱을 시작하지 않고 exit 2로 멈춘다. 관찰에 실패한 앱은 exit 1로 알리고, 다시 실행하면 그 앱만 다시 관찰한다. 실패 처리는 `bash ml/label/test_observe_all.sh`로 검사한다(가짜 adb 사용, 기기 불필요).
+표본 전체는 `ml/label/observe_all.sh ml/label/test_v1.csv [출력 폴더]`로 차례로 관찰한다. 앱이 기기에 남아 있거나 남았는지 확인하지 못하면(연결 끊김 등) 다음 앱을 시작하지 않고 exit 2로 멈춘다. 관찰에 실패한 앱은 exit 1로 알리고, 다시 실행하면 그 앱만 다시 관찰한다. 실패 처리는 `bash ml/label/test_observe_all.sh`로 검사한다(가짜 adb 사용, 기기 불필요).
 
 결과는 `ml/data/observe/<package>/`에 남는다(레포 제외). 판정 근거로 쓰는 파일은 다음과 같다.
 
@@ -84,6 +84,19 @@ v1 라벨 40행(2026-10-30): 7개가 `no`(versionCode가 다른 5개, versionCod
 
 ```bash
 python ml/label/apk_versions.py ml/label/test_v1_labels.csv   # 다른 앱이 있으면 exit 1
+```
+
+**다시 관찰할 때.** v1 라벨과 `ml/data/observe/`는 지우거나 덮어쓰지 않는다. 지금 관찰 기록에 SHA-256을 소급해 적지도 않는다.
+
+1. 새 실행은 새 폴더에 남긴다. `observe_all.sh`는 준 폴더 안의 기록만 보고 건너뛰므로 기존 `done` 때문에 건너뛰지 않는다.
+2. 그 관찰로 붙인 라벨은 새 파일에 적는다. 같은 날짜를 폴더와 파일 이름에 써서 짝을 맞춘다.
+3. 대조할 때 그 폴더를 지정한다. 실행을 끝까지 마쳤는지, 라벨의 `observed`가 실행 날짜와 같은지도 함께 확인한다.
+4. 특징 입력을 관찰한 base로 바꿀 때도 기존 `ml/data/apk/`·`apk_features.csv.gz`를 덮어쓰지 않는다. 새 판으로 따로 두고 MH-1M 대조(§4)를 다시 한다. 대조 도구가 새 판을 읽게 하는 일은 그때 함께 한다.
+
+```bash
+ml/label/observe_all.sh ml/label/test_v1.csv ml/data/observe_runs/<날짜>
+python ml/label/check_labels.py ml/label/test_v1_labels_<날짜>.csv ml/label/test_v1.csv
+python ml/label/apk_versions.py ml/label/test_v1_labels_<날짜>.csv ml/data/observe_runs/<날짜>
 ```
 
 ## 4. 테스트셋 규칙

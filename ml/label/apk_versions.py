@@ -2,14 +2,14 @@
 
 - 특징 입력: ml/data/apk/<package>.apk. 그 SHA-256이 특징 파일(ml/data/apk_features.csv.gz)의 sha256과 같은지
 - 관찰: 관찰한 base APK(ml/data/apk_split/<package>/<package>.apk 또는 <package>.apk)의 SHA-256과 versionCode.
-- 관찰 기록(ml/data/observe/<package>/meta.txt): 라벨이 이 관찰에서 나왔는지(끝까지 마친 관찰이고, 관찰 날짜가 라벨의
-  observed와 같음, 한국 시각 기준), apk_sha256에 적힌 분할 APK 세트 전체가 지금 파일과 같은지.
+- 관찰 기록(<관찰 폴더>/<package>/meta.txt, 기본 ml/data/observe): 라벨이 이 관찰에서 나왔는지(끝까지 마친 관찰이고, 관찰 날짜가 라벨의
+  observed와 같음, 한국 시각 기준), apk_sha256에 적힌 분할 APK 세트 전체가 지금 파일과 같은지(빠지거나 더해지거나 바뀐 조각).
   SHA-256 기록이 없으면(2026-10-30 전 관찰) 관찰 당시 APK와 같다고 확인할 수 없어 ok=unverified
 - versionCode는 aapt2로 읽는다 (AAPT2 환경 변수, 없으면 Android SDK build-tools의 마지막 판)
 
 ok가 yes가 아닌 앱이 있으면 exit 1. yes가 아닌 앱의 라벨은 설치 시점 분류기 평가에 쓰지 않는다
 (no = 같은 판을 다시 받아 특징을 뽑거나 다시 관찰해 라벨을 새로 붙일 때까지, unverified = SHA-256을 기록하며 다시 관찰할 때까지).
-사용: python ml/label/apk_versions.py ml/label/test_v1_labels.csv
+사용: python ml/label/apk_versions.py <라벨 CSV> [관찰 폴더]   (다시 관찰한 실행은 그 폴더를 지정, README §3)
 """
 import csv
 import datetime
@@ -22,6 +22,7 @@ import subprocess
 import sys
 
 DATA = "ml/data"
+OBSERVE = None   # 관찰 폴더. None이면 {DATA}/observe
 
 
 def sha256(path):
@@ -51,7 +52,7 @@ def observed_set(pkg):
 
 def record(pkg, observed):
     """관찰 기록과 라벨 대조. none = SHA-256 기록 없음(2026-10-30 전 관찰), stale = 라벨이 이 관찰에서 나오지 않음, 그 밖엔 {파일명: SHA-256}"""
-    d = f"{DATA}/observe/{pkg}"
+    d = f"{OBSERVE or DATA + '/observe'}/{pkg}"
     try:
         with open(f"{d}/meta.txt", encoding="utf-8") as f:
             meta = dict(l.rstrip("\n").split("=", 1) for l in f if "=" in l)
@@ -86,7 +87,9 @@ def compare(pkg, observed, feature_sha, aapt2):
     return row
 
 
-def main(labels_path):
+def main(labels_path, observe_dir=None):
+    global OBSERVE
+    OBSERVE = observe_dir
     sdk = os.path.expanduser(os.environ.get("ANDROID_HOME", "~/Library/Android/sdk"))
     aapt2 = os.environ.get("AAPT2") or (sorted(glob.glob(f"{sdk}/build-tools/*/aapt2")) or [None])[-1]
     if not aapt2:
@@ -117,16 +120,22 @@ def _check():
     h = lambda b: hashlib.sha256(b).hexdigest()
     p = "x.pkg"
     try:
-        for split, date, done, has_sha, want in [(b"S", "2026-10-30T06:00:00Z", True, True, "yes"),
-                                                 (b"T", "2026-10-30T06:00:00Z", True, True, "no"),        # split만 바뀜
-                                                 (b"S", "2026-10-31T01:00:00Z", True, True, "no"),        # 다시 관찰함
-                                                 (b"S", "2026-10-29T16:00:00Z", True, True, "yes"),       # 한국 시각으로 같은 날
-                                                 (b"S", "2026-10-30T06:00:00Z", False, True, "no"),       # 끝까지 못 마침
-                                                 (b"S", "2026-10-30T06:00:00Z", True, False, "unverified")]:
+        # split = 지금 config.ko 조각 내용(None이면 없음), 관찰 기록에는 base와 config.ko(S)
+        for split, extra, date, done, has_sha, want in [(b"S", False, "2026-10-30T06:00:00Z", True, True, "yes"),
+                                                        (b"T", False, "2026-10-30T06:00:00Z", True, True, "no"),   # split만 바뀜
+                                                        (None, False, "2026-10-30T06:00:00Z", True, True, "no"),   # split이 빠짐
+                                                        (b"S", True, "2026-10-30T06:00:00Z", True, True, "no"),    # split이 더해짐
+                                                        (b"S", False, "2026-10-31T01:00:00Z", True, True, "no"),   # 다시 관찰함
+                                                        (b"S", False, "2026-10-29T16:00:00Z", True, True, "yes"),  # 한국 시각으로 같은 날
+                                                        (b"S", False, "2026-10-30T06:00:00Z", False, True, "no"),  # 끝까지 못 마침
+                                                        (b"S", False, "2026-10-30T06:00:00Z", True, False, "unverified")]:
             DATA = tempfile.mkdtemp()
             for d in ("apk", f"apk_split/{p}", f"observe/{p}"):
                 os.makedirs(f"{DATA}/{d}")
-            for path, b in [(f"apk/{p}.apk", b"B"), (f"apk_split/{p}/{p}.apk", b"B"), (f"apk_split/{p}/{p}.config.ko.apk", split)]:
+            files = [(f"apk/{p}.apk", b"B"), (f"apk_split/{p}/{p}.apk", b"B"), (f"apk_split/{p}/{p}.config.ko.apk", split)]
+            for path, b in files + [(f"apk_split/{p}/{p}.config.xxhdpi.apk", b"X")] * extra:
+                if b is None:
+                    continue
                 with open(f"{DATA}/{path}", "wb") as f:
                     f.write(b)
             with open(f"{DATA}/observe/{p}/meta.txt", "w", encoding="utf-8") as f:
@@ -134,11 +143,11 @@ def _check():
             with open(f"{DATA}/observe/{p}/run.log", "w", encoding="utf-8") as f:
                 f.write("[00:00:00] done\n" if done else "[00:00:00] aborted\n")
             got = compare(p, "2026-10-30", h(b"B"), "aapt2")["ok"]
-            assert got == want, (split, date, done, has_sha, got)
+            assert got == want, (split, extra, date, done, has_sha, got)
     finally:
         DATA, version_code = saved
 
 
 if __name__ == "__main__":
     _check()
-    sys.exit(main(sys.argv[1]))
+    sys.exit(main(*sys.argv[1:3]))
