@@ -4,7 +4,8 @@
 """
 import os, shutil, subprocess, sys, tempfile
 F = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # testapps/poc
-src = open(os.path.join(F, "features/featx.py")).read()
+with open(os.path.join(F, "features/featx.py"), encoding="utf-8") as f:
+    src = f.read()
 M = [
  ("순열 대신 조회 순서만", "perms = [list(p) for p in itertools.permutations(rel) if fixed(p)]", "perms = [list(rel)]"),
  ("똑같은 이벤트 순서 고정 뺌", "if fixed(p)]", "]"),
@@ -42,10 +43,12 @@ for name, a, b in M:
         print(f"적용 못 함 ({src.count(a)}) {name}"); continue
     d = tempfile.mkdtemp()
     os.makedirs(f"{d}/features")
-    open(f"{d}/features/featx.py", "w").write(src.replace(a, b))
+    with open(f"{d}/features/featx.py", "w", encoding="utf-8") as f:
+        f.write(src.replace(a, b))
     shutil.copy(os.path.join(F, "features/cases.json"), f"{d}/features/")
     shutil.copy(os.path.join(F, "rule_v0.py"), d)
-    r = subprocess.run([sys.executable, f"{d}/features/featx.py"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, f"{d}/features/featx.py"], capture_output=True, text=True, encoding="utf-8",
+                       env={**os.environ, "PYTHONIOENCODING": "utf-8"})   # 한글 출력을 로케일과 무관하게
     fails = [l.split("  ")[0].replace("FAIL ", "") for l in r.stdout.splitlines() if l.startswith("FAIL")]
     hit = r.returncode != 0
     caught += hit
