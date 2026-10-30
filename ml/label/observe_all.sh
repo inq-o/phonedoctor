@@ -6,6 +6,10 @@
 # ml/label/observe_all.sh ml/label/test_v1.csv [출력 폴더]
 set -uo pipefail
 OBS=${2:-ml/data/observe}
+# 출력 폴더가 APK 입력 폴더이거나 그 안이면 아래 rm -rf가 입력 APK를 지운다
+obs_abs=$(mkdir -p "$OBS" && cd "$OBS" && pwd) || { echo "$OBS: 출력 폴더를 만들지 못함" >&2; exit 2; }
+split_abs=$(cd ml/data/apk_split 2>/dev/null && pwd) || split_abs=
+case "$obs_abs/" in "${split_abs:-//none}/"*) echo "$OBS: APK 입력 폴더(ml/data/apk_split) 안은 출력 폴더로 쓸 수 없음" >&2; exit 2 ;; esac
 PKGS=$(tail -n +2 "$1" | cut -d, -f1) && [ -n "$PKGS" ] || { echo "$1: 표본 목록을 읽지 못함" >&2; exit 2; }
 
 # 기기에 깔린 표본 앱을 출력한다. 기기 목록을 읽지 못하면 1

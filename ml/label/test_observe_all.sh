@@ -56,5 +56,10 @@ setup; run env > /dev/null; rm "$T/observed"
 got=$(OUT_DIR=ml/data/observe_runs/r2 run env)
 [ -f "$T/ml/data/observe/a.pkg/run.log" ] && [ -f "$T/ml/data/observe_runs/r2/b.pkg/run.log" ] || got="기존 기록 사라짐 또는 새 폴더에 없음"
 expect "새 출력 폴더: 기존 기록을 건드리지 않고 전부 다시" 0 "$got" "a.pkg b.pkg "
+for d in ml/data/apk_split ml/data/apk_split/r2 ./ml/data/../data/apk_split; do
+  setup; got=$(OUT_DIR=$d run env)
+  [ -e "$T/ml/data/apk_split/a.pkg.apk" ] || got="입력 APK가 지워짐"
+  expect "출력 폴더가 APK 입력 폴더 안($d): 시작 전 중단" 2 "$got" ""
+done
 
 [ $fails -eq 0 ] && echo "모두 통과" || { echo "실패 ${fails}개"; exit 1; }
