@@ -62,7 +62,7 @@ fi
   echo "device=$(adb shell getprop ro.build.fingerprint | tr -d '\r')"
   echo "version=$(adb shell dumpsys package "$PKG" | grep -m1 versionName | tr -d ' \r')"
   echo "version_code=$(adb shell dumpsys package "$PKG" | grep -m1 -o 'versionCode=[0-9]*' | cut -d= -f2)"
-  # 특징을 뽑은 APK와 같은 판인지 대조할 근거 (README §3)
+  # 특징을 뽑은 APK와 같은 판인지 대조할 근거 (README §3, apk_versions.py)
   echo "apk_sha256=$(if [ -d "$SRC" ]; then shasum -a 256 "$SRC"/*.apk; else shasum -a 256 "$SRC"; fi | awk '{ n = split($2, p, "/"); printf "%s%s:%s", sep, p[n], $1; sep = ";" }')"
   echo "use_seconds=$USE_SECONDS bg_minutes=$BG_MINUTES seed=$SEED"
   echo "launcher=$(adb shell cmd package resolve-activity --brief -c android.intent.category.LAUNCHER "$PKG" | tail -1 | tr -d '\r')"

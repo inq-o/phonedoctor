@@ -76,10 +76,12 @@ python ml/label/check_labels.py ml/label/test_v1_labels.csv ml/label/test_v1.csv
 | `evidence` | 근거 파일과 한 줄 설명 (예: `bg_04.png 홈 화면 전면 광고`) |
 | `observed` | 관찰 날짜 `YYYY-MM-DD` |
 
-라벨은 **관찰한 판**의 정답이다(`meta.txt`의 `version_code`·`apk_sha256`). 특징을 뽑은 APK(`ml/data/apk/`)는 먼저 받은 것이라 판이 다를 수 있다. 설치 시점 분류기 평가에 쓰기 전에 대조하고, 판이 다른 앱은 같은 판을 다시 받아 특징을 뽑거나 평가에서 뺀다. v1 라벨 40행 중 5개가 다르다(2026-10-30).
+라벨은 **관찰한 판**의 정답이다(`meta.txt`의 `version_code`·`apk_sha256`). 특징을 뽑은 APK(`ml/data/apk/`)는 먼저 받은 것이라 판이 다를 수 있다. 설치 시점 분류기 평가에 쓰기 전에 아래 세 가지를 대조한다: 특징 파일의 SHA-256과 특징 입력 APK, 특징 입력 APK와 관찰한 base APK(SHA-256·versionCode), 관찰 기록의 SHA-256과 지금 파일. 다른 앱은 같은 판을 다시 받아 특징을 뽑거나 평가에서 뺀다. 입력 APK를 바꾸면 MH-1M 대조(§4)도 새 입력으로 다시 한다.
+
+v1 라벨 40행 중 7개가 다르다(2026-10-30): versionCode가 다른 5개, versionCode는 같은데 base APK 파일이 다른 2개. 이 40행은 SHA-256을 기록하기 전에 관찰해 관찰 기록과의 대조는 하지 못했다.
 
 ```bash
-ml/label/apk_versions.sh ml/label/test_v1_labels.csv   # 다른 앱이 있으면 exit 1
+python ml/label/apk_versions.py ml/label/test_v1_labels.csv   # 다른 앱이 있으면 exit 1
 ```
 
 ## 4. 테스트셋 규칙
