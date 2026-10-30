@@ -4,6 +4,7 @@
 - 관찰: 관찰한 base APK(ml/data/apk_split/<package>/<package>.apk 또는 <package>.apk)의 SHA-256과 versionCode.
 - 관찰 기록(<관찰 폴더>/<package>/meta.txt, 기본 ml/data/observe): 라벨이 이 관찰에서 나왔는지(끝까지 마친 관찰이고, 관찰 날짜가 라벨의
   observed와 같음, 한국 시각 기준), apk_sha256에 적힌 분할 APK 세트 전체가 지금 파일과 같은지(빠지거나 더해지거나 바뀐 조각).
+  같은 날 같은 앱을 끝까지 관찰한 다른 실행({DATA}/observe, {DATA}/observe_runs/*)이 있으면 라벨이 어느 실행에서 나왔는지 가를 수 없어 no
   SHA-256 기록이 없으면(2026-10-30 전 관찰) 관찰 당시 APK와 같다고 확인할 수 없어 ok=unverified
 - versionCode는 aapt2로 읽는다 (AAPT2 환경 변수, 없으면 Android SDK build-tools의 마지막 판)
 
@@ -50,22 +51,36 @@ def observed_set(pkg):
     return {os.path.basename(p): sha256(p) for p in paths if os.path.exists(p)}
 
 
-def record(pkg, observed):
-    """관찰 기록과 라벨 대조. none = SHA-256 기록 없음(2026-10-30 전 관찰), stale = 라벨이 이 관찰에서 나오지 않음, 그 밖엔 {파일명: SHA-256}"""
-    d = f"{OBSERVE or DATA + '/observe'}/{pkg}"
+def read_run(d):
+    """관찰 기록 폴더의 (meta, 끝까지 마쳤는지, 한국 시각 관찰 날짜). 기록이 없으면 None"""
     try:
         with open(f"{d}/meta.txt", encoding="utf-8") as f:
             meta = dict(l.rstrip("\n").split("=", 1) for l in f if "=" in l)
         with open(f"{d}/run.log", encoding="utf-8") as f:
             done = any("] done" in l for l in f)
     except FileNotFoundError:
+        return None
+    try:
+        run = datetime.datetime.strptime(meta.get("date", ""), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
+    except ValueError:
+        return meta, done, None
+    return meta, done, run.astimezone(datetime.timezone(datetime.timedelta(hours=9))).date().isoformat()
+
+
+def record(pkg, observed):
+    """관찰 기록과 라벨 대조. none = SHA-256 기록 없음(2026-10-30 전 관찰), stale = 라벨이 이 관찰에서 나오지 않음,
+    ambiguous = 같은 날 끝까지 마친 다른 실행이 있음, 그 밖엔 {파일명: SHA-256}"""
+    d = f"{OBSERVE or DATA + '/observe'}/{pkg}"
+    r = read_run(d)
+    if r is None or "apk_sha256" not in r[0]:
         return "none"
-    if "apk_sha256" not in meta:
-        return "none"
-    run = datetime.datetime.strptime(meta.get("date", ""), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=datetime.timezone.utc)
-    run_day = run.astimezone(datetime.timezone(datetime.timedelta(hours=9))).date().isoformat()
+    meta, done, run_day = r
     if not done or run_day != observed:   # 다시 관찰했거나 끝까지 못 마친 관찰 → 라벨을 새 증거로 다시 붙여야 함
         return "stale"
+    others = [o for o in [f"{DATA}/observe/{pkg}"] + glob.glob(f"{DATA}/observe_runs/*/{pkg}")
+              if os.path.realpath(o) != os.path.realpath(d)]
+    if any((x := read_run(o)) and x[1] and x[2] == observed for o in others):
+        return "ambiguous"
     return dict(x.split(":", 1) for x in meta["apk_sha256"].split(";") if ":" in x)
 
 
@@ -80,7 +95,7 @@ def compare(pkg, observed, feature_sha, aapt2):
            "observation_record": rec if isinstance(rec, str) else ("same" if rec == obs_set else "diff")}   # 분할 APK 세트 전체
     files_same = (row["feature_version"] and row["feature_version"] == row["observed_version"]
                   and row["feature_file"] == row["observed_apk"] == "same")
-    if not files_same or row["observation_record"] in ("diff", "stale"):
+    if not files_same or row["observation_record"] in ("diff", "stale", "ambiguous"):
         row["ok"] = "no"
     else:
         row["ok"] = "yes" if row["observation_record"] == "same" else "unverified"
@@ -121,14 +136,18 @@ def _check():
     p = "x.pkg"
     try:
         # split = 지금 config.ko 조각 내용(None이면 없음), 관찰 기록에는 base와 config.ko(S)
-        for split, extra, date, done, has_sha, want in [(b"S", False, "2026-10-30T06:00:00Z", True, True, "yes"),
+        for split, extra, date, done, has_sha, want, *twin in [(b"S", False, "2026-10-30T06:00:00Z", True, True, "yes"),
                                                         (b"T", False, "2026-10-30T06:00:00Z", True, True, "no"),   # split만 바뀜
                                                         (None, False, "2026-10-30T06:00:00Z", True, True, "no"),   # split이 빠짐
                                                         (b"S", True, "2026-10-30T06:00:00Z", True, True, "no"),    # split이 더해짐
                                                         (b"S", False, "2026-10-31T01:00:00Z", True, True, "no"),   # 다시 관찰함
                                                         (b"S", False, "2026-10-29T16:00:00Z", True, True, "yes"),  # 한국 시각으로 같은 날
                                                         (b"S", False, "2026-10-30T06:00:00Z", False, True, "no"),  # 끝까지 못 마침
-                                                        (b"S", False, "2026-10-30T06:00:00Z", True, False, "unverified")]:
+                                                        (b"S", False, "2026-10-30T06:00:00Z", True, False, "unverified"),
+                                                        # 같은 날 끝까지 마친 다른 실행이 있음 / 다른 날이거나 못 마친 실행만 있음
+                                                        (b"S", False, "2026-10-30T06:00:00Z", True, True, "no", "2026-10-30T09:00:00Z", True),
+                                                        (b"S", False, "2026-10-30T06:00:00Z", True, True, "yes", "2026-10-31T09:00:00Z", True),
+                                                        (b"S", False, "2026-10-30T06:00:00Z", True, True, "yes", "2026-10-30T09:00:00Z", False)]:
             DATA = tempfile.mkdtemp()
             for d in ("apk", f"apk_split/{p}", f"observe/{p}"):
                 os.makedirs(f"{DATA}/{d}")
@@ -142,8 +161,14 @@ def _check():
                 f.write(f"date={date}\n" + (f"apk_sha256={p}.apk:{h(b'B')};{p}.config.ko.apk:{h(b'S')}\n" if has_sha else ""))
             with open(f"{DATA}/observe/{p}/run.log", "w", encoding="utf-8") as f:
                 f.write("[00:00:00] done\n" if done else "[00:00:00] aborted\n")
+            if twin:
+                os.makedirs(f"{DATA}/observe_runs/r2/{p}")
+                with open(f"{DATA}/observe_runs/r2/{p}/meta.txt", "w", encoding="utf-8") as f:
+                    f.write(f"date={twin[0]}\napk_sha256={p}.apk:{h(b'B')}\n")
+                with open(f"{DATA}/observe_runs/r2/{p}/run.log", "w", encoding="utf-8") as f:
+                    f.write("[00:00:00] done\n" if twin[1] else "[00:00:00] aborted\n")
             got = compare(p, "2026-10-30", h(b"B"), "aapt2")["ok"]
-            assert got == want, (split, extra, date, done, has_sha, got)
+            assert got == want, (split, extra, date, done, has_sha, twin, got)
     finally:
         DATA, version_code = saved
 
