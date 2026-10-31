@@ -1,7 +1,8 @@
 """변형 시험: featx.py를 한 곳씩 일부러 망가뜨려 cases.json이 잡는지 확인. 사용: python3 mutate.py
 
 "오래된 상태 정리 끔"은 결과가 같아야 맞는 변형이라 잡히지 않는 것이 정상(EQUIV).
-그 밖의 변형이 안 잡히거나 코드가 바뀌어 적용되지 않으면 exit 1.
+그 밖의 변형이 안 잡히거나, 코드가 바뀌어 적용되지 않거나, 변형 코드가 컴파일되지 않거나 사례 요약 전에 멈추면 exit 1
+(멈춘 실행은 사례가 잡은 것이 아니므로 검출로 세지 않는다).
 """
 import os, shutil, subprocess, sys, tempfile
 F = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # testapps/poc
@@ -13,7 +14,7 @@ M = [
  ("가정 모드: 이전 상태 무시", "s = ([w[\"life\"][a]] if a in w[\"life\"] else []) + s", "pass"),
  ("가정 모드: 다른 액티비티 PAUSED 앞 규칙 뺌", "elif e[\"type\"] == PAUSED and seen_r - {a}:", "elif False:"),
  ("가정 모드: 모순 시 빈 목록", "if _lifecycle_ok(p, w)] or perms", "if _lifecycle_ok(p, w)] or perms[:1]"),
- ("가정 모드를 기본으로", "if assume == \"lifecycle\":\n        return", "if True:\n        return"),
+ ("가정 모드를 기본으로", "if assume == \"lifecycle\":\n        return", "if True:\n        w.setdefault(\"life\", {})\n        return"),
  ("워터마크 대신 끝까지 확정", "fin = wall - SETTLE_MS", "fin = wall + 1"),
  ("커서 1ms 덜 옮김", "state[\"cursor\"] = max(cur, fin)", "state[\"cursor\"] = max(cur, fin - 1)"),
  ("커서 앞 이벤트 다시 처리", "if max(cur, skip) <= e[\"ts\"] < fin)", "if skip <= e[\"ts\"] < fin)"),
@@ -57,6 +58,10 @@ caught, bad = 0, []
 for name, a, b in M:
     if src.count(a) != 1:
         print(f"적용 못 함 ({src.count(a)}) {name}"); bad.append(name); continue
+    try:
+        compile(src.replace(a, b), "featx.py", "exec")
+    except SyntaxError as e:
+        print(f"컴파일 안 됨 {name}: {e}"); bad.append(name); continue
     d = tempfile.mkdtemp()
     os.makedirs(f"{d}/features")
     with open(f"{d}/features/featx.py", "w", encoding="utf-8") as f:
@@ -66,11 +71,13 @@ for name, a, b in M:
     r = subprocess.run([sys.executable, f"{d}/features/featx.py"], capture_output=True, text=True, encoding="utf-8",
                        env={**os.environ, "PYTHONIOENCODING": "utf-8"})   # 한글 출력을 로케일과 무관하게
     fails = [l.split("  ")[0].replace("FAIL ", "") for l in r.stdout.splitlines() if l.startswith("FAIL")]
+    if "사례 통과" not in r.stdout:   # 사례 요약 전에 멈춤
+        print(f"멈춤 {name}: {(r.stderr.strip().splitlines() or [''])[-1]}"); bad.append(name); shutil.rmtree(d); continue
     hit = r.returncode != 0
     caught += hit
     if not hit and name not in EQUIV:
         bad.append(name)
-    print(("잡힘 " if hit else "안 잡힘 ") + name + ("  " + ",".join(fails[:6]) if fails else ("  (오류)" if hit else "")))
+    print(("잡힘 " if hit else "안 잡힘 ") + name + ("  " + ",".join(fails[:6]) if fails else ""))
     shutil.rmtree(d)
 print(f"{caught}/{len(M)}")
 sys.exit(1 if bad else 0)
