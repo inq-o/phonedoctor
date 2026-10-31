@@ -62,3 +62,43 @@ jobs:
           path: |
             **/build/test-results/test*UnitTest/**.xml
             **/build/reports/lint-results-*.html
+
+  scripts:
+    name: "Python and shell checks"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # androguard 판은 ml/collect/README.md와 같게, pandas·numpy는 로컬 검증 판으로 고정
+      - name: Install dependencies
+        run: pip install androguard==4.1.4 pandas==2.1.4 numpy==1.26.4
+
+      # 스크립트마다 있는 _check() (실측 자료 ml/data 없이 돈다)
+      - name: Script self-checks
+        run: |
+          fails=0
+          for f in $(git grep -l '^def _check' -- '*.py'); do
+            echo "== $f"
+            python -c 'import sys; sys.path.insert(0, sys.argv[1]); __import__(sys.argv[2])._check()' "$(dirname "$f")" "$(basename "$f" .py)" || fails=$((fails + 1))
+          done
+          [ "$fails" -eq 0 ]
+
+      - name: Feature extractor cases and mutations
+        run: |
+          python testapps/poc/features/featx.py
+          python testapps/poc/features/make_cases.py "$RUNNER_TEMP/cases.json"
+          cmp "$RUNNER_TEMP/cases.json" testapps/poc/features/cases.json
+          python testapps/poc/features/mutate.py
+
+      - name: Observation wrapper
+        run: bash ml/label/test_observe_all.sh

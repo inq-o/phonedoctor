@@ -1,6 +1,7 @@
 """변형 시험: featx.py를 한 곳씩 일부러 망가뜨려 cases.json이 잡는지 확인. 사용: python3 mutate.py
 
-"오래된 상태 정리 끔"은 결과가 같아야 맞는 변형이라 잡히지 않는 것이 정상.
+"오래된 상태 정리 끔"은 결과가 같아야 맞는 변형이라 잡히지 않는 것이 정상(EQUIV).
+그 밖의 변형이 안 잡히거나 코드가 바뀌어 적용되지 않으면 exit 1.
 """
 import os, shutil, subprocess, sys, tempfile
 F = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # testapps/poc
@@ -51,10 +52,11 @@ M = [
  ("CAP 창 대신 값만 자름", "        return (t - ts, OBS)", "        return (t - ts, OBS)\n        if ts is not None: return (CAP_MS, OBS)"),
  ("부팅 경계 적용 안 함", "            _reset(state, p[\"start\"], p[\"kind\"])\n        _process_group", "            pass\n        _process_group"),
 ]
-caught = 0
+EQUIV = {"오래된 상태 정리 끔"}
+caught, bad = 0, []
 for name, a, b in M:
     if src.count(a) != 1:
-        print(f"적용 못 함 ({src.count(a)}) {name}"); continue
+        print(f"적용 못 함 ({src.count(a)}) {name}"); bad.append(name); continue
     d = tempfile.mkdtemp()
     os.makedirs(f"{d}/features")
     with open(f"{d}/features/featx.py", "w", encoding="utf-8") as f:
@@ -66,6 +68,9 @@ for name, a, b in M:
     fails = [l.split("  ")[0].replace("FAIL ", "") for l in r.stdout.splitlines() if l.startswith("FAIL")]
     hit = r.returncode != 0
     caught += hit
+    if not hit and name not in EQUIV:
+        bad.append(name)
     print(("잡힘 " if hit else "안 잡힘 ") + name + ("  " + ",".join(fails[:6]) if fails else ("  (오류)" if hit else "")))
     shutil.rmtree(d)
 print(f"{caught}/{len(M)}")
+sys.exit(1 if bad else 0)

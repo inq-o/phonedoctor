@@ -36,7 +36,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 | `events` (한 번 조회) | 모든 묶음 경계에서 두 조회로 나누기, 조회마다 저장 실패 뒤 재실행, 같은 ms 묶음의 조회 순서 바꾸기(뒤집기·한 칸 돌리기) |
 | `queries` (조회를 직접 적음) | 조회마다 저장 실패 뒤 재실행, 같은 ms 순서 바꾸기, `range`가 있으면 `query_range` 결과 |
 
-`mutate.py`의 변형 43개 중 42개가 잡힌다. 남은 하나("오래된 상태 정리 끔")는 결과가 같아야 맞는 변형이다.
+`mutate.py`의 변형 43개 중 42개가 잡힌다. 남은 하나("오래된 상태 정리 끔")는 결과가 같아야 맞는 변형이다. 그 밖의 변형이 안 잡히거나 적용되지 않으면 exit 1이다. 사례·사례 재생성 일치·변형 시험은 CI(`Python and shell checks`)에서도 돈다.
 
 ## 가정과 미확인 사항
 
