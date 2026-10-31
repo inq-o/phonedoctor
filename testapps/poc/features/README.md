@@ -52,7 +52,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 | 재부팅 + 시계 후퇴 | 부팅 시작(`wall − elapsed`)이 앞 조회보다 이르면 끝을 모르는 격리를 연다. 새 부팅 시작부터 읽되 행을 만들지 않고 `uncertain_discarded`만 센다. **기본은 닫지 않는다**(사례 16·16a·16g) | 옛 부팅이 앞 조회 뒤 꺼질 때까지 남긴 기록의 끝은 지금 시각만으로 알 수 없다. 옛 부팅의 SHUTDOWN이 보여도 그것이 옛 부팅의 끝인지, 옛 부팅 안의 런타임 재시작인지 가를 수 없다(사례 16g). 재부팅과 시계 전진이 겹치면 꺼져 있던 시간으로 보고 구분하지 못한다 |
 | SHUTDOWN 해제 (`recover="shutdown"`) | 열린 격리를 옛 부팅의 SHUTDOWN에서 닫고 새 구간을 연다. SHUTDOWN은 옛 부팅에서 본 마지막 기록 이후 것만 쓰고, OS가 기록을 앞으로 옮겼으면 그만큼 기준도 올린다. 새 구간은 커서보다 앞에서 시작하지 않는다(격리 중 버린 기록을 상태에 넣지 않았으므로). 닫을 수 있는 동안은 커서 앞에 늦게 보이는 SHUTDOWN도 찾도록 기준 시각부터 다시 읽는다. 행에 `recover_basis=shutdown_assumed`로 표시 (사례 16b·16c·16d·16e·16f·16h·16i) | **분석용, 확정 판정에 안 씀.** 옛 부팅이 앞 조회 뒤 런타임 재시작을 했다면 그 SHUTDOWN에서 닫아 옛 기록을 판정한다(사례 16g-S, **한계**). 격리 중 다시 재부팅하거나 런타임 재시작이 보이면 닫지 않는다(사례 16d). 조회마다 과거를 다시 읽어 처리량이 조회 횟수에 대해 제곱으로 늘 수 있고 실기기 비용은 측정하지 않았다 |
 | 런타임 재시작 | elapsed가 이어지는 STARTUP은 새 구간을 열되 "없음"을 확정하지 않음 | 공식 문서상 STARTUP은 런타임 재시작에도 기록될 수 있다. 재시작과 시계 변경이 겹치면 재부팅으로 잘못 볼 수 있다 |
-| null 조회 | 커서와 시각 기준을 그대로 둠 | Android R부터 사용자 잠금 해제 전에는 null일 수 있다(공식 문서) |
+| null 조회 | 커서와 시각 기준을 그대로 둠 | 공식 문서는 Android R부터 사용자 잠금 해제 전 조회가 null이라고 하지만, AOSP 15 구현(`UsageStatsManager.queryEvents`)은 서비스가 null을 주면 빈 결과를 돌려준다. 그래서 수집기는 조회 직전 `isUserUnlocked`를 `queries.csv`에 남기고, 잠금 상태 조회는 null과 같이 다룬다(빈 결과를 "없음"으로 읽지 않음). 갤럭시에서 미확인 |
 
 실측 645건(에뮬레이터 덤프 18개)에서 기본 판정은 NORMAL 490, AD 124, HOLD 31이다. 생명주기 가정을 켜면 516, 125, 4가 된다. 차이 27건은 모두 HOLD 쪽으로만 바뀌었고, AD와 NORMAL이 서로 뒤바뀐 경우는 없다. 정확도 평가가 아니라 판정 분포 비교다.
 
@@ -61,7 +61,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 - 스키마 변경 복구, Room 트랜잭션, Kotlin 구현과의 대조
 - 닫지 못한 격리에서 판정을 다시 시작하는 기준. 지금은 계속 행을 만들지 않고 `uncertain_discarded`만 센다. 상태를 조용히 새로 시작해 풀지 않는다. 제품에 옮기기 전에 정하고, 격리 기간을 평가 보고에 드러낸다
 - SHUTDOWN 해제를 실기기에 쓰려면: 다시 읽는 조회 횟수·범위의 상한(상한에 닿아도 판정을 다시 시작하지 않음)과 조회 횟수·반환 건수·소요 시간 측정
-- 수집기 보강: 패키지 정보에 설치·업데이트 시각(`firstInstallTime`·`lastUpdateTime`), 조회마다 `wall`·`elapsed`·`BOOT_COUNT` 기록
+- 수집기(`testapps/usageprobe`)는 조회마다 전후 `wall`·`elapsed`와 앱이 읽은 `BOOT_COUNT`(못 읽으면 예외 이름)를 `queries.csv`에, 설치·업데이트 시각을 `launchers.csv`에 남긴다. 이 값을 `query_range`·`init_state` 입력으로 옮기는 변환기는 실측 자료를 받은 뒤 만든다
 - 실기기 확인 (갤럭시 연결 후 이 순서로)
   1. 수집과 기록 지연: 같은 과거 범위를 시간차를 두고 다시 조회해 늦게 나타나는 이벤트 측정
   2. 재부팅 복구: `BOOT_COUNT`·STARTUP·elapsed가 실제로 어떻게 바뀌는지, 잠금 해제 전 null 조회
