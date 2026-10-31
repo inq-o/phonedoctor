@@ -18,12 +18,14 @@ import java.io.File
  */
 class DumpReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        val unlocked = QueryLog.unlocked(context)
         val before = QueryLog.Clock()
         val now = before.wall
         val from = intent.getLongExtra("from", now - 3_600_000)
         val to = intent.getLongExtra("to", now)
         val out = File(context.filesDir, intent.getStringExtra("out") ?: "events.csv")
         val events: UsageEvents? = context.getSystemService(UsageStatsManager::class.java).queryEvents(from, to)
+        val after = QueryLog.Clock()
         val e = UsageEvents.Event()
         var n = 0
         out.bufferedWriter().use { w ->
@@ -33,8 +35,8 @@ class DumpReceiver : BroadcastReceiver() {
                 n++
             }
         }
-        QueryLog.append(context, "dump:${out.name}", from, to, before, if (events == null) null else n)
-        Log.i("USAGEPROBE", "DUMP n=${if (events == null) "null" else n} from=$from to=$to out=${out.name}")
+        QueryLog.append(context, "dump:${out.name}", from, to, before, after, unlocked, if (events == null) null else n)
+        Log.i("USAGEPROBE", "DUMP n=${if (events == null) "null" else n} unlocked=$unlocked from=$from to=$to out=${out.name}")
     }
 
     companion object {
