@@ -1,0 +1,41 @@
+package,label,codes,confidence,evidence,observed
+abdelrahman.wifianalyzerpro,normal,,,"use.webm 프리미엄 유도 창만, 광고 없음, 홈·잠금·알림 이상 없음",2026-10-12
+ai.junk.cleaner,review,R2?;R5?;R6,,"use.webm 45s 앱 안 전면 광고(R6, 정상 표시); notifications.png 정크 파일 41.73MB 알림(R2/R5 경계)",2026-10-12
+ai.memorae,normal,,weak,use.webm 앱이 곧 닫혀 사용 대부분 홈 화면(근거 약함),2026-10-12
+ai.storage.cleaner.app,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+aplicacion.tiempo,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+app.connectopia.video.calendar,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+app.happytoday.allfree,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+app.inglenook.launcher,normal,,weak,"use.webm 런처 앱, 온보딩 뒤 홈 화면, 광고 없음(근거 약함)",2026-10-12
+apps.r.speedometer,normal,,,"use.webm 속도계 화면만, 광고 없음",2026-10-12
+biz.cloudex.android.cleaner,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+bt.fullbatteryalert.charge.alarm,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+cc.pacer.androidapp,normal,,,"use.webm 온보딩·로그인 화면, notifications.png 걸음 수 상태 알림(광고 아님)",2026-10-12
+ch.smalltech.battery.free,normal,,,"use.webm 앱 정보·공유 화면, notifications.png 배터리 상태 알림",2026-10-12
+chairyogaforseniors.yogaworkout.chairworkout.loseweight,excluded,,,"use_00.png 실행 직후부터 홈 화면, 앱 화면 한 번도 안 뜸",2026-10-12
+com.a0soft.gphone.acc.free,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+com.adyala.free.apps.input.language.chinese.keyboard.hanzi.text.writing.program,normal,,weak,"use.webm 키보드 켜기 안내 화면에서 멈춤, 광고 없음(근거 약함)",2026-10-12
+com.ahnlab.v3mobilesecurity.soda,normal,,,"use.webm 메인 화면 하단 배너(앱 안), 앱 밖 광고 없음",2026-10-12
+com.ai4senior.ssiniya,normal,,weak,"use.webm 카카오 로그인 화면에서 멈춤, 광고 없음(근거 약함)",2026-10-12
+com.aicleaner.phone.storagecleanup,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+com.akuapps.memcleaner,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+com.antivirus,normal,,,"use.webm 온보딩·업그레이드 유도, notifications.png 새 네트워크 검사 알림(보안 기능 알림)",2026-10-12
+com.appworld.wifi.free,normal,R6,,"use.webm 15s·30s 실행 직후 약관 동의 전 전면 광고 2번, 90~165s 전면 광고가 화면 차지",2026-10-12
+com.arar557.am777,normal,,,"use.webm 라디오 설정 화면, 광고 없음",2026-10-12
+com.avast.android.mobilesecurity,normal,,,"use.webm 온보딩·한정 혜택 배너(앱 안), lock.png 보호 업데이트 알림(기능 알림)",2026-10-12
+com.b01t.wifialerts,excluded,,,"use.webm 180초 내내 시작 화면에서 멈춤, 대기 중 잠자기로 끊김(재관찰)",2026-10-12
+com.bat.batsaver,excluded,,,"use.webm 시작 화면에서 멈춤, 사용·대기 모두 잠자기로 끊김(재관찰)",2026-10-12
+com.bestweatherfor.bibleoffline_pt_ra,normal,,,"use.webm 앱 안 배너, 150s 전면 동영상은 monkey가 배너를 누른 직후 열림; lock.png 오디오 재생 알림",2026-10-12
+com.bluecode.oneulun,excluded,,,"use.webm 시작 화면 뒤 바로 닫혀 앱 화면 거의 없음(라이선스 확인 코드 있음, 로그인 뒤 재관찰)",2026-10-12
+com.bokhary.lazyboard,normal,,,"use.webm 키보드 설정 안내·프리미엄 화면, 광고 없음",2026-10-12
+com.boss.flashapp,excluded,,,"use.webm 사용 단계 대부분 Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+com.bubblegame.bubbleshooterpop,excluded,,,"use.webm 로딩 뒤 게임 화면이 검게 나옴(하단 Pangle 배너만 보임), 판단 불가",2026-10-12
+com.buna.trot,normal,R6,,"use.webm 15s 시작 화면 직후부터 180초 내내 AppLovin 전면 광고가 연달아 뜸(카운트다운 5→3, 다시 8)",2026-10-12
+com.cashwalk.cashwalk,review,R1?,,"lock.png 잠금화면을 자체 화면으로 대체(회원가입 유도 문구, 제3자 광고는 안 보임); 사용 중 잠자기로 끊김",2026-10-12
+com.cklee.freewifisearch2,excluded,,,"use.webm 0s부터 Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-13
+com.cleaner.phone.junk.files,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-13
+com.code404.mytrot,normal,,weak,"use.webm 로그인 화면에서 멈춤, 광고 없음(근거 약함)",2026-10-13
+com.comprehensivefortune,normal,,,"use.webm 사주 정보 입력 화면, 광고 없음",2026-10-13
+com.DisisaEstudio.Memory,excluded,,,"focus.log use_end Play 로그인 화면(라이선스 확인, 로그인 뒤 재관찰)",2026-10-12
+com.JindoBlu.OfflineGames,normal,,,"use.webm 약관·설정·게임 선택 화면, 광고 없음",2026-10-12
+com.UtkuGogen.CalismaMuzikleri,normal,,,"use.webm 온보딩 화면, lock.png 음악 재생 알림",2026-10-12
