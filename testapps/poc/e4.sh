@@ -12,7 +12,7 @@ wake() { sh input keyevent KEYCODE_WAKEUP; sleep 1; sh wm dismiss-keyguard; }
 
 sh am force-stop $PROBE
 sh am force-stop $BGAD   # 남은 알람·얼어 있는 프로세스 제거
-sh run-as $PROBE rm -f files/work.csv files/runs.csv shared_prefs/cursor.xml
+sh run-as $PROBE rm -f files/work.csv files/runs.csv files/queries.csv shared_prefs/cursor.xml
 sh appops set $PROBE GET_USAGE_STATS allow
 sh am set-standby-bucket $PROBE active   # 화면 없는 앱은 NEVER(50) 버킷이라 주기 작업 할당량이 0. 설정 직후 한 번 열린 앱을 가정
 sh input keyevent KEYCODE_HOME

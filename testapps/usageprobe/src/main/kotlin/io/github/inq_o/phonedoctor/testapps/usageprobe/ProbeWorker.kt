@@ -12,23 +12,32 @@ import java.io.File
  * 15분 주기 작업 흉내(E4). 실행마다 커서 이후 ACTIVITY_RESUMED를 읽어 work.csv에 덧붙인다.
  * 광고 시각과 이 파일의 runAt을 맞추면 "광고 → 감지" 지연이 나온다. 커서는 data-model `usage_cursor`처럼
  * lastEventTime부터 다시 읽고 겹친 이벤트는 (시각, 패키지, 클래스)로 거른다.
+ * 조회 전후 시각·BOOT_COUNT는 queries.csv(QueryLog, source=work). 조회가 null이면 커서를 옮기지 않는다.
  */
 class ProbeWorker(context: Context, params: WorkerParameters) : Worker(context, params) {
     override fun doWork(): Result {
         val ctx = applicationContext
         val prefs = ctx.getSharedPreferences("cursor", Context.MODE_PRIVATE)
-        val now = System.currentTimeMillis()
+        val before = QueryLog.Clock()
+        val now = before.wall
         val from = prefs.getLong("last", now - 3_600_000)
         val seen = prefs.getStringSet("seenAtLast", emptySet())!!
         val out = File(ctx.filesDir, "work.csv")
         if (!out.exists()) out.writeText("runAt,timeStamp,package,class\n")
-        val events = ctx.getSystemService(UsageStatsManager::class.java).queryEvents(from, now)
+        val events: UsageEvents? = ctx.getSystemService(UsageStatsManager::class.java).queryEvents(from, now)
+        if (events == null) {
+            QueryLog.append(ctx, "work", from, now, before, null)
+            Log.i("USAGEPROBE", "WORK run=$now null from=$from")
+            return Result.success()
+        }
         val e = UsageEvents.Event()
         var last = from
         val atLast = mutableSetOf<String>()
         var n = 0
+        var all = 0
         val sb = StringBuilder()
         while (events.getNextEvent(e)) {
+            all++
             if (e.eventType != UsageEvents.Event.ACTIVITY_RESUMED) continue
             val key = "${e.timeStamp},${e.packageName},${e.className}"
             if (e.timeStamp == from && key in seen) continue
@@ -40,6 +49,7 @@ class ProbeWorker(context: Context, params: WorkerParameters) : Worker(context, 
         out.appendText(sb.toString())
         prefs.edit().putLong("last", last).putStringSet("seenAtLast", if (last == from) seen + atLast else atLast).apply()
         File(ctx.filesDir, "runs.csv").appendText("$now,$n\n")
+        QueryLog.append(ctx, "work", from, now, before, all)
         Log.i("USAGEPROBE", "WORK run=$now n=$n from=$from")
         return Result.success()
     }

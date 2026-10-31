@@ -14,24 +14,27 @@ import java.io.File
  * adb shell am broadcast -n io.github.inq_o.phonedoctor.testapps.usageprobe/.DumpReceiver \
  *   --el from <epochMs> --el to <epochMs> --es out e1.csv
  * adb exec-out run-as io.github.inq_o.phonedoctor.testapps.usageprobe cat files/e1.csv
+ * 조회 전후 시각·BOOT_COUNT는 files/queries.csv(QueryLog, source=dump:<out>). 조회가 null이면 헤더만 쓴다
  */
 class DumpReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val now = System.currentTimeMillis()
+        val before = QueryLog.Clock()
+        val now = before.wall
         val from = intent.getLongExtra("from", now - 3_600_000)
         val to = intent.getLongExtra("to", now)
         val out = File(context.filesDir, intent.getStringExtra("out") ?: "events.csv")
-        val events = context.getSystemService(UsageStatsManager::class.java).queryEvents(from, to)
+        val events: UsageEvents? = context.getSystemService(UsageStatsManager::class.java).queryEvents(from, to)
         val e = UsageEvents.Event()
         var n = 0
         out.bufferedWriter().use { w ->
             w.write("queriedAt,timeStamp,type,typeName,package,class\n")
-            while (events.getNextEvent(e)) {
+            while (events?.getNextEvent(e) == true) {
                 w.write("$now,${e.timeStamp},${e.eventType},${TYPE_NAMES[e.eventType] ?: ""},${e.packageName},${e.className ?: ""}\n")
                 n++
             }
         }
-        Log.i("USAGEPROBE", "DUMP n=$n from=$from to=$to out=${out.name}")
+        QueryLog.append(context, "dump:${out.name}", from, to, before, if (events == null) null else n)
+        Log.i("USAGEPROBE", "DUMP n=${if (events == null) "null" else n} from=$from to=$to out=${out.name}")
     }
 
     companion object {

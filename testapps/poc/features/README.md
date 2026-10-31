@@ -61,7 +61,7 @@ python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/
 - 스키마 변경 복구, Room 트랜잭션, Kotlin 구현과의 대조
 - 닫지 못한 격리에서 판정을 다시 시작하는 기준. 지금은 계속 행을 만들지 않고 `uncertain_discarded`만 센다. 상태를 조용히 새로 시작해 풀지 않는다. 제품에 옮기기 전에 정하고, 격리 기간을 평가 보고에 드러낸다
 - SHUTDOWN 해제를 실기기에 쓰려면: 다시 읽는 조회 횟수·범위의 상한(상한에 닿아도 판정을 다시 시작하지 않음)과 조회 횟수·반환 건수·소요 시간 측정
-- 수집기 보강: 패키지 정보에 설치·업데이트 시각(`firstInstallTime`·`lastUpdateTime`), 조회마다 `wall`·`elapsed`·`BOOT_COUNT` 기록
+- 수집기(`testapps/usageprobe`)는 조회마다 전후 `wall`·`elapsed`와 앱이 읽은 `BOOT_COUNT`(못 읽으면 예외 이름)를 `queries.csv`에, 설치·업데이트 시각을 `launchers.csv`에 남긴다. 이 값을 `query_range`·`init_state` 입력으로 옮기는 변환기는 실측 자료를 받은 뒤 만든다
 - 실기기 확인 (갤럭시 연결 후 이 순서로)
   1. 수집과 기록 지연: 같은 과거 범위를 시간차를 두고 다시 조회해 늦게 나타나는 이벤트 측정
   2. 재부팅 복구: `BOOT_COUNT`·STARTUP·elapsed가 실제로 어떻게 바뀌는지, 잠금 해제 전 null 조회
