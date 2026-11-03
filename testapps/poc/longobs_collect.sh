@@ -48,14 +48,15 @@ pull() {  # $1=파일명 → 상태 문자열 echo, 성공 시에만 스냅샷 �
 }
 runs_st=$(pull runs.csv)
 work_st=$(pull work.csv)
+queries_st=$(pull queries.csv)   # 조회 전후 wall·elapsed·BOOT_COUNT
 # logcat: 한 파일에 >>로 붙이면 수집마다 버퍼 전체가 중복된다 → 회차별 스냅샷 파일로. 실패도 상태로 남김
 if adb logcat -d -s USAGEPROBE:I WM-WorkerWrapper:I BGAD:I > "$out/snap/logcat_$t.txt" 2>/dev/null; then log_st=ok; else log_st=실패; rm -f "$out/snap/logcat_$t.txt"; fi
 
 # 전송 실패가 하나라도 있으면 그 회차를 부분 실패로 표시(정상 수집으로 확정 안 함)
-status=ok; case "$runs_st$work_st" in *전송실패*|*저장실패*) status=부분실패;; esac
+status=ok; case "$runs_st$work_st$queries_st" in *전송실패*|*저장실패*) status=부분실패;; esac
 [ "$log_st" = 실패 ] && status=부분실패
-printf 'event=collect\nat=%s\nstatus=%s\nbucket=%s\nperm=%s\nruns=%s\nwork=%s\nlogcat=%s\nbattery=%s\n---\n' \
-  "$t" "$status" "$bucket" "$perm" "$runs_st" "$work_st" "$log_st" "$plugged" >> "$out/log.txt" || die "log.txt 기록 실패(스냅샷은 snap/에 있음)"
+printf 'event=collect\nat=%s\nstatus=%s\nbucket=%s\nperm=%s\nruns=%s\nwork=%s\nqueries=%s\nlogcat=%s\nbattery=%s\n---\n' \
+  "$t" "$status" "$bucket" "$perm" "$runs_st" "$work_st" "$queries_st" "$log_st" "$plugged" >> "$out/log.txt" || die "log.txt 기록 실패(스냅샷은 snap/에 있음)"
 echo "collect at=$t status=$status bucket=$bucket runs=$runs_st work=$work_st perm=$perm"
 echo "  battery: $plugged"
 [ "$runs_st" = "미생성" ] && echo "  (runs.csv 미생성: 작업이 아직 한 번도 안 돎 — 수집 실패와 다름)"

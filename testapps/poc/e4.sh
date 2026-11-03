@@ -12,7 +12,7 @@ wake() { sh input keyevent KEYCODE_WAKEUP; sleep 1; sh wm dismiss-keyguard; }
 
 sh am force-stop $PROBE
 sh am force-stop $BGAD   # 남은 알람·얼어 있는 프로세스 제거
-sh run-as $PROBE rm -f files/work.csv files/runs.csv shared_prefs/cursor.xml
+sh run-as $PROBE rm -f files/work.csv files/runs.csv files/queries.csv shared_prefs/cursor.xml
 sh appops set $PROBE GET_USAGE_STATS allow
 sh am set-standby-bucket $PROBE active   # 화면 없는 앱은 NEVER(50) 버킷이라 주기 작업 할당량이 0. 설정 직후 한 번 열린 앱을 가정
 sh input keyevent KEYCODE_HOME
@@ -50,6 +50,7 @@ adb exec-out run-as $PROBE cat files/work.csv > "$out/work.csv" 2>/dev/null
 adb exec-out run-as $PROBE cat files/runs.csv > "$out/runs.csv" 2>/dev/null
 sh am broadcast -f 32 -n $PROBE/.DumpReceiver --el from $begin --el to $end --es out e4_$cond.csv; sleep 2
 adb exec-out run-as $PROBE cat files/e4_$cond.csv > "$out/events.csv"
+adb exec-out run-as $PROBE cat files/queries.csv > "$out/queries.csv" 2>/dev/null   # 덤프 조회까지 포함, 다음 조건 시작 때 지워짐
 sh am broadcast -f 32 -n $PROBE/.WorkReceiver --es action stop
 printf 'cond=%s\nbegin=%s\nend=%s\n' "$cond" "$begin" "$end" > "$out/meta.txt"  # lag.py obs_end (작업 실행에서 추정 금지)
 echo "$cond: SHOW=$(grep -c ' SHOW ' "$out/truth.log") RESUMED=$(grep -c ' RESUMED ' "$out/truth.log") runs=$(wc -l < "$out/runs.csv" 2>/dev/null || echo 0) begin=$begin end=$end"

@@ -27,7 +27,7 @@ req install -r testapps/usageprobe/build/outputs/apk/debug/usageprobe-debug.apk
 req install -r -g testapps/bgad/build/outputs/apk/debug/bgad-debug.apk
 # 1회 명시적 초기화: install -r은 앱 데이터를 보존하므로 이전 실험의 작업 기록·커서가 남는다. 여기서만 지움(수집 단계는 지우지 않음)
 req shell am broadcast -f 32 -n $PROBE/.WorkReceiver --es action stop
-req shell run-as $PROBE rm -f files/work.csv files/runs.csv shared_prefs/cursor.xml
+req shell run-as $PROBE rm -f files/work.csv files/runs.csv files/queries.csv shared_prefs/cursor.xml
 req shell appops set $PROBE GET_USAGE_STATS allow
 # 실제 온보딩처럼 한 번 열기(버킷 NEVER 탈출). am start는 실패해도 exit 0일 수 있어 Status로 확인
 adb shell am start -W -n $PROBE/.MainActivity 2>&1 | grep -q 'Status: ok' || die "시작 화면 열기 실패"
