@@ -104,7 +104,7 @@ internal fun SeniorHomeScreen(
         actions = {
             when (state) {
                 SeniorHomeUiState.Loading -> Unit
-                SeniorHomeUiState.UsageAccessOff -> {
+                is SeniorHomeUiState.UsageAccessOff -> {
                     PdOutlinedButton(history, onHistoryClick)
                     PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
                 }
@@ -127,10 +127,15 @@ internal fun SeniorHomeScreen(
         Spacer(Modifier.height(8.dp))
         when (state) {
             SeniorHomeUiState.Loading -> Unit
-            SeniorHomeUiState.UsageAccessOff -> {
+            is SeniorHomeUiState.UsageAccessOff -> {
                 StatusCircle(StatusKind.ATTENTION)
                 Headline(stringResource(R.string.feature_senior_home_impl_usage_off_title))
                 Body(stringResource(R.string.feature_senior_home_impl_usage_off_body))
+                if (state.alerts.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Body(stringResource(R.string.feature_senior_home_impl_attention_title, state.alerts.size))
+                    AlertCards(state.alerts, onAlertClick)
+                }
             }
             is SeniorHomeUiState.Ready ->
                 if (state.alerts.isEmpty()) {
@@ -143,10 +148,7 @@ internal fun SeniorHomeScreen(
                     StatusCircle(StatusKind.ATTENTION)
                     Headline(stringResource(R.string.feature_senior_home_impl_attention_title, state.alerts.size))
                     Body(stringResource(R.string.feature_senior_home_impl_attention_body))
-                    state.alerts.forEach { alert ->
-                        AlertCard(alert, onClick = { onAlertClick(alert.id) })
-                        Spacer(Modifier.height(16.dp))
-                    }
+                    AlertCards(state.alerts, onAlertClick)
                 }
         }
     }
@@ -179,6 +181,14 @@ private fun Headline(text: String) {
 private fun Body(text: String) {
     Text(text, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(12.dp))
+}
+
+@Composable
+private fun AlertCards(alerts: List<SymptomAlert>, onAlertClick: (Long) -> Unit) {
+    alerts.forEach { alert ->
+        AlertCard(alert, onClick = { onAlertClick(alert.id) })
+        Spacer(Modifier.height(16.dp))
+    }
 }
 
 /** 카드 전체가 버튼이다 (S1′). 높이 80dp 이상 */
@@ -227,6 +237,6 @@ private fun AttentionPreview() {
 @Composable
 private fun UsageOffLargeFontPreview() {
     PhoneDoctorTheme {
-        SeniorHomeScreen(SeniorHomeUiState.UsageAccessOff, {}, {}, {}, {})
+        SeniorHomeScreen(SeniorHomeUiState.UsageAccessOff(listOf(PreviewAlert)), {}, {}, {}, {})
     }
 }

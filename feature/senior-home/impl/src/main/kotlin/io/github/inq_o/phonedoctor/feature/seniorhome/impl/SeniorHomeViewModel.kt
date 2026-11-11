@@ -23,8 +23,11 @@ data class DevicePermissions(val usageAccess: Boolean, val notifications: Boolea
 sealed interface SeniorHomeUiState {
     data object Loading : SeniorHomeUiState
 
-    /** 사용 기록 보기가 꺼져 있어 광고를 찾지 못하는 상태. 정상으로 보이게 두지 않는다 */
-    data object UsageAccessOff : SeniorHomeUiState
+    /**
+     * 사용 기록 보기가 꺼져 있어 광고를 찾지 못하는 상태. 정상으로 보이게 두지 않는다.
+     * 이미 열린 요청은 권한 없이도 지울 수 있으므로 함께 보여 준다
+     */
+    data class UsageAccessOff(val alerts: List<SymptomAlert>) : SeniorHomeUiState
 
     data class Ready(
         val alerts: List<SymptomAlert>,
@@ -45,7 +48,7 @@ class SeniorHomeViewModel @Inject constructor(
 
     val uiState: StateFlow<SeniorHomeUiState> =
         combine(repository.openAlerts, repository.latestScan, repository.scanning, permissions) { alerts, last, scanning, perm ->
-            if (!perm.usageAccess) SeniorHomeUiState.UsageAccessOff else SeniorHomeUiState.Ready(alerts, last, scanning, perm.notifications)
+            if (!perm.usageAccess) SeniorHomeUiState.UsageAccessOff(alerts) else SeniorHomeUiState.Ready(alerts, last, scanning, perm.notifications)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SeniorHomeUiState.Loading)
 
     val usageAccessSettingsIntents: List<Intent> get() = usageAccess.settingsIntents()

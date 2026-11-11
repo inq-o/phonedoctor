@@ -56,16 +56,16 @@ class AppDetailViewModel @AssistedInject constructor(
     }
 
     private val phase = MutableStateFlow(UninstallPhase.IDLE)
-    private var loaded = false
 
     val uiState: StateFlow<AppDetailUiState> = combine(repository.alert(alertId), phase) { alert, phase ->
         when {
-            alert == null -> if (loaded) AppDetailUiState.Gone else AppDetailUiState.Loading
+            // Room의 첫 값이 곧 조회 결과다. 읽기 전 상태는 stateIn 초기값(Loading)이 맡는다
+            alert == null -> AppDetailUiState.Gone
             // 이 화면에서 지운 직후에는 "지웠어요"를 보여 준다
             phase == UninstallPhase.REMOVED -> AppDetailUiState.Ready(alert, phase)
             alert.status != AlertStatus.OPEN -> AppDetailUiState.Gone
             else -> AppDetailUiState.Ready(alert, phase)
-        }.also { loaded = true }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppDetailUiState.Loading)
 
     init {
