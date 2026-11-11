@@ -16,19 +16,40 @@
 
 package io.github.inq_o.phonedoctor.ui
 
-import io.github.inq_o.phonedoctor.feature.appscan.api.navigation.AppScanNavKey
-import io.github.inq_o.phonedoctor.feature.appscan.impl.navigation.appScanEntry
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import io.github.inq_o.phonedoctor.feature.onboarding.api.navigation.OnboardingNavKey
+import io.github.inq_o.phonedoctor.feature.onboarding.impl.navigation.onboardingEntry
+import io.github.inq_o.phonedoctor.feature.seniorappdetail.api.navigation.AppDetailNavKey
+import io.github.inq_o.phonedoctor.feature.seniorappdetail.impl.navigation.appDetailEntry
+import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.ScanHistoryNavKey
+import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
+import io.github.inq_o.phonedoctor.feature.seniorhome.impl.navigation.seniorHomeEntries
 
+/**
+ * 첫 설정을 끝냈으면 홈, 아니면 첫 설정부터 시작한다. 알림을 눌러 들어온 경우 [pendingAlertId]의 앱 상세를 홈 위에 연다.
+ */
 @Composable
-fun MainNavigation() {
+fun MainNavigation(
+    onboardingDone: Boolean,
+    pendingAlertId: Long?,
+    onAlertOpened: () -> Unit,
+) {
+    // 시작 화면은 처음 한 번만 정한다. 첫 설정이 끝나면 아래 onFinished에서 홈으로 바꾼다
+    val backStack = rememberNavBackStack(if (onboardingDone) SeniorHomeNavKey else OnboardingNavKey)
 
-    val backStack = rememberNavBackStack(AppScanNavKey)
+    LaunchedEffect(pendingAlertId, onboardingDone) {
+        if (pendingAlertId != null && onboardingDone) {
+            backStack.removeAll { it is AppDetailNavKey }
+            backStack.add(AppDetailNavKey(pendingAlertId))
+            onAlertOpened()
+        }
+    }
 
     NavDisplay(
         backStack = backStack,
@@ -38,7 +59,18 @@ fun MainNavigation() {
             rememberViewModelStoreNavEntryDecorator()
         ),
         entryProvider = entryProvider {
-            appScanEntry(backStack = backStack)
+            onboardingEntry(
+                onFinished = {
+                    backStack.clear()
+                    backStack.add(SeniorHomeNavKey)
+                },
+            )
+            seniorHomeEntries(
+                onAlertClick = { backStack.add(AppDetailNavKey(it)) },
+                onHistoryClick = { backStack.add(ScanHistoryNavKey) },
+                onBack = { backStack.removeLastOrNull() },
+            )
+            appDetailEntry(onBack = { backStack.removeLastOrNull() })
         }
     )
 }

@@ -17,6 +17,7 @@
 plugins {
     alias(libs.plugins.phonedoctor.android.library)
     alias(libs.plugins.phonedoctor.hilt)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -24,9 +25,14 @@ android {
 }
 
 dependencies {
-    api(projects.core.database)
+    api(projects.core.model)
+    api(projects.core.packages)
+    api(projects.core.usage)
 
+    implementation(projects.core.database)
+    implementation(projects.core.datastore)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 
     testImplementation(libs.kotlinx.coroutines.test)
 }

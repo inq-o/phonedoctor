@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_onboarding_impl_step">%1$d단계 중 %2$d단계</string>
+
+    <string name="feature_onboarding_impl_disclosure_title">폰주치의가 하는 일</string>
+    <string name="feature_onboarding_impl_disclosure_body_1">폰주치의는 이 폰에 설치된 앱과, 어떤 앱이 화면에 떴는지를 이 폰 안에서 살펴봐요.</string>
+    <string name="feature_onboarding_impl_disclosure_body_2">쓰지도 않았는데 광고를 띄우는 앱을 찾으면 알려 드려요.</string>
+    <string name="feature_onboarding_impl_disclosure_body_3">살펴본 내용은 이 폰 안에만 두고 폰 밖으로 보내지 않아요. 앱 목록, 사용 기록, 사진, 문자, 위치도 보내지 않아요.</string>
+    <string name="feature_onboarding_impl_disclosure_agree">알겠어요, 시작할게요</string>
+
+    <string name="feature_onboarding_impl_notification_title">알림을 켜 주세요</string>
+    <string name="feature_onboarding_impl_notification_body">확인이 필요한 앱을 찾으면 알림으로 알려 드려요.</string>
+    <string name="feature_onboarding_impl_notification_allow">알림 켜기</string>
+    <string name="feature_onboarding_impl_later">나중에 할게요</string>
+
+    <string name="feature_onboarding_impl_usage_title">사용 기록 보기를 켜 주세요</string>
+    <string name="feature_onboarding_impl_usage_body">어떤 앱이 광고를 띄웠는지 찾으려면 필요해요.</string>
+    <string name="feature_onboarding_impl_usage_how">다음 화면에서 폰주치의를 찾아 스위치를 켜고, 뒤로 돌아와 주세요.</string>
+    <string name="feature_onboarding_impl_usage_open">설정 열기</string>
+    <string name="feature_onboarding_impl_usage_granted_title">켜졌어요</string>
+    <string name="feature_onboarding_impl_usage_granted_body">이제 광고를 띄우는 앱을 찾을 수 있어요.</string>
+    <string name="feature_onboarding_impl_start">시작하기</string>
+</resources>

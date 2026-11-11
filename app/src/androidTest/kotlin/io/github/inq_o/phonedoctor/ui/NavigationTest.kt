@@ -1,22 +1,8 @@
-/*
- * Copyright (C) 2026 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.github.inq_o.phonedoctor.ui
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -35,10 +21,10 @@ class NavigationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun mainActivity_showsMainScreen() {
-        // Here we just verify that something from the main screen is displayed.
-        composeTestRule.onNodeWithText("Save").assertExists()
-
-        // TODO: Add actions and assertions to test navigation
+    fun home_opensScanHistory_andReturns() {
+        composeTestRule.onNodeWithText("검사 기록 보기").performClick()
+        composeTestRule.onNodeWithText("살펴본 기록").assertExists()
+        composeTestRule.onNodeWithText("뒤로").performClick()
+        composeTestRule.onNodeWithText("검사 기록 보기").assertExists()
     }
 }

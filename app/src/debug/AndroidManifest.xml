@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application>
+        <!-- 시험용(debug 빌드에만 있음): adb로 검사를 한 번 돌린다. 출시 빌드에는 들어가지 않는다 -->
+        <receiver
+            android:name=".debug.ScanNowReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
+    </application>
+</manifest>

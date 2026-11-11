@@ -40,7 +40,8 @@ internal fun Project.configureKotlinAndroid(
         compileSdk = 36
 
         defaultConfig.apply {
-            minSdk = 23
+            // spec NFR-10: getChangedPackages 등 API 26 이상
+            minSdk = 26
         }
 
         compileOptions.apply {

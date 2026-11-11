@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_senior_home_impl_app_name">폰주치의</string>
+
+    <string name="feature_senior_home_impl_ok_title">지금은 확인할 앱이 없어요</string>
+    <string name="feature_senior_home_impl_last_scan_today">오늘 %1$s에 살펴봤어요</string>
+    <string name="feature_senior_home_impl_last_scan_date">%1$d월 %2$d일 %3$s에 살펴봤어요</string>
+    <string name="feature_senior_home_impl_last_scan_none">아직 살펴보지 않았어요</string>
+    <string name="feature_senior_home_impl_scanning">살펴보는 중이에요</string>
+    <string name="feature_senior_home_impl_scope">쓰지 않았는데 화면에 뜨는 광고를 찾아요. 다른 화면 위에 겹쳐 뜨는 광고는 찾지 못할 수 있어요.</string>
+    <string name="feature_senior_home_impl_notifications_off">알림이 꺼져 있어요. 확인할 앱이 생기면 이 화면에서 볼 수 있어요.</string>
+
+    <string name="feature_senior_home_impl_attention_title">확인이 필요한 앱이 %1$d개 있어요</string>
+    <string name="feature_senior_home_impl_attention_body">눌러서 살펴보세요</string>
+    <string name="feature_senior_home_impl_alert_today">오늘 광고를 %1$d번 띄웠어요</string>
+    <string name="feature_senior_home_impl_alert_date">%1$d월 %2$d일에 광고를 %3$d번 띄웠어요</string>
+
+    <string name="feature_senior_home_impl_usage_off_title">광고 찾기가 꺼져 있어요</string>
+    <string name="feature_senior_home_impl_usage_off_body">사용 기록 보기를 켜야 광고를 띄우는 앱을 찾을 수 있어요. 다음 화면에서 폰주치의를 찾아 스위치를 켜 주세요.</string>
+    <string name="feature_senior_home_impl_usage_open">설정 열기</string>
+
+    <string name="feature_senior_home_impl_history">검사 기록 보기</string>
+    <string name="feature_senior_home_impl_scan_now">지금 다시 살펴보기</string>
+
+    <string name="feature_senior_home_impl_history_title">검사 기록</string>
+    <string name="feature_senior_home_impl_back">뒤로</string>
+    <string name="feature_senior_home_impl_history_apps">광고를 띄운 앱 (최근 7일)</string>
+    <string name="feature_senior_home_impl_history_apps_empty">광고를 띄운 앱을 찾지 못했어요</string>
+    <string name="feature_senior_home_impl_history_app_row">%1$d월 %2$d일 · %3$d번</string>
+    <string name="feature_senior_home_impl_history_runs">살펴본 기록</string>
+    <string name="feature_senior_home_impl_history_runs_empty">아직 살펴본 기록이 없어요</string>
+    <string name="feature_senior_home_impl_run_time">%1$d월 %2$d일 %3$s</string>
+    <string name="feature_senior_home_impl_run_ok">화면 전환 %1$d번을 살펴봤고, 광고로 본 것은 %2$d번이에요</string>
+    <string name="feature_senior_home_impl_run_ok_hold">화면 전환 %1$d번을 살펴봤고, 광고로 본 것은 %2$d번이에요. %3$d번은 판단을 미뤘어요</string>
+    <string name="feature_senior_home_impl_run_no_permission">사용 기록 보기가 꺼져 있어 살펴보지 못했어요</string>
+    <string name="feature_senior_home_impl_run_locked">폰이 잠겨 있어 살펴보지 못했어요</string>
+    <string name="feature_senior_home_impl_run_query_null">사용 기록을 받지 못했어요</string>
+    <string name="feature_senior_home_impl_run_clock">폰 시간이 바뀌어 이번 기록은 쓰지 않았어요</string>
+    <string name="feature_senior_home_impl_run_error">살펴보는 중 문제가 생겼어요</string>
+    <string name="feature_senior_home_impl_run_quarantined">폰을 다시 켜면서 시간이 바뀌어 판단을 멈췄어요</string>
+</resources>

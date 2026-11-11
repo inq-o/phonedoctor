@@ -124,7 +124,6 @@ phonedoctor/
 │   ├── ui/                   # NEW  공용 컴포저블 (앱 카드, 근거 목록)
 │   └── testing/              # 있음
 ├── feature/
-│   ├── appscan/              # 있음  → senior-home으로 이름 변경
 │   ├── onboarding/{api,impl}
 │   ├── senior-home/{api,impl}
 │   ├── senior-appdetail/{api,impl}
