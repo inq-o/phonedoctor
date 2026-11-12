@@ -1,36 +1,23 @@
-/*
- * Copyright (C) 2022 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package io.github.inq_o.phonedoctor.core.data.di
 
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
-import io.github.inq_o.phonedoctor.core.data.AppScanRepository
-import io.github.inq_o.phonedoctor.core.data.DefaultAppScanRepository
+import io.github.inq_o.phonedoctor.core.data.DefaultSymptomRepository
+import io.github.inq_o.phonedoctor.core.data.DefaultUserSettingsRepository
+import io.github.inq_o.phonedoctor.core.data.SymptomRepository
+import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import javax.inject.Singleton
 
 @Module
 @InstallIn(SingletonComponent::class)
 interface DataModule {
+    @Singleton
+    @Binds
+    fun bindsSymptomRepository(impl: DefaultSymptomRepository): SymptomRepository
 
     @Singleton
     @Binds
-    fun bindsAppScanRepository(
-        appScanRepository: DefaultAppScanRepository
-    ): AppScanRepository
+    fun bindsUserSettingsRepository(impl: DefaultUserSettingsRepository): UserSettingsRepository
 }

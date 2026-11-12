@@ -22,7 +22,7 @@ import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import org.junit.Rule
 import org.junit.Test
-import io.github.inq_o.phonedoctor.core.data.test.fakeAppScans
+import io.github.inq_o.phonedoctor.core.data.test.fakeAlert
 import io.github.inq_o.phonedoctor.ui.MainActivity
 
 @HiltAndroidTest
@@ -35,8 +35,10 @@ class AppTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun test1() {
-        // TODO: Add navigation tests
-        composeTestRule.onNodeWithText(fakeAppScans.first(), substring = true).assertExists()
+    fun home_showsOpenAlertOrUsageAccessGuide() {
+        // 시험 기기에서 사용 기록 보기를 켰으면 확인할 앱 카드가, 안 켰으면 켜 달라는 안내가 보인다
+        composeTestRule.waitForIdle()
+        val card = composeTestRule.onAllNodes(androidx.compose.ui.test.hasText(fakeAlert.label)).fetchSemanticsNodes().isNotEmpty()
+        if (!card) composeTestRule.onNodeWithText("광고 찾기가 꺼져 있어요").assertExists()
     }
 }

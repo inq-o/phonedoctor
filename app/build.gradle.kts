@@ -49,20 +49,31 @@ android {
 }
 
 dependencies {
-    implementation(projects.feature.appscan.api)
-    implementation(projects.feature.appscan.impl)
+    implementation(projects.feature.onboarding.api)
+    implementation(projects.feature.onboarding.impl)
+    implementation(projects.feature.seniorAppdetail.api)
+    implementation(projects.feature.seniorAppdetail.impl)
+    implementation(projects.feature.seniorHome.api)
+    implementation(projects.feature.seniorHome.impl)
 
+    implementation(projects.core.data)
     implementation(projects.core.designsystem)
+    implementation(projects.core.notifications)
+    implementation(projects.sync.work)
 
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.work.runtime.ktx)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
+    ksp(libs.androidx.hilt.compiler)
     kspAndroidTest(libs.hilt.compiler)
 
     androidTestImplementation(projects.core.testing)

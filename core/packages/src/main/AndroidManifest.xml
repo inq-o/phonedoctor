@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- 설치 앱 전체를 읽어야 광고를 띄운 앱을 짚을 수 있다 (FR-001). 아이콘을 숨긴 앱도 포함 -->
+    <uses-permission
+        android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <!-- 시스템 삭제 확인창 요청 (FR-030). 삭제 자체는 시니어가 시스템 창에서 확인해야 진행된다 -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
+
+    <application>
+        <receiver
+            android:name=".UninstallResultReceiver"
+            android:exported="false" />
+    </application>
+</manifest>

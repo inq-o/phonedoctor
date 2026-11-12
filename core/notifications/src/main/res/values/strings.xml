@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="core_notifications_channel_alerts">확인이 필요한 앱</string>
+    <string name="core_notifications_channel_alerts_description">광고를 띄운 앱을 찾으면 알려 드려요</string>
+    <string name="core_notifications_alert_title">확인이 필요한 앱이 있어요</string>
+    <string name="core_notifications_alert_text_today">%1$s 오늘 광고를 %2$d번 띄웠어요</string>
+    <string name="core_notifications_alert_text_date">%1$s %2$d월 %3$d일에 광고를 %4$d번 띄웠어요</string>
+</resources>

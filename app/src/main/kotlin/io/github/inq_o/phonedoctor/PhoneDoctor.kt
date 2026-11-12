@@ -17,7 +17,26 @@
 package io.github.inq_o.phonedoctor
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import io.github.inq_o.phonedoctor.core.data.ScanScheduler
+import javax.inject.Inject
 
 @HiltAndroidApp
-class PhoneDoctor : Application()
+class PhoneDoctor : Application(), Configuration.Provider {
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    @Inject
+    lateinit var scanScheduler: ScanScheduler
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder().setWorkerFactory(workerFactory).build()
+
+    override fun onCreate() {
+        super.onCreate()
+        // 주기 검사는 앱 프로세스가 처음 뜰 때 건다. 한 번도 열지 않은 앱은 작업 할당량이 없어 첫 실행이 필요하다
+        scanScheduler.ensurePeriodic()
+    }
+}

@@ -22,6 +22,9 @@ reviews:
   path_filters:
     - "!gradle/wrapper/**"
     - "!**/*.webp"
+    # 파일 수 한도(100개)를 넘으면 리뷰가 통째로 생략됨 → 모듈마다 붙는 상용구는 뺌
+    - "!**/.gitignore"
+    - "!**/build.gradle.kts"
   path_instructions:
     - path: "**/*.kt"
       instructions: |
