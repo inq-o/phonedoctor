@@ -1,5 +1,5 @@
 {
- "schema": "fx0-draft",
+ "schema": "fx1-draft",
  "note": "기대값은 추출기 실행 전에 손으로 계산. 시각 ms. segment 기본값 {start:-600000, kind:install}(CAP 이상 관측). events 사례는 검사기가 한 번 조회·모든 묶음 경계 두 조회 분할·조회마다 저장 실패 재실행·같은 ms 순서 바꾸기(뒤집기, 돌리기)를 함께 확인. queries 사례는 적힌 조회 그대로에 저장 실패 재실행·같은 ms 순서 바꾸기를 확인하고, range가 있으면 query_range 결과도 확인. order_assume이 있는 사례([생명주기 가정])는 분석용 모드. recover가 있는 사례([SHUTDOWN 해제, 분석용])는 열린 격리를 옛 부팅의 SHUTDOWN으로 닫는 분석용 모드",
  "launchers": {
   "app.a": {
@@ -5851,6 +5851,205 @@
       "failed": [
        "R6"
       ],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
+   "id": "19l",
+   "title": "R6: 재부팅 뒤 첫 전환이라 직전 화면을 몰라도, 꺼질 때 보던 화면(.Detail)으로 돌아오면 복귀",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "segments": [
+    1,
+    1,
+    2
+   ],
+   "counts": {
+    "segments_boot": 1
+   },
+   "queries": [
+    {
+     "wall_to": 20000,
+     "elapsed": 620000,
+     "boot_count": 1,
+     "events": [
+      [
+       1000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       3000,
+       "PAUSED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       3100,
+       "RESUMED",
+       "app.a",
+       ".Detail"
+      ]
+     ]
+    },
+    {
+     "wall_to": 90000,
+     "elapsed": 20000,
+     "boot_count": 2,
+     "events": [
+      [
+       70000,
+       "STARTUP",
+       "android",
+       ""
+      ],
+      [
+       75050,
+       "RESUMED",
+       "app.a",
+       ".Detail"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      75050,
+      "app.a",
+      ".Detail"
+     ],
+     "features": {
+      "F2": [
+       null,
+       "NONE_IN_WINDOW"
+      ],
+      "F11": [
+       true,
+       "OBSERVED"
+      ],
+      "F12": [
+       true,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "NORMAL",
+      "failed": [
+       "R6"
+      ],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
+   "id": "19k",
+   "title": "R6 통과: 같은 ms 순서에 따라 세계마다 떠난 화면이 다름(.C는 한 세계에만 있음) → 구간을 넘길 때 정상으로 확정하지 않음",
+   "init": {
+    "wall": -600000,
+    "elapsed": 0,
+    "boot_count": 1
+   },
+   "counts": {
+    "segments_boot": 1
+   },
+   "queries": [
+    {
+     "wall_to": 20000,
+     "elapsed": 620000,
+     "boot_count": 1,
+     "events": [
+      [
+       1000,
+       "RESUMED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       3000,
+       "PAUSED",
+       "app.a",
+       ".Main"
+      ],
+      [
+       3100,
+       "RESUMED",
+       "app.a",
+       ".C"
+      ],
+      [
+       5000,
+       "RESUMED",
+       "app.a",
+       ".D"
+      ],
+      [
+       5000,
+       "RESUMED",
+       "app.b",
+       ".Main"
+      ]
+     ]
+    },
+    {
+     "wall_to": 90000,
+     "elapsed": 20000,
+     "boot_count": 2,
+     "events": [
+      [
+       70000,
+       "STARTUP",
+       "android",
+       ""
+      ],
+      [
+       71000,
+       "RESUMED",
+       "home.l",
+       ".Home"
+      ],
+      [
+       75000,
+       "PAUSED",
+       "home.l",
+       ".Home"
+      ],
+      [
+       75050,
+       "RESUMED",
+       "app.a",
+       ".C"
+      ]
+     ]
+    }
+   ],
+   "expect": [
+    {
+     "target": [
+      75050,
+      "app.a",
+      ".C"
+     ],
+     "features": {
+      "F11": [
+       true,
+       "OBSERVED"
+      ],
+      "F12": [
+       false,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0t": {
+      "outcome": "AD",
+      "failed": [],
       "unknown": []
      }
     }

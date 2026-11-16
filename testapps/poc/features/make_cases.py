@@ -344,6 +344,22 @@ add("19j", "R6: 재부팅 뒤에도 떠난 화면 기록을 이어 감. 꺼질 �
              {"wall_to": 90000, "elapsed": 20000, "boot_count": 2,
               "events": [[70000, "STARTUP", "android", ""], [71000, "RESUMED", "home.l", ".Home"], [75000, "PAUSED", "home.l", ".Home"],
                          [75050, "RESUMED", "app.a", ".Detail"]]}])
+q19 = {"wall_to": 20000, "elapsed": 620000, "boot_count": 1,
+       "events": [[1000, "RESUMED", "app.a", ".Main"], [3000, "PAUSED", "app.a", ".Main"], [3100, "RESUMED", "app.a", ".Detail"]]}
+add("19l", "R6: 재부팅 뒤 첫 전환이라 직전 화면을 몰라도, 꺼질 때 보던 화면(.Detail)으로 돌아오면 복귀",
+    [{"target": [75050, "app.a", ".Detail"], "features": F(F2=none, F11=o(True), F12=o(True)), "rule_v0t": NORMAL(["R6"])}],
+    init=init, segments=[1, 1, 2], counts={"segments_boot": 1},
+    queries=[q19, {"wall_to": 90000, "elapsed": 20000, "boot_count": 2,
+                   "events": [[70000, "STARTUP", "android", ""], [75050, "RESUMED", "app.a", ".Detail"]]}])
+add("19k", "R6 통과: 같은 ms 순서에 따라 세계마다 떠난 화면이 다름(.C는 한 세계에만 있음) → 구간을 넘길 때 정상으로 확정하지 않음",
+    [{"target": [75050, "app.a", ".C"], "features": F(F11=o(True), F12=o(False)), "rule_v0t": AD()}],
+    init=init, counts={"segments_boot": 1},
+    queries=[{"wall_to": 20000, "elapsed": 620000, "boot_count": 1,
+              "events": [[1000, "RESUMED", "app.a", ".Main"], [3000, "PAUSED", "app.a", ".Main"], [3100, "RESUMED", "app.a", ".C"],
+                         [5000, "RESUMED", "app.a", ".D"], [5000, "RESUMED", "app.b", ".Main"]]},
+             {"wall_to": 90000, "elapsed": 20000, "boot_count": 2,
+              "events": [[70000, "STARTUP", "android", ""], [71000, "RESUMED", "home.l", ".Home"], [75000, "PAUSED", "home.l", ".Home"],
+                         [75050, "RESUMED", "app.a", ".C"]]}])
 add("19c", "R6 통과: 정상으로 쓰던 앱이 나중에 떠날 때와 다른 화면을 띄움",
     [{"target": [40100, "app.b", ".Ad"], "features": F(F11=o(False), F12=none), "rule_v0t": AD()}],
     events=[[1000, "RESUMED", "app.b", ".Main"], [9000, "PAUSED", "app.b", ".Main"], [9100, "RESUMED", "home.l", ".Home"],
@@ -367,7 +383,7 @@ add("19g", "R7 통과: 앞 앱이 멈추자마자 떠도 공개 화면이 아님
     [{"target": [8050, "ad.x", ".Ad"], "features": F(F13=o(False), F14=o(50)), "rule_v0": [], "rule_v0t": AD()}],
     events=[[1000, "RESUMED", "app.a", ".Main"], [8000, "PAUSED", "app.a", ".Main"], [8050, "RESUMED", "ad.x", ".Ad"]])
 
-spec = {"schema": "fx0-draft",
+spec = {"schema": "fx1-draft",
         "note": "기대값은 추출기 실행 전에 손으로 계산. 시각 ms. segment 기본값 {start:-600000, kind:install}(CAP 이상 관측). events 사례는 검사기가 한 번 조회·모든 묶음 경계 두 조회 분할·조회마다 저장 실패 재실행·같은 ms 순서 바꾸기(뒤집기, 돌리기)를 함께 확인. queries 사례는 적힌 조회 그대로에 저장 실패 재실행·같은 ms 순서 바꾸기를 확인하고, range가 있으면 query_range 결과도 확인. order_assume이 있는 사례([생명주기 가정])는 분석용 모드. recover가 있는 사례([SHUTDOWN 해제, 분석용])는 열린 격리를 옛 부팅의 SHUTDOWN으로 닫는 분석용 모드",
         "launchers": {"app.a": {"resolved": [".Main"], "system": False}, "app.b": {"resolved": [".Main"], "system": False},
                       "ad.x": {"resolved": [".Splash"], "system": False}, "home.l": {"resolved": [".Home"], "system": True},

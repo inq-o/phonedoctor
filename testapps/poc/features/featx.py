@@ -30,7 +30,7 @@ import json
 import os
 import sys
 
-SCHEMA = "fx0-draft"
+SCHEMA = "fx1-draft"            # fx1: 세계에 sess·left 추가 (fx0 상태는 복원하지 않고 새로 채움)
 CAP_MS = 600_000            # 경과 시간 특징의 관측 창이자 값 상한 (동결 전 결정)
 SETTLE_MS = 5_000           # 워터마크 여유: 기록 지연이 이보다 짧다고 가정 [실기기 미확인]
 CLOCK_TOL_MS = 1_000        # 벽시계 경과와 elapsed 경과의 허용 차이. OS가 기록을 옮기는 기준(OS_SHIFT_MS)보다 작게
@@ -85,8 +85,9 @@ def _leave(w, pkg, cls):
 
 def _carry(worlds):
     """구간을 새로 열 때 떠난 화면 기록만 넘김. 앱 작업은 재부팅·시계 변경 뒤에도 최근 앱에 남아 그 화면으로 다시 열리므로
-    시간 창 상태와 달리 버리지 않음. 그때 보이던 화면도 떠난 화면으로 남기고, 세계마다 다르면 모두 정상일 때만 정상"""
-    order, trust = {}, {}
+    시간 창 상태와 달리 버리지 않음. 그때 보이던 화면도 떠난 화면으로 남김.
+    세계마다 다르면 모든 세계에 기록이 있고 모두 정상일 때만 정상 (기록이 없는 세계가 있으면 정상으로 확정하지 않음)"""
+    order, trust, seen = {}, {}, {}
     for w0 in worlds:
         w = copy.deepcopy(w0)
         if w["prev"]:
@@ -98,7 +99,8 @@ def _carry(worlds):
                     trust[(pkg, cls)] = t
                 else:
                     trust[(pkg, cls)] = trust[(pkg, cls)] and t
-    return {pkg: [[c, trust[(pkg, c)]] for c in cs][-LEFT_MAX:] for pkg, cs in order.items()}
+                seen[(pkg, cls)] = seen.get((pkg, cls), 0) + 1
+    return {pkg: [[c, trust[(pkg, c)] and seen[(pkg, c)] == len(worlds)] for c in cs][-LEFT_MAX:] for pkg, cs in order.items()}
 
 
 def _reset(state, start, kind):
@@ -273,10 +275,11 @@ def features(w, seg, t, p, c, snap):
     info, _ = _meta(snap, p, t)
     f["F9"] = (c in info["resolved"], OBS) if info else (None, LF)
     f["F10"] = (info["system"], OBS) if info else (None, LF)
-    # F11 다른 앱에서 넘어와, 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴. 기록이 없으면 아님으로 봄(기록 시작 전은 모름)
+    # F11 다른 앱에서 넘어와(구간 첫 전환처럼 직전 화면을 모르면 포함), 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴.
+    #     기록이 없으면 아님으로 봄(기록 시작 전은 모름)
     # F12 그 화면을 떠난 사용이 정상 판정으로 시작했는지. 보류로 시작했으면 아님(광고를 보류 사슬로 놓치지 않게)
     lf = dict(w["left"].get(p, []))
-    f["F11"] = (bool(prev and prev[0] != p and c in lf), OBS)
+    f["F11"] = (bool((prev is None or prev[0] != p) and c in lf), OBS)
     f["F12"] = (lf[c], OBS) if c in lf else (None, NONE)
     # F13 다른 앱이 열 수 있는 화면(exported, 별칭이면 targetActivity)인지
     # F14 직전 화면이 다른 앱이면 그 앱이 멈춘 뒤 경과 (같은 앱이면 해당 없음)

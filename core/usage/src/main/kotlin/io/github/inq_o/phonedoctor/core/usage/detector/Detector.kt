@@ -16,7 +16,8 @@ import kotlin.math.min
  * - 재부팅·시계 변경·긴 공백이면 상태를 비우고 새 관측 구간을 연다. 어느 시계의 기록인지 가를 수 없는 범위는 행을 만들지 않는다
  */
 object Detector {
-    const val SCHEMA = "fx0-draft"
+    /** 저장 상태 형식. fx1: 세계에 sess·left 추가 (fx0 상태는 복원하지 않고 첫 검사로 새로 채움) */
+    const val SCHEMA = "fx1-draft"
     const val CAP_MS = 600_000L
     const val SETTLE_MS = 5_000L
     const val CLOCK_TOL_MS = 1_000L
@@ -176,11 +177,13 @@ object Detector {
 
     /**
      * 구간을 새로 열 때 떠난 화면 기록만 넘긴다. 앱 작업은 재부팅·시계 변경 뒤에도 최근 앱에 남아 그 화면으로 다시 열리므로
-     * 시간 창 상태와 달리 버리지 않는다. 그때 보이던 화면도 떠난 화면으로 남기고, 세계마다 다르면 모두 정상일 때만 정상
+     * 시간 창 상태와 달리 버리지 않는다. 그때 보이던 화면도 떠난 화면으로 남긴다.
+     * 세계마다 다르면 모든 세계에 기록이 있고 모두 정상일 때만 정상 (기록이 없는 세계가 있으면 정상으로 확정하지 않음)
      */
     private fun carry(worlds: List<World>): Map<String, List<Left>> {
         val order = LinkedHashMap<String, MutableList<String>>()
         val trust = HashMap<Pair<String, String>, Boolean>()
+        val seen = HashMap<Pair<String, String>, Int>()
         for (w0 in worlds) {
             val left = w0.prev?.let { leave(w0.left, w0.sess, it.pkg, it.cls) } ?: w0.left
             for ((pkg, list) in left) {
@@ -193,10 +196,13 @@ object Detector {
                     } else {
                         trust[key] = old && l.trusted
                     }
+                    seen[key] = (seen[key] ?: 0) + 1
                 }
             }
         }
-        return order.mapValues { (pkg, cs) -> cs.map { Left(it, trust.getValue(pkg to it)) }.takeLast(LEFT_MAX) }
+        return order.mapValues { (pkg, cs) ->
+            cs.map { Left(it, trust.getValue(pkg to it) && seen.getValue(pkg to it) == worlds.size) }.takeLast(LEFT_MAX)
+        }
     }
 
     /**
@@ -333,8 +339,9 @@ object Detector {
             },
             "F9" to if (info != null) bool(c in info.resolved) else none(FeatureStatus.LOOKUP_FAILED),
             "F10" to if (info != null) bool(info.system) else none(FeatureStatus.LOOKUP_FAILED),
-            // 다른 앱에서 넘어와, 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴. 기록이 없으면 아님으로 본다
-            "F11" to bool(prev != null && prev.pkg != p && w.left[p].orEmpty().any { it.cls == c }),
+            // 다른 앱에서 넘어와(구간 첫 전환처럼 직전 화면을 모르면 포함), 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴.
+            // 기록이 없으면 아님으로 본다
+            "F11" to bool((prev == null || prev.pkg != p) && w.left[p].orEmpty().any { it.cls == c }),
             // 그 화면을 떠난 사용이 정상 판정으로 시작했는지 (광고·보류로 시작했으면 아님)
             "F12" to (w.left[p]?.lastOrNull { it.cls == c }?.let { bool(it.trusted) } ?: none(FeatureStatus.NONE_IN_WINDOW)),
             // 다른 앱이 열 수 있는 화면(exported)인지

@@ -107,6 +107,8 @@ class SymptomScanner @Inject constructor(
             } catch (e: SecurityException) {
                 return skipped(ScanResult.NO_PERMISSION, "조회 중 권한 꺼짐")
             }
+            // 채우기 조회가 null이면 채우지 못한 상태를 저장하지 않는다. 저장하면 다음 검사가 지난 하루를 판정 대상으로 읽는다
+            if (warmup && events == null) return skipped(ScanResult.QUERY_NULL, "warmup")
             val apps = installedApps.snapshot()
             // 공개 화면 목록은 앱마다 읽는 비용이 커서, 이번 조회에서 화면이 바뀐 앱만 읽는다. 못 읽으면 공개 화면 없음으로 본다
             val shown = events.orEmpty().filter { it.type == Detector.RESUMED }.map { it.pkg }.toSet()

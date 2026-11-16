@@ -18,7 +18,7 @@ err() { echo "오류: $1" >&2; exit 1; }
 pkgs=$(adb shell pm list packages | tr -d '\r')   # grep -q가 먼저 끝나면 pipefail에 걸리므로 변수로 받는다
 grep -qx "package:$APP" <<< "$pkgs" || err "폰주치의가 설치돼 있지 않음"
 now() { local ns; ns=$(adb shell date +%s%N | tr -d '\r'); [[ "$ns" =~ ^[0-9]+$ ]] || return 1; echo $(( ns / 1000000 )); }
-sql() { sqlite3 "$out/phonedoctor.db" "$1"; }
+sql() { sqlite3 "$out/phonedoctor.db" "$@"; }
 pull_db() {
   local f
   for f in phonedoctor.db phonedoctor.db-wal phonedoctor.db-shm; do
@@ -26,7 +26,8 @@ pull_db() {
   done
   [ -s "$out/phonedoctor.db" ]
 }
-# 검사를 한 번 돌리고 그 기록의 id를 낸다. 실패하면 빈 값
+# 검사를 한 번 돌리고 그 기록의 id를 낸다. 실패하면 빈 값.
+# 단계 사이에 주기 검사가 돌면 커서가 그만큼 나아가므로, 단계 집계는 trigger와 무관하게 앞 단계 뒤의 OK 검사를 모두 더한다
 scan() {
   local last n i
   pull_db || return 1
@@ -75,6 +76,7 @@ sleep "$SETTLE_WAIT"
 base=$(scan) || err "검사가 돌지 않음. 폰주치의 첫 설정과 사용 기록 권한을 확인하세요"
 [ "$(sql "SELECT result FROM scan_run WHERE id=$base")" = "OK" ] || err "준비 검사 결과가 OK가 아님: $(sql "SELECT result,note FROM scan_run WHERE id=$base")"
 echo "base_scan_id=$base" >> "$out/env.txt"
+last=$base   # 앞 단계까지 집계한 마지막 scan_run.id
 echo "   통과. 총 ${#steps[@]}단계. 단계마다 Enter=시작/끝, s=건너뜀, q=끝냄"
 
 for entry in "${steps[@]}"; do
@@ -90,7 +92,11 @@ for entry in "${steps[@]}"; do
   echo "   기록 중(약 10초)…"
   sleep "$SETTLE_WAIT"
   if sid=$(scan); then
-    row=$(sql "SELECT result||','||id||','||transitionCount||','||adCount||','||holdCount||','||storedCount FROM scan_run WHERE id=$sid")
+    # 상태 열은 이 단계 검사의 결과, 숫자 열은 앞 단계 뒤 OK 검사 전부의 합
+    row=$(sql "SELECT (SELECT result FROM scan_run WHERE id=$sid)||',$sid,'||COALESCE(SUM(transitionCount),0)||','||
+               COALESCE(SUM(adCount),0)||','||COALESCE(SUM(holdCount),0)||','||COALESCE(SUM(storedCount),0)
+               FROM scan_run WHERE id > $last AND id <= $sid AND result='OK'")
+    last=$sid
     echo "   전환·광고·보류·저장: $(echo "$row" | cut -d, -f3-6 | tr ',' ' ')"
   else
     row="scan_failed,,,,,"
@@ -106,6 +112,6 @@ adb shell dumpsys usagestats > "$out/usagestats_dump.txt" 2>/dev/null || true   
 echo "ended_ms=$(now)" >> "$out/env.txt"
 sql ".mode csv" ".headers on" "SELECT * FROM symptom_event WHERE id > 0 ORDER BY resumedAt" > "$out/symptom_event.csv" 2>/dev/null || true
 sql ".mode csv" ".headers on" "SELECT * FROM alert_local" > "$out/alert_local.csv" 2>/dev/null || true
-ad=$(awk -F, 'NR>1 && $4=="OK" {s+=$7} END {print s+0}' "$out/steps.csv")
+ad=$(sql "SELECT COALESCE(SUM(adCount),0) FROM scan_run WHERE id > $base AND result='OK'")   # 단계 밖 주기 검사도 포함
 echo "광고로 센 전환 합계=$ad  (0이 아니면 오탐 후보. 단계별 값은 steps.csv)"
 echo "원자료: $out"
