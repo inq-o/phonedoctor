@@ -15,6 +15,7 @@ import java.io.File
  *
  * adb shell am broadcast -n io.github.inq_o.phonedoctor.testapps.usageprobe/.LaunchersReceiver
  * adb exec-out run-as io.github.inq_o.phonedoctor.testapps.usageprobe cat files/launchers.csv
+ * 다른 앱이 열 수 있는 액티비티 목록은 files/exported.csv (package,activity)
  */
 class LaunchersReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -30,6 +31,12 @@ class LaunchersReceiver : BroadcastReceiver() {
                 ?: listOf("${app.packageName},,,$system,$times")
         }
         out.writeText("package,launcherClass,resolvedClass,system,firstInstallTime,lastUpdateTime\n" + rows.joinToString("\n") + "\n")
-        Log.i("USAGEPROBE", "LAUNCHERS n=${rows.size}")
+        // 다른 앱이 열 수 있는 액티비티(exported). 별칭이면 targetActivity로 풀어 적는다
+        val exported = pm.getInstalledApplications(0).flatMap { app ->
+            val acts = runCatching { pm.getPackageInfo(app.packageName, PackageManager.GET_ACTIVITIES).activities }.getOrNull().orEmpty()
+            acts.filter { it.exported }.map { "${app.packageName},${it.targetActivity ?: it.name}" }
+        }.distinct()
+        File(context.filesDir, "exported.csv").writeText("package,activity\n" + exported.joinToString("\n") + "\n")
+        Log.i("USAGEPROBE", "LAUNCHERS n=${rows.size} exported=${exported.size}")
     }
 }

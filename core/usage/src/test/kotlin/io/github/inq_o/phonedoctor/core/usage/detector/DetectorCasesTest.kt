@@ -55,6 +55,7 @@ class DetectorCasesTest {
                 resolved = o["resolved"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet() ?: emptySet(),
                 system = o["system"]?.jsonPrimitive?.booleanOrNull ?: false,
                 since = o["since"]?.takeIf { it !is JsonNull }?.jsonPrimitive?.longOrNull,
+                exported = o["exported"]?.jsonArray?.map { it.jsonPrimitive.content }?.toSet() ?: emptySet(),
             )
         }
 

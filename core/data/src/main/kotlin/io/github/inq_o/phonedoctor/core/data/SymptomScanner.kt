@@ -95,20 +95,31 @@ class SymptomScanner @Inject constructor(
             val saved = stateDao.get()
             val restored = saved?.takeIf { it.schema == Detector.SCHEMA }
                 ?.let { runCatching { json.decodeFromString(DetectorState.serializer(), it.json) }.getOrNull() }
-            // 처음이거나 저장된 상태를 못 읽으면 지금부터 새로 센다. 그 전 기록은 판정하지 않는다
-            val state = restored
-                ?: Detector.initState(clock.wall, if (saved == null) "install" else "schema", clock.wall, clock.elapsed, clock.bootCount)
+            // 처음이거나 저장된 상태를 못 읽으면 지금부터 새로 센다. 그 전 기록은 판정 결과로 남기지 않고,
+            // 지난 하루치로 상태(앱마다 떠난 화면 등)만 채운다. 안 채우면 최근 앱에서 다시 여는 앱마다 첫 번을 광고로 센다
+            val warmup = restored == null
+            val state = restored ?: Detector.initState(
+                clock.wall - WARMUP_MS, if (saved == null) "install" else "schema", clock.wall, clock.elapsed, clock.bootCount,
+            )
             val (from, to) = Detector.queryRange(state, clock.wall, clock.elapsed, clock.bootCount)
             val events = try {
                 source.query(from, to)
             } catch (e: SecurityException) {
                 return skipped(ScanResult.NO_PERMISSION, "조회 중 권한 꺼짐")
             }
+            // 채우기 조회가 null이면 채우지 못한 상태를 저장하지 않는다. 저장하면 다음 검사가 지난 하루를 판정 대상으로 읽는다
+            if (warmup && events == null) return skipped(ScanResult.QUERY_NULL, "warmup")
             val apps = installedApps.snapshot()
-            val snapshot = apps.mapValues { PackageMeta(it.value.launcherTargets, it.value.isSystem, it.value.lastUpdateTime) }
+            // 공개 화면 목록은 앱마다 읽는 비용이 커서, 이번 조회에서 화면이 바뀐 앱만 읽는다. 못 읽으면 공개 화면 없음으로 본다
+            val shown = events.orEmpty().filter { it.type == Detector.RESUMED }.map { it.pkg }.toSet()
+            val exported = shown.filter { it in apps }.associateWith { installedApps.exportedActivities(it).orEmpty() }
+            val snapshot = apps.mapValues {
+                PackageMeta(it.value.launcherTargets, it.value.isSystem, it.value.lastUpdateTime, exported[it.key].orEmpty())
+            }
             val result = Detector.processQuery(state, UsageQuery(clock.wall, clock.elapsed, clock.bootCount, events), snapshot)
 
-            val ads = result.rows.filter { it.outcome == Outcome.AD }
+            val rows = if (warmup) emptyList() else result.rows
+            val ads = rows.filter { it.outcome == Outcome.AD }
             // 판정할 때 설치돼 있던 판이 확인된 것만 앱에 귀속한다. 그사이 지워졌거나 업데이트된 앱의 전환은 버린다
             val attributable = ads.filter { it.metaValidity == MetaValidity.VERIFIED && it.pkg != installedApps.ownPackageName }
             val identities = attributable.map { it.pkg }.distinct().associateWith { installedApps.identity(it) }
@@ -133,14 +144,15 @@ class SymptomScanner @Inject constructor(
                 },
                 queryFrom = from, queryTo = to,
                 eventCount = events?.size ?: 0,
-                transitionCount = result.rows.size,
+                transitionCount = rows.size,
                 adCount = ads.size,
-                holdCount = result.rows.count { it.outcome == Outcome.HOLD },
+                holdCount = rows.count { it.outcome == Outcome.HOLD },
                 storedCount = entities.size,
                 segmentId = result.state.segment.id,
                 segmentKind = result.state.segment.kind,
                 quarantined = result.state.openQuarantine != null,
                 durationMs = elapsedMs(),
+                note = if (warmup) "warmup ${result.rows.size}" else "",
             )
             val (opened, closed) = transactions.run {
                 symptomDao.insert(entities)
@@ -250,6 +262,9 @@ class SymptomScanner @Inject constructor(
 
     private companion object {
         const val TAG = "PhoneDoctorScan"
+
+        /** 처음 검사 때 상태를 채우는 데 쓰는 지난 기록 길이. 판정기의 공백 기준(3일)보다 짧게 */
+        const val WARMUP_MS = 86_400_000L
         const val SOURCE_SYMPTOM = "symptom"
     }
 }
