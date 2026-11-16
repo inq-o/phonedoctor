@@ -1,6 +1,6 @@
 # 증상 감지 특징 추출기 (실험용)
 
-사용 기록(`UsageEvents`)에서 앱 화면 전환마다 특징 F0~F10을 뽑고, 규칙 v0를 특징으로 다시 쓴 `rule_v0t`로 판정한다. 기기 추출기(Kotlin)가 같은 입력에서 같은 행을 내는지 대조하는 **PC 기준 구현**이다.
+사용 기록(`UsageEvents`)에서 앱 화면 전환마다 특징 F0~F14를 뽑고, 규칙 v0(R1~R5)를 특징으로 다시 쓰고 R6·R7을 더한 `rule_v0t`로 판정한다. R6(정상으로 쓰다 떠난 화면으로 복귀)·R7(다른 앱이 바로 연 공개 화면)의 근거와 한계는 [정상 사용 실측](../../../docs/measurements/2026-11-17-normal-use-scenario.md). 기기 추출기(Kotlin)가 같은 입력에서 같은 행을 내는지 대조하는 **PC 기준 구현**이다.
 
 - 상태: 실험용 초안(`fx0-draft`). 실기기 검증 전이고 제품 코드가 아니다.
 - 표준 라이브러리만 쓴다(Python 3). 원본 규칙 대조에 상위 폴더의 `rule_v0.py`를 읽는다.
@@ -12,6 +12,7 @@ python3 testapps/poc/features/featx.py          # 검증 사례 52개
 python3 testapps/poc/features/mutate.py         # 변형 시험 (코드를 한 곳씩 망가뜨려 사례가 잡는지)
 python3 testapps/poc/features/make_cases.py testapps/poc/features/cases.json   # 사례 다시 만들기
 python3 testapps/poc/features/featx.py real ml/data/poc/launchers.csv $(find ml/data/poc -name '*events.csv')
+python3 testapps/poc/features/eval_real.py --exported <exported.csv> <launchers.csv> <events.csv>...   # 정답(AdActivity=광고)별 집계
 ```
 
 - 기대값은 추출기를 돌리기 전에 손으로 계산해 `make_cases.py`에 적는다. `cases.json`은 그 출력이다.
