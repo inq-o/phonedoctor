@@ -8,8 +8,11 @@ data class UsageEvent(val ts: Long, val type: Int, val pkg: String, val cls: Str
 /** 조회 1회분. [events]는 OS가 돌려준 순서 그대로이고, 잠금 해제 전처럼 조회가 null이면 null */
 data class UsageQuery(val wallTo: Long, val elapsed: Long, val bootCount: Int?, val events: List<UsageEvent>?)
 
-/** 판정 시점의 패키지 정보. [since]는 마지막 설치·업데이트 시각(모르면 null) */
-data class PackageMeta(val resolved: Set<String>, val system: Boolean, val since: Long?)
+/**
+ * 판정 시점의 패키지 정보. [since]는 마지막 설치·업데이트 시각(모르면 null).
+ * [exported]는 다른 앱이 열 수 있는 액티비티(별칭이면 targetActivity). 모르면 빈 집합(공개 화면 아님으로 봄)
+ */
+data class PackageMeta(val resolved: Set<String>, val system: Boolean, val since: Long?, val exported: Set<String> = emptySet())
 
 enum class FeatureStatus { OBSERVED, NONE_IN_WINDOW, NOT_COVERED, LOOKUP_FAILED, TIED }
 
@@ -42,7 +45,14 @@ data class Prev(val pkg: String, val cls: String, val ts: Long)
 @Serializable
 data class ScreenOff(val ts: Long, val beforePkg: String?, val beforeCls: String?)
 
-/** 같은 ms 묶음의 순서를 한 가지로 정했을 때의 직전 상태 */
+/** 앱이 다른 앱에 화면을 넘길 때 보던 화면 하나와, 그 사용이 정상 판정으로 시작했는지 */
+@Serializable
+data class Left(val cls: String, val trusted: Boolean)
+
+/**
+ * 같은 ms 묶음의 순서를 한 가지로 정했을 때의 직전 상태.
+ * [sess]는 앱별 지금(또는 마지막) 사용이 정상 판정으로 시작했는지, [left]는 앱별로 떠날 때 보던 화면들(오래된 것부터)
+ */
 @Serializable
 data class World(
     val prev: Prev? = null,
@@ -52,6 +62,8 @@ data class World(
     val on: Long? = null,
     val unlock: Long? = null,
     val off: ScreenOff? = null,
+    val sess: Map<String, Boolean> = emptyMap(),
+    val left: Map<String, List<Left>> = emptyMap(),
 )
 
 @Serializable

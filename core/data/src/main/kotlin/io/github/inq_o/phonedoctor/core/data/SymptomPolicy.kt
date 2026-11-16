@@ -32,7 +32,7 @@ object SymptomPolicy {
     const val RETENTION_DAYS = 30L
 
     /** 판정기·규칙 판. 근거와 함께 남긴다 */
-    const val DETECTOR_VERSION = "usage-fx0-draft"
+    const val DETECTOR_VERSION = "usage-fx0-r7"
 
     /**
      * [days]는 날짜 오름차순의 하루 근거. 열린 요청이 있으면 그 요청이 열린 날부터, 없으면 이번에 새로 센 날부터다.

@@ -309,10 +309,69 @@ add("18", "조회가 null (사용자 잠금 해제 전): 커서를 옮기지 않
              {"wall_to": 70000, "elapsed": 670000, "boot_count": 1,
               "events": [[30000, "PAUSED", "app.a", ".Main"], [30500, "RESUMED", "app.a", ".Detail"]]}])
 
+# 19: 다른 앱을 거쳐 돌아옴(R6)·다른 앱이 바로 연 공개 화면(R7). 실기기 S10+ 2026-11-16 정상 사용 오탐 6건의 형태
+e19 = [[1000, "RESUMED", "app.a", ".Main"], [3000, "PAUSED", "app.a", ".Main"], [3100, "RESUMED", "app.a", ".Detail"],
+       [9000, "PAUSED", "app.a", ".Detail"], [9050, "RESUMED", "home.l", ".Home"], [40000, "PAUSED", "home.l", ".Home"]]
+add("19", "R6: 정상으로 쓰다 홈으로 나간 앱을 다시 열면 떠날 때 보던 화면(.Detail)이 열림 (아이콘·최근 앱으로 다시 열기)",
+    [{"target": [40100, "app.a", ".Detail"], "features": F(F2=o(False), F9=o(False), F11=o(True), F12=o(True), F13=o(False), F14=o(100)),
+      "rule_v0": [], "rule_v0t": NORMAL(["R6"])}],
+    events=e19 + [[40100, "RESUMED", "app.a", ".Detail"]])
+add("19b", "R6 통과: 광고가 반복해서 뜸. 앞 광고 사용이 광고 판정으로 시작했으므로 같은 화면이어도 복귀가 아님",
+    [{"target": [10100, "ad.x", ".Ad"], "features": F(F11=o(False), F12=none), "rule_v0t": AD()},
+     {"target": [40100, "ad.x", ".Ad"], "features": F(F11=o(True), F12=o(False), F13=o(False)), "rule_v0": [], "rule_v0t": AD()}],
+    events=[[1000, "RESUMED", "home.l", ".Home"], [10000, "PAUSED", "home.l", ".Home"], [10100, "RESUMED", "ad.x", ".Ad"],
+            [15000, "PAUSED", "ad.x", ".Ad"], [15100, "RESUMED", "home.l", ".Home"], [40000, "PAUSED", "home.l", ".Home"],
+            [40100, "RESUMED", "ad.x", ".Ad"]])
+add("19h", "R6 통과: 광고로 시작한 사용은 앱 안 전환(R2 정상)을 거쳐도 정상 사용이 아님",
+    [{"target": [12100, "ad.x", ".Ad2"], "rule_v0t": NORMAL(["R2"])},
+     {"target": [40100, "ad.x", ".Ad2"], "features": F(F11=o(True), F12=o(False)), "rule_v0t": AD()}],
+    events=[[1000, "RESUMED", "home.l", ".Home"], [10000, "PAUSED", "home.l", ".Home"], [10100, "RESUMED", "ad.x", ".Ad"],
+            [12000, "PAUSED", "ad.x", ".Ad"], [12100, "RESUMED", "ad.x", ".Ad2"], [15000, "PAUSED", "ad.x", ".Ad2"],
+            [15100, "RESUMED", "home.l", ".Home"], [40000, "PAUSED", "home.l", ".Home"], [40100, "RESUMED", "ad.x", ".Ad2"]])
+add("19i", "R6: 다른 앱이 공유로 이 앱의 공개 화면(.Share)을 연 뒤에도, 이 앱이 홈으로 떠날 때 보던 화면(.Detail) 기록이 남음",
+    [{"target": [30050, "app.a", ".Share"], "features": F(F11=o(False), F13=o(True), F14=o(50)), "rule_v0t": NORMAL(["R7"])},
+     {"target": [70050, "app.a", ".Detail"], "features": F(F11=o(True), F12=o(True)), "rule_v0": [], "rule_v0t": NORMAL(["R6"])}],
+    launchers={"app.a": {"resolved": [".Main"], "system": False, "exported": [".Share"]}},
+    events=e19[:5] + [[20000, "PAUSED", "home.l", ".Home"], [20050, "RESUMED", "app.b", ".Main"], [30000, "PAUSED", "app.b", ".Main"],
+                      [30050, "RESUMED", "app.a", ".Share"], [35000, "PAUSED", "app.a", ".Share"], [35050, "RESUMED", "app.b", ".Main"],
+                      [40000, "PAUSED", "app.b", ".Main"], [40050, "RESUMED", "home.l", ".Home"], [70000, "PAUSED", "home.l", ".Home"],
+                      [70050, "RESUMED", "app.a", ".Detail"]])
+add("19j", "R6: 재부팅 뒤에도 떠난 화면 기록을 이어 감. 꺼질 때 보던 화면(.Detail)이 최근 앱에서 다시 열림",
+    [{"target": [75050, "app.a", ".Detail"], "features": F(F2=o(False), F11=o(True), F12=o(True)), "rule_v0t": NORMAL(["R6"])}],
+    init=init, segments=[1, 1, 2, 2], counts={"segments_boot": 1},
+    queries=[{"wall_to": 20000, "elapsed": 620000, "boot_count": 1,
+              "events": [[1000, "RESUMED", "app.a", ".Main"], [3000, "PAUSED", "app.a", ".Main"], [3100, "RESUMED", "app.a", ".Detail"]]},
+             {"wall_to": 90000, "elapsed": 20000, "boot_count": 2,
+              "events": [[70000, "STARTUP", "android", ""], [71000, "RESUMED", "home.l", ".Home"], [75000, "PAUSED", "home.l", ".Home"],
+                         [75050, "RESUMED", "app.a", ".Detail"]]}])
+add("19c", "R6 통과: 정상으로 쓰던 앱이 나중에 떠날 때와 다른 화면을 띄움",
+    [{"target": [40100, "app.b", ".Ad"], "features": F(F11=o(False), F12=none), "rule_v0t": AD()}],
+    events=[[1000, "RESUMED", "app.b", ".Main"], [9000, "PAUSED", "app.b", ".Main"], [9100, "RESUMED", "home.l", ".Home"],
+            [40000, "PAUSED", "home.l", ".Home"], [40100, "RESUMED", "app.b", ".Ad"]])
+add("19d", "R6 통과: 떠난 사용이 보류로 시작함 (관측 시작 직후) → 정상으로 믿지 않음. 떠난 기록이 없으면 관측 구간 길이와 무관하게 F12 없음",
+    [{"target": [1000, "ad.x", ".Ad"], "features": F(F11=o(False), F12=none), "rule_v0t": HOLD(["R2", "R3", "R4"])},
+     {"target": [700050, "ad.x", ".Ad"], "features": F(F11=o(True), F12=o(False)), "rule_v0t": AD()}],
+    segment={"start": 0, "kind": "install"},
+    events=[[1000, "RESUMED", "ad.x", ".Ad"], [5000, "PAUSED", "ad.x", ".Ad"], [5050, "RESUMED", "home.l", ".Home"],
+            [700000, "PAUSED", "home.l", ".Home"], [700050, "RESUMED", "ad.x", ".Ad"]])
+add("19e", "R7: 앱에서 공유로 다른 사용자 앱의 공개 화면이 바로 열림, 돌아오면 R5·R6",
+    [{"target": [8050, "share.b", ".Share"], "features": F(F2=o(False), F11=o(False), F12=none, F13=o(True), F14=o(50)),
+      "rule_v0": [], "rule_v0t": NORMAL(["R7"])},
+     {"target": [20050, "app.a", ".Main"], "features": F(F11=o(True), F12=o(True), F13=o(False)), "rule_v0": ["R5"], "rule_v0t": NORMAL(["R5", "R6"])}],
+    events=[[1000, "RESUMED", "app.a", ".Main"], [8000, "PAUSED", "app.a", ".Main"], [8050, "RESUMED", "share.b", ".Share"],
+            [20000, "PAUSED", "share.b", ".Share"], [20050, "RESUMED", "app.a", ".Main"]])
+add("19f", "R7 통과: 공개 화면이어도 앞 앱이 멈추고 2초 넘게 지나서 뜸",
+    [{"target": [30000, "share.b", ".Share"], "features": F(F13=o(True), F14=o(3000)), "rule_v0t": AD()}],
+    events=[[1000, "RESUMED", "home.l", ".Home"], [27000, "PAUSED", "home.l", ".Home"], [30000, "RESUMED", "share.b", ".Share"]])
+add("19g", "R7 통과: 앞 앱이 멈추자마자 떠도 공개 화면이 아님 (다른 앱 위 광고)",
+    [{"target": [8050, "ad.x", ".Ad"], "features": F(F13=o(False), F14=o(50)), "rule_v0": [], "rule_v0t": AD()}],
+    events=[[1000, "RESUMED", "app.a", ".Main"], [8000, "PAUSED", "app.a", ".Main"], [8050, "RESUMED", "ad.x", ".Ad"]])
+
 spec = {"schema": "fx0-draft",
         "note": "기대값은 추출기 실행 전에 손으로 계산. 시각 ms. segment 기본값 {start:-600000, kind:install}(CAP 이상 관측). events 사례는 검사기가 한 번 조회·모든 묶음 경계 두 조회 분할·조회마다 저장 실패 재실행·같은 ms 순서 바꾸기(뒤집기, 돌리기)를 함께 확인. queries 사례는 적힌 조회 그대로에 저장 실패 재실행·같은 ms 순서 바꾸기를 확인하고, range가 있으면 query_range 결과도 확인. order_assume이 있는 사례([생명주기 가정])는 분석용 모드. recover가 있는 사례([SHUTDOWN 해제, 분석용])는 열린 격리를 옛 부팅의 SHUTDOWN으로 닫는 분석용 모드",
         "launchers": {"app.a": {"resolved": [".Main"], "system": False}, "app.b": {"resolved": [".Main"], "system": False},
-                      "ad.x": {"resolved": [".Splash"], "system": False}},
+                      "ad.x": {"resolved": [".Splash"], "system": False}, "home.l": {"resolved": [".Home"], "system": True},
+                      "share.b": {"resolved": [".Main"], "system": False, "exported": [".Main", ".Share"]}},
         "cases": cases}
 json.dump(spec, open(sys.argv[1], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 print(len(cases), "cases")

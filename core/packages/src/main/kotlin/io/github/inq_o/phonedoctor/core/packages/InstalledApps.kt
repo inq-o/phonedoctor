@@ -34,6 +34,9 @@ interface InstalledApps {
 
     fun label(packageName: String): String?
 
+    /** 다른 앱이 열 수 있는 액티비티(exported, 별칭이면 targetActivity). 못 읽으면 null */
+    fun exportedActivities(packageName: String): Set<String>?
+
     /** 설치돼 있으면 true, 없으면 false, 확인하지 못하면 null */
     fun isInstalled(packageName: String): Boolean?
 }
@@ -68,6 +71,15 @@ class AndroidInstalledApps @Inject constructor(
 
     override fun label(packageName: String): String? =
         packageInfo(packageName, signing = false)?.applicationInfo?.let { pm.getApplicationLabel(it).toString() }
+
+    override fun exportedActivities(packageName: String): Set<String>? = try {
+        pm.getPackageInfo(packageName, PackageManager.GET_ACTIVITIES).activities.orEmpty()
+            .filter { it.exported }.map { it.targetActivity ?: it.name }.toSet()
+    } catch (e: PackageManager.NameNotFoundException) {
+        null
+    } catch (e: RuntimeException) {
+        null
+    }
 
     override fun isInstalled(packageName: String): Boolean? = try {
         pm.getPackageInfo(packageName, 0)

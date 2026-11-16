@@ -16,6 +16,8 @@
 - 시계 변경 때 OS가 저장된 기록의 시각을 옮기는 경우(AOSP 15 UsageStatsDatabase.onTimeChanged, 2초 넘게 어긋날 때)와
   옮기지 않는 경우를 모두 가정하고, 어느 쪽이든 섞일 수 있는 범위를 버림
 - 판정: rule_v0t = 규칙 v0를 특징으로 다시 쓴 시간 기준 판. 3값 논리(참·거짓·모름), 모름이 남으면 HOLD
+  R6(정상으로 쓰다 떠난 화면으로 복귀)·R7(다른 앱이 바로 연 공개 화면)을 더함. 근거: docs/measurements/2026-11-17-normal-use-scenario.md
+  떠난 화면 기록(left)은 시간 창 상태가 아니라서 구간을 새로 열어도 넘김
 
 사용:
   python3 featx.py                      검증 사례(cases.json) 전부 확인
@@ -37,6 +39,7 @@ RETENTION_SAFE_MS = 3 * 86_400_000  # 이보다 오래 조회를 못 하면 공�
 MAX_TIE = 6                 # 같은 ms 묶음에서 순서를 모르는 이벤트 수 상한 (6! = 720가지)
 MAX_WORLDS = 64
 HANDOFF_MS, LOOKBACK_MS = 2000, 3000
+LEFT_MAX = 8                # 앱마다 기억하는 떠난 화면 수 (공유·링크로 다른 앱 작업에 뜬 화면이 앱 자체 화면 기록을 밀어내지 않게)
 
 RESUMED, PAUSED, USER_INTERACTION = 1, 2, 7
 SCREEN_ON, SCREEN_OFF, KEYGUARD_SHOWN, KEYGUARD_HIDDEN = 15, 16, 17, 18
@@ -46,12 +49,15 @@ TYPE = {"RESUMED": 1, "PAUSED": 2, "USER_INTERACTION": 7, "SCREEN_ON": 15, "SCRE
 ORDERED = {RESUMED, PAUSED, USER_INTERACTION, SCREEN_ON, SCREEN_OFF, KEYGUARD_HIDDEN}   # 특징에 영향을 주는 종류
 
 OBS, NONE, NC, LF, TIED = "OBSERVED", "NONE_IN_WINDOW", "NOT_COVERED", "LOOKUP_FAILED", "TIED"
-FEATURES = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"]
-RULES = ["R1", "R2", "R3", "R4", "R5"]
+FEATURES = ["F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14"]
+RULES = ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
 
 
 def empty_world(assume=None):
-    w = {"prev": None, "off_after_prev": False, "paused": {}, "ui": {}, "on": None, "unlock": None, "off": None}
+    # sess: 앱별 지금(또는 마지막) 사용이 정상 판정으로 시작했는지 (광고·보류로 시작했으면 False)
+    # left: 앱별로 다른 앱에 화면을 넘길 때 보던 화면들 [[클래스, 그 사용이 정상으로 시작했는지], ...] (오래된 것부터, LEFT_MAX개)
+    w = {"prev": None, "off_after_prev": False, "paused": {}, "ui": {}, "on": None, "unlock": None, "off": None,
+         "sess": {}, "left": {}}
     if assume == "lifecycle":
         w["life"] = {}   # 액티비티별 마지막 RESUMED/PAUSED (가정 모드에서만 씀)
     return w
@@ -71,9 +77,35 @@ def _bump(state, k, n=1):
     state["counts"][k] = state["counts"].get(k, 0) + n
 
 
+def _leave(w, pkg, cls):
+    """앱 pkg가 화면 cls를 보이다 다른 앱에 넘김. 같은 화면 기록은 최신으로 바꿈"""
+    lst = [x for x in w["left"].get(pkg, []) if x[0] != cls] + [[cls, w["sess"].get(pkg, False)]]
+    w["left"][pkg] = lst[-LEFT_MAX:]
+
+
+def _carry(worlds):
+    """구간을 새로 열 때 떠난 화면 기록만 넘김. 앱 작업은 재부팅·시계 변경 뒤에도 최근 앱에 남아 그 화면으로 다시 열리므로
+    시간 창 상태와 달리 버리지 않음. 그때 보이던 화면도 떠난 화면으로 남기고, 세계마다 다르면 모두 정상일 때만 정상"""
+    order, trust = {}, {}
+    for w0 in worlds:
+        w = copy.deepcopy(w0)
+        if w["prev"]:
+            _leave(w, w["prev"][0], w["prev"][1])
+        for pkg, lst in w["left"].items():
+            for cls, t in lst:
+                if (pkg, cls) not in trust:
+                    order.setdefault(pkg, []).append(cls)
+                    trust[(pkg, cls)] = t
+                else:
+                    trust[(pkg, cls)] = trust[(pkg, cls)] and t
+    return {pkg: [[c, trust[(pkg, c)]] for c in cs][-LEFT_MAX:] for pkg, cs in order.items()}
+
+
 def _reset(state, start, kind):
     state["seg"] = {"id": state["seg"]["id"] + 1, "start": start, "kind": kind}
-    state["worlds"] = [empty_world(state["order_assume"])]
+    w = empty_world(state["order_assume"])
+    w["left"] = _carry(state["worlds"])
+    state["worlds"] = [w]
     _bump(state, "segments_" + kind)
 
 
@@ -168,9 +200,15 @@ def query_range(state, wall, elapsed, boot_count):
     return begin, wall
 
 
-def _apply(w, e):
+def _apply(w, e, outcome=None):
+    """outcome: RESUMED면 이 세계에서 그 전환의 판정. 다른 앱에서 넘어온 전환이면 그 앱 사용의 시작 판정으로 남김"""
     t, typ, pkg, cls = e["ts"], e["type"], e["pkg"], e["cls"]
     if typ == RESUMED:
+        prev = w["prev"]
+        if prev is None or prev[0] != pkg:
+            if prev is not None:
+                _leave(w, prev[0], prev[1])
+            w["sess"][pkg] = outcome == "NORMAL"
         w["prev"], w["off_after_prev"] = [pkg, cls, t], False
     elif typ == PAUSED:
         w["paused"][pkg] = t
@@ -235,6 +273,15 @@ def features(w, seg, t, p, c, snap):
     info, _ = _meta(snap, p, t)
     f["F9"] = (c in info["resolved"], OBS) if info else (None, LF)
     f["F10"] = (info["system"], OBS) if info else (None, LF)
+    # F11 다른 앱에서 넘어와, 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴. 기록이 없으면 아님으로 봄(기록 시작 전은 모름)
+    # F12 그 화면을 떠난 사용이 정상 판정으로 시작했는지. 보류로 시작했으면 아님(광고를 보류 사슬로 놓치지 않게)
+    lf = dict(w["left"].get(p, []))
+    f["F11"] = (bool(prev and prev[0] != p and c in lf), OBS)
+    f["F12"] = (lf[c], OBS) if c in lf else (None, NONE)
+    # F13 다른 앱이 열 수 있는 화면(exported, 별칭이면 targetActivity)인지
+    # F14 직전 화면이 다른 앱이면 그 앱이 멈춘 뒤 경과 (같은 앱이면 해당 없음)
+    f["F13"] = (c in info["exported"], OBS) if info else (None, LF)
+    f["F14"] = (win(w["paused"].get(prev[0])) if prev[0] != p else (None, NONE)) if prev else none_state
     return f
 
 
@@ -273,6 +320,8 @@ def rule_v0t(f, age, system_filter=True):
     r["R3"] = _le(f["F1"], LOOKBACK_MS, age)
     r["R4"] = _and(_or(_le(f["F6"], LOOKBACK_MS, age), _le(f["F7"], LOOKBACK_MS, age)), _b(f["F8"]))
     r["R5"] = f["F9"][0] if f["F9"][1] == OBS else False
+    r["R6"] = _and(_b(f["F11"]), _b(f["F12"]))
+    r["R7"] = _and(f["F13"][0] if f["F13"][1] == OBS else False, _le(f["F14"], HANDOFF_MS, age))
     return r
 
 
@@ -330,10 +379,13 @@ def _process_group(state, group, snap, query_id, rows, system_filter):
         for order in _orders(group, w0, assume):
             w = copy.deepcopy(w0)
             for e in order:
+                out = None
                 if e["type"] == RESUMED:
                     f = features(w, seg, e["ts"], e["pkg"], e["cls"], snap)
-                    per[id(e)].append((f, rule_v0t(f, e["ts"] - seg["start"], system_filter)))
-                _apply(w, e)
+                    rr = rule_v0t(f, e["ts"] - seg["start"], system_filter)
+                    per[id(e)].append((f, rr))
+                    out = _outcome(rr)
+                _apply(w, e, out)
             _prune(w, group[0]["ts"])
             k = json.dumps(w, sort_keys=True)
             if k not in seen:
@@ -348,13 +400,15 @@ def _process_group(state, group, snap, query_id, rows, system_filter):
         _reset(state, group[0]["ts"] + 1, "world_overflow")
 
 
+def _outcome(rw):
+    return "NORMAL" if any(v is True for v in rw.values()) else ("HOLD" if any(v is None for v in rw.values()) else "AD")
+
+
 def _row(state, e, query_id, f, rule_worlds, meta_validity):
     failed = [r for r in RULES if all(rw[r] is True for rw in rule_worlds)]
     passed = [r for r in RULES if all(rw[r] is False for rw in rule_worlds)]
     unknown = [r for r in RULES if r not in failed and r not in passed]
-    outs = set()
-    for rw in rule_worlds:
-        outs.add("NORMAL" if any(v is True for v in rw.values()) else ("HOLD" if any(v is None for v in rw.values()) else "AD"))
+    outs = {_outcome(rw) for rw in rule_worlds}
     row = {"segment_id": state["seg"]["id"], "ingest_id": state["next_ingest"], "query_id": query_id,
            "source_seq": e["seq"], "ts": e["ts"], "pkg": e["pkg"], "cls": e["cls"],
            "features": {k: list(v) for k, v in f.items()}, "meta_validity": meta_validity,
@@ -423,7 +477,8 @@ def _rule_v0():
 
 
 def snap_from(d):
-    return {p: {"resolved": set(v.get("resolved", [])), "system": v.get("system", False), "since": v.get("since")}
+    return {p: {"resolved": set(v.get("resolved", [])), "system": v.get("system", False), "since": v.get("since"),
+                "exported": set(v.get("exported", []))}
             for p, v in d.items()}
 
 
@@ -573,7 +628,8 @@ def real(launchers_csv, paths):
     meta_validity=unverified. 같은 ms 순서 가정 없음(기본)과 생명주기 가정(분석용) 두 판을 함께 셈"""
     rv0 = _rule_v0()
     L = rv0.load_launchers(launchers_csv)
-    snap = {p: {"resolved": v["resolved"], "system": v["system"], "since": None} for p, v in L.items()}
+    snap = {p: {"resolved": v["resolved"], "system": v["system"], "since": None, "exported": v.get("exported", set())}
+            for p, v in L.items()}
     for assume in (None, "lifecycle"):
         tot, diff, outs, tied, inv_bad = 0, {}, {}, {}, 0
         for path in paths:

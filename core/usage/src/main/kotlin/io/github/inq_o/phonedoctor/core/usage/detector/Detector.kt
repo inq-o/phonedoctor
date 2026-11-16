@@ -5,7 +5,7 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * 증상 감지 판정기. 사용 기록의 화면 전환(RESUMED)마다 특징 F0~F10을 뽑고 규칙 v0의 시간 기준 판(rule_v0t)으로
+ * 증상 감지 판정기. 사용 기록의 화면 전환(RESUMED)마다 특징 F0~F14를 뽑고 규칙 v0의 시간 기준 판(rule_v0t)으로
  * 광고(AD)·정상(NORMAL)·보류(HOLD)를 가른다.
  *
  * PC 기준 구현 `testapps/poc/features/featx.py`의 기본 모드(같은 ms 순서 가정 없음, SHUTDOWN 해제 없음)를 그대로 옮겼고,
@@ -26,6 +26,8 @@ object Detector {
     const val MAX_WORLDS = 64
     const val HANDOFF_MS = 2_000L
     const val LOOKBACK_MS = 3_000L
+    /** 앱마다 기억하는 떠난 화면 수. 공유·링크로 다른 앱 작업에 뜬 화면이 앱 자체 화면 기록을 밀어내지 않게 */
+    const val LEFT_MAX = 8
 
     const val RESUMED = 1
     const val PAUSED = 2
@@ -43,8 +45,8 @@ object Detector {
     /** 판정기가 쓰는 종류 전부. 수집기는 이것만 넘기면 된다 */
     val RELEVANT_TYPES: Set<Int> = ORDERED + setOf(KEYGUARD_SHOWN, SHUTDOWN, STARTUP)
 
-    val FEATURES = listOf("F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10")
-    val RULES = listOf("R1", "R2", "R3", "R4", "R5")
+    val FEATURES = listOf("F0", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12", "F13", "F14")
+    val RULES = listOf("R1", "R2", "R3", "R4", "R5", "R6", "R7")
 
     fun initState(
         start: Long,
@@ -162,8 +164,39 @@ object Detector {
 
     private fun reset(st: Work, start: Long, kind: String) {
         st.seg = Segment(st.seg.id + 1, start, kind)
-        st.worlds = listOf(World())
+        st.worlds = listOf(World(left = carry(st.worlds)))
         st.bump("segments_$kind")
+    }
+
+    /** 앱 [pkg]가 화면 [cls]를 보이다 다른 앱에 넘김. 같은 화면 기록은 최신으로 바꾼다 */
+    private fun leave(left: Map<String, List<Left>>, sess: Map<String, Boolean>, pkg: String, cls: String): Map<String, List<Left>> {
+        val list = left[pkg].orEmpty().filter { it.cls != cls } + Left(cls, sess[pkg] ?: false)
+        return left + (pkg to list.takeLast(LEFT_MAX))
+    }
+
+    /**
+     * 구간을 새로 열 때 떠난 화면 기록만 넘긴다. 앱 작업은 재부팅·시계 변경 뒤에도 최근 앱에 남아 그 화면으로 다시 열리므로
+     * 시간 창 상태와 달리 버리지 않는다. 그때 보이던 화면도 떠난 화면으로 남기고, 세계마다 다르면 모두 정상일 때만 정상
+     */
+    private fun carry(worlds: List<World>): Map<String, List<Left>> {
+        val order = LinkedHashMap<String, MutableList<String>>()
+        val trust = HashMap<Pair<String, String>, Boolean>()
+        for (w0 in worlds) {
+            val left = w0.prev?.let { leave(w0.left, w0.sess, it.pkg, it.cls) } ?: w0.left
+            for ((pkg, list) in left) {
+                for (l in list) {
+                    val key = pkg to l.cls
+                    val old = trust[key]
+                    if (old == null) {
+                        order.getOrPut(pkg) { mutableListOf() } += l.cls
+                        trust[key] = l.trusted
+                    } else {
+                        trust[key] = old && l.trusted
+                    }
+                }
+            }
+        }
+        return order.mapValues { (pkg, cs) -> cs.map { Left(it, trust.getValue(pkg to it)) }.takeLast(LEFT_MAX) }
     }
 
     /**
@@ -230,8 +263,21 @@ object Detector {
         return true
     }
 
-    private fun apply(w: World, e: Ev): World = when (e.type) {
-        RESUMED -> w.copy(prev = Prev(e.pkg, e.cls, e.ts), offAfterPrev = false)
+    /**
+     * [outcome]은 RESUMED일 때 이 세계에서 그 전환의 판정. 다른 앱에서 넘어온 전환이면 그 앱 사용이 정상으로 시작했는지 남기고,
+     * 넘겨준 앱이 떠날 때 보던 화면을 기록한다(R6)
+     */
+    private fun apply(w: World, e: Ev, outcome: Outcome? = null): World = when (e.type) {
+        RESUMED -> {
+            val prev = w.prev
+            val (sess, left) = if (prev == null || prev.pkg != e.pkg) {
+                val l = if (prev != null) leave(w.left, w.sess, prev.pkg, prev.cls) else w.left
+                (w.sess + (e.pkg to (outcome == Outcome.NORMAL))) to l
+            } else {
+                w.sess to w.left
+            }
+            w.copy(prev = Prev(e.pkg, e.cls, e.ts), offAfterPrev = false, sess = sess, left = left)
+        }
         PAUSED -> w.copy(paused = w.paused + (e.pkg to e.ts))
         USER_INTERACTION -> w.copy(ui = w.ui + (e.pkg to e.ts))
         SCREEN_ON -> w.copy(on = e.ts)
@@ -287,6 +333,18 @@ object Detector {
             },
             "F9" to if (info != null) bool(c in info.resolved) else none(FeatureStatus.LOOKUP_FAILED),
             "F10" to if (info != null) bool(info.system) else none(FeatureStatus.LOOKUP_FAILED),
+            // 다른 앱에서 넘어와, 이 앱이 전에 다른 앱에 넘길 때 보던 화면으로 돌아옴. 기록이 없으면 아님으로 본다
+            "F11" to bool(prev != null && prev.pkg != p && w.left[p].orEmpty().any { it.cls == c }),
+            // 그 화면을 떠난 사용이 정상 판정으로 시작했는지 (광고·보류로 시작했으면 아님)
+            "F12" to (w.left[p]?.lastOrNull { it.cls == c }?.let { bool(it.trusted) } ?: none(FeatureStatus.NONE_IN_WINDOW)),
+            // 다른 앱이 열 수 있는 화면(exported)인지
+            "F13" to if (info != null) bool(c in info.exported) else none(FeatureStatus.LOOKUP_FAILED),
+            // 직전 화면이 다른 앱이면 그 앱이 멈춘 뒤 경과
+            "F14" to when {
+                prev == null -> noneState
+                prev.pkg == p -> none(FeatureStatus.NONE_IN_WINDOW)
+                else -> win(w.paused[prev.pkg])
+            },
         )
     }
 
@@ -312,7 +370,8 @@ object Detector {
      * 조건별 '실패' 여부(true=실패, false=통과, null=모름). R1·R5의 LOOKUP_FAILED는 통과로 둔다(아이콘 숨긴 앱을 놓치지 않게).
      *
      * R1 시스템 앱, R2 같은 앱 안 전환, R3 직전 3초 안 그 앱의 사용자 조작, R4 화면 켜짐·잠금 해제 3초 안 끄기 전 화면 복귀,
-     * R5 런처 아이콘이 여는 액티비티. 하나라도 실패면 정상 전환이다.
+     * R5 런처 아이콘이 여는 액티비티, R6 정상으로 쓰다 떠난 앱의 그 화면으로 복귀(다시 열기·공유·링크·권한 창 뒤),
+     * R7 다른 앱이 멈추자마자(2초 안) 열린 공개(exported) 화면(공유·링크 대상). 하나라도 실패면 정상 전환이다.
      */
     private fun ruleV0t(f: Map<String, Feature>, age: Long, systemFilter: Boolean): Map<String, Boolean?> {
         val f10 = f.getValue("F10")
@@ -323,6 +382,11 @@ object Detector {
             "R3" to le(f.getValue("F1"), LOOKBACK_MS, age),
             "R4" to and(or(le(f.getValue("F6"), LOOKBACK_MS, age), le(f.getValue("F7"), LOOKBACK_MS, age)), b(f.getValue("F8"))),
             "R5" to if (f9.status == FeatureStatus.OBSERVED) f9.bool else false,
+            "R6" to and(b(f.getValue("F11")), b(f.getValue("F12"))),
+            "R7" to and(
+                f.getValue("F13").let { if (it.status == FeatureStatus.OBSERVED) it.bool else false },
+                le(f.getValue("F14"), HANDOFF_MS, age),
+            ),
         )
     }
 
@@ -380,11 +444,14 @@ object Detector {
             for (order in orders(group)) {
                 var w = w0
                 for (e in order) {
+                    var out: Outcome? = null
                     if (e.type == RESUMED) {
                         val f = features(w, seg, e.ts, e.pkg, e.cls, snap)
-                        per.getValue(e.seq) += f to ruleV0t(f, e.ts - seg.start, systemFilter)
+                        val rules = ruleV0t(f, e.ts - seg.start, systemFilter)
+                        per.getValue(e.seq) += f to rules
+                        out = outcome(rules)
                     }
-                    w = apply(w, e)
+                    w = apply(w, e, out)
                 }
                 worlds += prune(w, group[0].ts)
             }
@@ -403,7 +470,14 @@ object Detector {
 
     /** 저장한 상태가 실행마다 같도록 세계 순서를 고정하는 키 */
     private fun canonical(w: World) =
-        "${w.prev}|${w.offAfterPrev}|${w.paused.toSortedMap()}|${w.ui.toSortedMap()}|${w.on}|${w.unlock}|${w.off}"
+        "${w.prev}|${w.offAfterPrev}|${w.paused.toSortedMap()}|${w.ui.toSortedMap()}|${w.on}|${w.unlock}|${w.off}|" +
+            "${w.sess.toSortedMap()}|${w.left.toSortedMap()}"
+
+    private fun outcome(rw: Map<String, Boolean?>) = when {
+        rw.values.any { it == true } -> Outcome.NORMAL
+        rw.values.any { it == null } -> Outcome.HOLD
+        else -> Outcome.AD
+    }
 
     private fun row(
         st: Work,
@@ -416,13 +490,7 @@ object Detector {
         val failed = RULES.filter { r -> ruleWorlds.all { it[r] == true } }
         val passed = RULES.filter { r -> ruleWorlds.all { it[r] == false } }
         val unknown = RULES.filter { it !in failed && it !in passed }
-        val outs = ruleWorlds.map { rw ->
-            when {
-                rw.values.any { it == true } -> Outcome.NORMAL
-                rw.values.any { it == null } -> Outcome.HOLD
-                else -> Outcome.AD
-            }
-        }.toSet()
+        val outs = ruleWorlds.map { outcome(it) }.toSet()
         val row = DetectorRow(
             segmentId = st.seg.id, ingestId = st.nextIngest, queryId = queryId, sourceSeq = e.seq,
             ts = e.ts, pkg = e.pkg, cls = e.cls, features = f, metaValidity = metaValidity,
