@@ -75,4 +75,21 @@
 
 1. [x] 안 선택 — B
 2. [ ] Firebase 프로젝트 생성, Android 앱 2개 등록(ADR-0002 결과에 따라 1~2개)
-3. [ ] App Check Play Integrity 연결 (Play Console 앱 등록 후 가능)
+3. [ ] App Check Play Integrity 연결 — 원스토어 배포 기준은 아래 보완 참조 (Play Console 등록 없이 Google Cloud Console에서 API 사용 설정)
+
+## 보완 (2026-11-18): 원스토어 배포에서의 App Check
+
+출시 경로를 원스토어로 바꿔(spec G5) Play Console에 앱을 등록하지 않는다. 결정: **App Check 공급자는 Play Integrity 그대로, "Google Play 밖에서만 배포" 설정으로 쓴다.**
+
+| 항목 | 근거 | 이 앱에 적용 |
+|---|---|---|
+| Play 밖 배포 지원 | Firebase: "supports Android apps that are published on Google Play, outside Google Play, or both" ([Play Integrity 공급자](https://firebase.google.com/docs/app-check/android/play-integrity-provider)) | 사용 가능 |
+| 판정 기준 | 기본값은 `PLAY_RECOGNIZED` 필요인데 Play 밖 앱은 받을 수 없음. 권장 설정 "Exclusively outside Google Play": `PLAY_RECOGNIZED`·`LICENSED` 불필요, 최소 기기 무결성 "Device integrity" | Firebase 콘솔 App Check > 앱별 설정에서 이 값으로 바꿈 |
+| API 사용 설정 | Play 밖에서만 배포하면 Google Cloud Console에서 Play Integrity API를 켤 수 있음. 연결 안 한 프로젝트는 추가 설정·할당량 증설 불가 ([설정](https://developer.android.com/google/play/integrity/setup)) | Firebase 프로젝트와 같은 Cloud 프로젝트에서 켬 |
+| 할당량 | 하루 토큰 요청 10,000, 증설 요청은 연결 안 한 프로젝트면 거절 | 시연·학기 규모는 충분. 토큰을 매 요청마다 새로 받지 않고 SDK 캐시를 씀 |
+| 서명 인증서 | Firebase에 앱 서명 인증서 SHA-256 등록 필요 | 원스토어 등록 때 서명을 "기존 키" 또는 "서명된 APK 직접 등록"으로 해 우리 릴리스 키를 유지하고, 그 SHA-256을 등록 (원스토어 관리 키로 재서명하면 지문이 바뀜, tasks T060) |
+
+- **위험·미확인**
+  - Firebase 문서의 연결 절차는 Play Console 연결을 전제로 적혀 있음. 연결 없이 콘솔에서 위 설정이 되는지는 프로젝트를 만들 때 확인한다. 안 되면 대안은 사용자 지정 공급자(서버가 직접 Play Integrity 판정을 복호화해 App Check 토큰 발급)
+  - Android 13 이상에서 Play 밖 설치 앱은 `MEETS_BASIC_INTEGRITY`를 받을 수 없어, 기기 무결성(`MEETS_DEVICE_INTEGRITY`)을 못 넘는 기기(루팅·비인증 기기)는 서버 호출이 막힘. 시니어용 갤럭시 정품 기기는 통과할 것으로 보지만 실기기(S10+)에서 확인 필요
+  - 에뮬레이터·디버그 빌드는 기기 무결성을 못 받으므로 App Check 디버그 공급자로 개발·시험

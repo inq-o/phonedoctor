@@ -408,7 +408,7 @@ components:
       type: apiKey
       in: header
       name: X-Firebase-AppCheck
-      description: Firebase App Check 토큰 (Play Integrity 공급자)
+      description: Firebase App Check 토큰 (Play Integrity 공급자, Google Play 밖 배포 설정 — ADR-0001 보완)
 
   parameters:
     IdempotencyKey:
