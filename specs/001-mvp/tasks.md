@@ -15,7 +15,6 @@
 - [ ] T001 [P] Google Play 개발자 계정 등록($25) + 본인 인증 시작 — 인증에 며칠 걸림, App Check·Integrity 연결도 이것에 의존
 - [ ] T002 [P] 원스토어 개발자 계정 등록 (무료)
 - [ ] T003 [P] 비공개 테스터 12명 이상 모집 시작 — Google 그룹 생성, 지인·수강생에게 안내. **11/9부터 14일 연속 참여** 조건 미리 고지
-- [ ] T004 [P] AndroZoo 접근용 교수님 서약 요청 메일
 - [x] T005 [P] MH-1M Figshare npz 다운로드(`~/data/mh1m`, md5 검증) + 라벨표 `ml/data_prep/mh1m_labels.py` → `ml/data/mh1m/labels.csv.gz` (2026-10-03)
   - npz 메타데이터에 VT 추천 위협 라벨이 있어 **Dataverse 라벨 12.3GB 불필요**. adware 58,067개(dowgin·kuguo·revmob·airpush 등 중국·구형 광고 SDK 위주, hiddenad 496) / 전체 악성 119,094 / 정상 1,221,421
   - inner npz 특징 11,961개 중 기기에서 뽑을 수 있는 건 **권한 166 + 인텐트 250**뿐(나머지 API 호출 11,545) → T020 스키마 어휘의 출발점
