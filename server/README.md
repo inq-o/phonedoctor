@@ -23,7 +23,7 @@
 ./gradlew test
 ```
 
-- Postgres 실행 파일을 시험 안에서 띄운다(zonky embedded-postgres). Docker 필요 없음
+- Postgres 실행 파일을 시험 안에서 띄운다(zonky embedded-postgres). Docker를 켤 필요 없음
 - 응답 본문을 `openapi.yaml` 스키마와 대조한다(`Contract.check`, JSON Schema 2020-12, 날짜·URI 형식 포함)
 - 토큰은 가짜 검증기(`FakeVerifier`)로 바꾼다. 실제 Firebase 검증은 배포 뒤 실기기로 확인
 
