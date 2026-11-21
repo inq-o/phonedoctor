@@ -63,6 +63,38 @@ jobs:
             **/build/test-results/test*UnitTest/**.xml
             **/build/reports/lint-results-*.html
 
+  server:
+    name: "Server tests"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      # 서버는 앱과 분리된 Gradle 빌드 (server/README.md). 시험 안에서 Postgres를 띄우고 응답을 openapi.yaml과 대조한다
+      - name: Run server tests
+        working-directory: server
+        run: ./gradlew test installDist
+
+      - name: Upload server test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-reports
+          path: server/build/test-results/test/*.xml
+
   scripts:
     name: "Python and shell checks"
     runs-on: ubuntu-latest

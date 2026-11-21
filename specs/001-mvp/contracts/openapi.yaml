@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.3.0
+  version: 0.3.1
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -11,6 +11,9 @@ info:
       - 보호자 기기: Google 로그인 (Credential Manager)
     - 오류 형식: RFC 9457 `application/problem+json`
     - POST는 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비). 예외는 익명 신고 `/feedback/false-positives` 하나 (해당 경로 설명)
+      - 성공(2xx) 응답만 24시간 보관하고, 재전송 응답에는 `Idempotent-Replayed: true` 헤더를 붙임. 실패 응답은 보관하지 않아 같은 키로 다시 보내면 그때 상태로 새로 판단
+      - 같은 키를 다른 경로·메서드에 쓰면 422 (type = .../problems/idempotency-key-reused)
+    - 본문이 JSON이 아니면 415, 없는 경로·메서드는 404·405. 모두 같은 오류 형식
     - 서버 구현: Ktor + Cloud Run + Neon (docs/adr/0001-backend.md, Accepted)
   license:
     name: Proprietary
@@ -42,6 +45,9 @@ paths:
       tags: [devices]
       operationId: registerDevice
       summary: 기기 등록 (앱 첫 실행 시 1회, 재설치 시 다시)
+      description: |
+        - 같은 Firebase 사용자가 다시 등록하면 새로 만들지 않고 그 기기의 푸시 토큰·앱 정보(보내면 표시 이름도)를 갱신해 돌려줌 (201)
+        - 보호자(`guardian`)는 Google 로그인 사용자만. 익명 사용자면 403
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -57,6 +63,16 @@ paths:
               schema: { $ref: '#/components/schemas/Device' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: 익명 사용자가 보호자로 등록 (type = .../problems/guardian-requires-account)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: 이 사용자는 이미 다른 역할로 등록됨 (type = .../problems/role-mismatch). 역할을 바꾸려면 앱 데이터 초기화
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /devices/{deviceId}:
     parameters:
@@ -83,7 +99,7 @@ paths:
       operationId: deleteDevice
       summary: 기기 삭제 (앱 안의 "모든 데이터 지우기"). 연결·요청 전부 삭제
       responses:
-        '204': { description: 삭제됨 }
+        '204': { description: 삭제됨 (이미 없어도 204 — 응답 유실 뒤 재전송) }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   /devices/{deviceId}/status:
@@ -97,6 +113,9 @@ paths:
         - 시니어 기기는 주기 작업이 검사를 마칠 때 마지막 보고 후 6시간이 지났으면 보냄 (위험 앱이 없는 날에도)
         - 서버는 `Link.lastCheckedAt`·`protection`을 이 보고로만 갱신. 보호자 홈의 "마지막 검사"와 연락 끊김 판정(ux-flows F6, 48시간)에 씀. 다른 API 호출은 `lastSeenAt`만 갱신해 검사가 멈춘 기기를 정상으로 보이게 하지 않음
         - PUT이라 같은 본문 재전송 결과가 같아 `Idempotency-Key`가 필요 없음
+        - 새 보고인지는 기기가 보낸 `checkedAt`으로 판단: 지금까지 받은 가장 큰 값보다 커야 새 보고, 같거나 작으면 무시(재전송 순서 뒤바뀜·같은 본문 재전송)
+        - `lastCheckedAt`에는 서버 시각을 넘지 않게 자른 값을 저장(기기 시계가 앞서도 F6 판정이 밀리지 않게)
+        - 앞서 있던 기기 시계가 바로잡혀 서버 시각 이하의 보고가 오면, 저장된 `lastCheckedAt` 이후 것만 받음(마지막 검사 시각이 뒤로 가지 않음)
       requestBody:
         required: true
         content:

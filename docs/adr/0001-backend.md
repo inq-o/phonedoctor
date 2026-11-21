@@ -93,3 +93,15 @@
   - Firebase 문서의 연결 절차는 Play Console 연결을 전제로 적혀 있음. 연결 없이 콘솔에서 위 설정이 되는지는 프로젝트를 만들 때 확인한다. 안 되면 대안은 사용자 지정 공급자(서버가 직접 Play Integrity 판정을 복호화해 App Check 토큰 발급)
   - Android 13 이상에서 Play 밖 설치 앱은 `MEETS_BASIC_INTEGRITY`를 받을 수 없어, 기기 무결성(`MEETS_DEVICE_INTEGRITY`)을 못 넘는 기기(루팅·비인증 기기)는 서버 호출이 막힘. 시니어용 갤럭시 정품 기기는 통과할 것으로 보지만 실기기(S10+)에서 확인 필요
   - 에뮬레이터·디버그 빌드는 기기 무결성을 못 받으므로 App Check 디버그 공급자로 개발·시험
+
+## 보완 (2026-11-21): 서버 구현 세부
+
+devices 묶음을 구현하며 결정 절의 구성 중 하나를 바꿨다.
+
+| 항목 | 결정 절 | 바꾼 것 | 이유 |
+|---|---|---|---|
+| API 코드 | openapi-generator로 서버 인터페이스 생성 | 요청·응답 클래스를 손으로 쓰고, 시험에서 모든 응답 본문을 `openapi.yaml` 스키마로 검증 (JSON Schema 2020-12) | 계약이 OpenAPI 3.1의 `if/then` 조건부 필수(예: `source = symptom`이면 `symptom` 필수)를 쓰는데, 이는 데이터 클래스 모양으로 표현되지 않아 생성 코드를 써도 따로 검증해야 함. 그래서 시험이 응답마다 계약 위반을 잡게 함 |
+| App Check 검증 | firebase-admin-java | ID 토큰은 Admin SDK, App Check 토큰은 공개 키(JWKS)로 직접 검증 | Java Admin SDK에 App Check 검증 기능이 없음. Firebase 안내의 직접 검증 절차(발급자·대상에 프로젝트 번호, 주체가 등록 앱 ID)를 따름 |
+| 시험 DB | — | 시험 안에서 실제 Postgres 실행(zonky embedded-postgres) | Docker를 켜지 않아도 `./gradlew test`만으로 돎(CI도 같음). H2 같은 흉내 DB는 조건부 UPDATE·jsonb 동작이 달라 "먼저 쓴 응답만 유효" 시험이 무의미해짐 |
+
+- 앱 쪽 클라이언트도 생성하지 않고 같은 방식(손으로 쓴 클래스 + 계약 대조)으로 할지는 T054에서 정한다
