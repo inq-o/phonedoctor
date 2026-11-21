@@ -13,6 +13,7 @@ info:
     - POST는 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비). 예외는 익명 신고 `/feedback/false-positives` 하나 (해당 경로 설명)
       - 성공(2xx) 응답만 24시간 보관하고, 재전송 응답에는 `Idempotent-Replayed: true` 헤더를 붙임. 실패 응답은 보관하지 않아 같은 키로 다시 보내면 그때 상태로 새로 판단
       - 같은 키를 다른 경로·메서드에 쓰면 422 (type = .../problems/idempotency-key-reused)
+    - 본문이 JSON이 아니면 415, 없는 경로·메서드는 404·405. 모두 같은 오류 형식
     - 서버 구현: Ktor + Cloud Run + Neon (docs/adr/0001-backend.md, Accepted)
   license:
     name: Proprietary
@@ -112,7 +113,8 @@ paths:
         - 시니어 기기는 주기 작업이 검사를 마칠 때 마지막 보고 후 6시간이 지났으면 보냄 (위험 앱이 없는 날에도)
         - 서버는 `Link.lastCheckedAt`·`protection`을 이 보고로만 갱신. 보호자 홈의 "마지막 검사"와 연락 끊김 판정(ux-flows F6, 48시간)에 씀. 다른 API 호출은 `lastSeenAt`만 갱신해 검사가 멈춘 기기를 정상으로 보이게 하지 않음
         - PUT이라 같은 본문 재전송 결과가 같아 `Idempotency-Key`가 필요 없음
-        - 이미 반영된 것보다 오래된 `checkedAt`은 무시(재전송 순서 뒤바뀜), 서버 시각보다 미래면 서버 시각으로 저장(기기 시계 오차가 F6 판정을 막지 않게)
+        - 새 보고인지는 기기가 보낸 `checkedAt`끼리 비교: 이미 반영된 것보다 오래되거나 같으면 무시(재전송 순서 뒤바뀜·같은 본문 재전송)
+        - `lastCheckedAt`에는 서버 시각을 넘지 않게 자른 값을 저장(기기 시계가 앞서도 F6 판정이 밀리지 않게). 앞서 있던 기기 시계가 바로잡혀 서버 시각 이하의 보고가 오면 그 보고를 받음
       requestBody:
         required: true
         content:

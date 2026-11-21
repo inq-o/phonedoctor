@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.server
 
+import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod.Companion.Delete
 import io.ktor.http.HttpMethod.Companion.Patch
@@ -143,7 +144,27 @@ class IdempotencyTest {
     }
 
     @Test
-    fun `24시간이 지난 키는 새 요청으로 처리`()= serverTest { clock ->
+    fun `다른 키로 동시에 등록해도 모두 201, 기기는 하나`() = serverTest {
+        repeat(5) { round ->
+            val token = "id:race2-$round"
+            val ids = coroutineScope {
+                List(4) { async { client.api(Post, "/devices", token, registration()) } }.awaitAll()
+            }.map { assertEquals(HttpStatusCode.Created, it.status, it.bodyAsText()); it.json()["deviceId"]!!.jsonPrimitive.content }
+            assertEquals(1, ids.toSet().size, ids.toString())
+        }
+    }
+
+    @Test
+    fun `보관 기간이 지난 키는 다른 사용자의 POST 뒤에 지워짐`() = serverTest { clock ->
+        client.api(Post, "/devices", SENIOR, registration())
+        clock.instant = clock.instant.plusSeconds(25 * 3600)
+        client.api(Post, "/devices", "id:senior2", registration())
+        val left = transaction(TestDb.db) { IdempotencyKeys.selectAll().map { it[IdempotencyKeys.firebaseUid] } }
+        assertEquals(listOf("senior2"), left)
+    }
+
+    @Test
+    fun `24시간이 지난 키는 새 요청으로 처리`() = serverTest { clock ->
         val key = UUID.randomUUID().toString()
         client.api(Post, "/devices", SENIOR, registration(), key = key)
         clock.instant = clock.instant.plusSeconds(24 * 3600 + 1)
@@ -235,11 +256,51 @@ class DeviceStatusTest {
     }
 
     @Test
+    fun `미래 시각 본문을 나중에 다시 보내도 lastCheckedAt이 앞으로 가지 않음, 시계가 바로잡히면 새 보고를 받음`() = serverTest { clock ->
+        val id = register()
+        val future = """{"checkedAt":"2027-01-01T00:00:00Z","protection":{"notifications":true,"usageAccess":false,"notificationListener":false}}"""
+        client.api(Put, "/devices/$id/status", body = future)
+        val first = clock.instant
+        clock.instant = clock.instant.plusSeconds(49 * 3600)
+        client.api(Put, "/devices/$id/status", body = future)
+        assertEquals(first, deviceRow(id)[Devices.lastCheckedAt]!!.toInstant())
+        // 기기 시계가 바로잡혀 서버 시각보다 앞서지 않는 보고가 옴 → 저장된 기기 시각(2027년)보다 작아도 받음
+        val fixed = clock.instant.minusSeconds(60)
+        client.api(Put, "/devices/$id/status", body = """{"checkedAt":"$fixed","protection":{"notifications":true,"usageAccess":true,"notificationListener":true}}""")
+        assertEquals(fixed, deviceRow(id)[Devices.lastCheckedAt]!!.toInstant())
+        assertEquals(true, deviceRow(id)[Devices.protection]!!.notificationListener)
+    }
+
+    @Test
     fun `보호자 기기·남의 기기는 403, 형식 오류는 400`() = serverTest {
         val senior = register()
         val guardian = register(GUARDIAN, "guardian")
         assertEquals(HttpStatusCode.Forbidden, client.api(Put, "/devices/$guardian/status", GUARDIAN, STATUS_OK).status)
         assertEquals(HttpStatusCode.Forbidden, client.api(Put, "/devices/$senior/status", GUARDIAN, STATUS_OK).status)
         assertEquals(HttpStatusCode.BadRequest, client.api(Put, "/devices/$senior/status", SENIOR, """{"checkedAt":"어제"}""").status)
+    }
+}
+
+class ErrorFormatTest {
+    @Test
+    fun `없는 경로 404·없는 메서드 405도 문제 형식, 앱이 던진 404는 내용 그대로`() = serverTest {
+        val unknown = client.api(io.ktor.http.HttpMethod.Get, "/nope")
+        assertEquals(HttpStatusCode.NotFound, unknown.status)
+        assertEquals("https://phonedoctor.example/problems/not-found", unknown.contract("Problem")["type"]!!.jsonPrimitive.content)
+        val method = client.api(io.ktor.http.HttpMethod.Get, "/devices")
+        assertEquals(HttpStatusCode.MethodNotAllowed, method.status)
+        assertEquals("https://phonedoctor.example/problems/method-not-allowed", method.contract("Problem")["type"]!!.jsonPrimitive.content)
+        val missing = client.api(Patch, "/devices/nope", SENIOR, """{"fcmToken":"x"}""")
+        assertEquals(HttpStatusCode.NotFound, missing.status)
+        assertEquals("기기 없음", missing.contract("Problem")["detail"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `JSON이 아닌 본문은 415`() = serverTest {
+        val r = client.api(Post, "/devices", SENIOR) {
+            setBody(io.ktor.http.content.TextContent("role=protected", io.ktor.http.ContentType.Text.Plain))
+        }
+        assertEquals(HttpStatusCode.UnsupportedMediaType, r.status, r.bodyAsText())
+        assertEquals("https://phonedoctor.example/problems/unsupported-media-type", r.contract("Problem")["type"]!!.jsonPrimitive.content)
     }
 }

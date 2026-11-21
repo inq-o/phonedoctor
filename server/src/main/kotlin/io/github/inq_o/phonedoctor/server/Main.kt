@@ -15,6 +15,7 @@ import org.jetbrains.exposed.v1.jdbc.Database
 import java.time.Clock
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.atomic.AtomicReference
 
 /** 환경 변수 설정 (Cloud Run). 값과 받는 곳은 server/README.md */
 data class Config(
@@ -48,6 +49,9 @@ class Deps(
     val verifier: TokenVerifier,
     val clock: Clock = Clock.systemUTC(),
 ) {
+    /** 만료된 Idempotency-Key를 마지막으로 지운 시각 (Idempotency.kt) */
+    val keysSweptAt = AtomicReference(Instant.EPOCH)
+
     /** DB 정밀도(µs)와 응답이 어긋나지 않게 ms로 자른 현재 시각 */
     fun now(): Instant = clock.instant().truncatedTo(ChronoUnit.MILLIS)
 }

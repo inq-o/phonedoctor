@@ -99,6 +99,8 @@ class FirebaseVerifier(private val config: Config) : TokenVerifier {
         ),
     )
     private val jwks: JwkProvider = JwkProviderBuilder(URI("https://firebaseappcheck.googleapis.com/v1/jwks").toURL())
+        // 키 서버가 멈춰도 요청이 무기한 기다리지 않게 (기본은 읽기 제한 없음)
+        .timeouts(3_000, 3_000)
         .cached(10, 6, TimeUnit.HOURS)
         .rateLimited(10, 1, TimeUnit.MINUTES)
         .build()

@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.exceptions.ExposedSQLException
 import org.jetbrains.exposed.v1.jdbc.JdbcTransaction
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
@@ -64,19 +65,34 @@ suspend fun ApplicationCall.idempotent(deps: Deps, block: JdbcTransaction.(Calle
             (stored(deps, caller.uid, key, method, path) ?: throw e) to true
         }
     }
+    if (!replayed) withContext(Dispatchers.IO) { sweepExpired(deps) }
     if (replayed) response.header("Idempotent-Replayed", "true")
     respondText(reply.body, ContentType.Application.Json, reply.status)
 }
 
 private fun stored(deps: Deps, uid: String, key: String, method: String, path: String): Reply? = transaction(deps.db) {
     val where = (IdempotencyKeys.firebaseUid eq uid) and (IdempotencyKeys.key eq key)
-    val row = IdempotencyKeys.selectAll().where(where).singleOrNull() ?: return@transaction null
-    if (row[IdempotencyKeys.createdAt].toInstant() < deps.now().minus(KEEP)) {
-        IdempotencyKeys.deleteWhere { where }
-        return@transaction null
+    var row = IdempotencyKeys.selectAll().where(where).singleOrNull() ?: return@transaction null
+    val created = row[IdempotencyKeys.createdAt]
+    if (created.toInstant() < deps.now().minus(KEEP)) {
+        // 읽은 그 만료 기록만 지운다. 그사이 같은 키의 다른 요청이 새로 저장했으면 지우지 않고 그 응답을 돌려준다
+        if (IdempotencyKeys.deleteWhere { where and (IdempotencyKeys.createdAt eq created) } > 0) return@transaction null
+        row = IdempotencyKeys.selectAll().where(where).singleOrNull() ?: return@transaction null
     }
     if (row[IdempotencyKeys.method] != method || row[IdempotencyKeys.path] != path) {
         throw ApiProblem(HttpStatusCode.UnprocessableEntity, "idempotency-key-reused", "다른 요청에 쓴 Idempotency-Key", "요청마다 새 UUID를 쓰세요")
     }
     Reply(HttpStatusCode.fromValue(row[IdempotencyKeys.status]), row[IdempotencyKeys.body])
+}
+
+private val SWEEP_EVERY = Duration.ofHours(1)
+
+/** 보관 기간(24시간)이 지난 키를 지운다. 서버 인스턴스마다 1시간에 한 번, 새 POST를 처리한 뒤에 */
+private fun sweepExpired(deps: Deps) {
+    val now = deps.now()
+    val last = deps.keysSweptAt.get()
+    if (now < last.plus(SWEEP_EVERY) || !deps.keysSweptAt.compareAndSet(last, now)) return
+    transaction(deps.db) {
+        IdempotencyKeys.deleteWhere { IdempotencyKeys.createdAt less now.minus(KEEP).utc() }
+    }
 }

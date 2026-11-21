@@ -6,8 +6,11 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.application.log
 import io.ktor.server.plugins.BadRequestException
+import io.ktor.server.plugins.CannotTransformContentToTypeException
+import io.ktor.server.plugins.UnsupportedMediaTypeException
 import io.ktor.server.plugins.statuspages.StatusPages
 import io.ktor.server.response.respondText
+import io.ktor.util.AttributeKey
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -52,14 +55,29 @@ fun Application.installProblems() {
                 call.respondProblem(ApiProblem(HttpStatusCode.InternalServerError, "internal", "서버 오류"))
             }
         }
+        // 본문 형식이 JSON이 아님 (Ktor 기본 동작과 같은 415)
+        exception<UnsupportedMediaTypeException> { call, _ -> call.respondProblem(unsupportedMedia()) }
+        exception<CannotTransformContentToTypeException> { call, _ -> call.respondProblem(unsupportedMedia()) }
         exception<Throwable> { call, e ->
             call.application.log.error("처리 못 한 오류", e)
             call.respondProblem(ApiProblem(HttpStatusCode.InternalServerError, "internal", "서버 오류"))
         }
+        // 맞는 경로·메서드가 없을 때 Ktor가 만드는 빈 응답도 같은 오류 형식으로. 이미 오류 본문이 있으면(ApiProblem) 그대로 둔다
+        status(HttpStatusCode.NotFound, HttpStatusCode.MethodNotAllowed) { call, status ->
+            if (!call.attributes.contains(ProblemSent)) {
+                call.respondProblem(ApiProblem(status, if (status == HttpStatusCode.NotFound) "not-found" else "method-not-allowed", status.description))
+            }
+        }
     }
 }
 
+private fun unsupportedMedia() =
+    ApiProblem(HttpStatusCode.UnsupportedMediaType, "unsupported-media-type", "지원하지 않는 본문 형식", "Content-Type: application/json 으로 보내세요")
+
+private val ProblemSent = AttributeKey<Unit>("problem-sent")
+
 suspend fun io.ktor.server.application.ApplicationCall.respondProblem(p: ApiProblem) {
+    attributes.put(ProblemSent, Unit)
     val body = buildJsonObject {
         put("type", JsonPrimitive(PROBLEM_BASE + p.slug))
         put("title", JsonPrimitive(p.title))

@@ -29,6 +29,7 @@ object Devices : Table("device") {
     val createdAt = timestampWithTimeZone("created_at")
     val lastSeenAt = timestampWithTimeZone("last_seen_at").nullable()
     val lastCheckedAt = timestampWithTimeZone("last_checked_at").nullable()
+    val checkedReportedAt = timestampWithTimeZone("checked_reported_at").nullable()
     val protection = jsonb("protection", ApiJson, ProtectionState.serializer()).nullable()
     override val primaryKey = PrimaryKey(deviceId)
 }

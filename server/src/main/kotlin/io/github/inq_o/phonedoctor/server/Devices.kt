@@ -17,10 +17,12 @@ import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.isNull
-import org.jetbrains.exposed.v1.core.lessEq
+import org.jetbrains.exposed.v1.core.Op
+import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.less
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
-import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -113,11 +115,29 @@ fun Route.deviceRoutes(deps: Deps) {
                 if (body.role == DeviceRole.GUARDIAN && caller.signInProvider == "anonymous") {
                     throw ApiProblem(HttpStatusCode.Forbidden, "guardian-requires-account", "보호자는 Google 로그인이 필요함")
                 }
-                val existing = Devices.selectAll().where { Devices.firebaseUid eq caller.uid }.singleOrNull()
-                if (existing != null) {
-                    if (existing[Devices.role] != body.role.db) {
-                        throw ApiProblem(HttpStatusCode.Conflict, "role-mismatch", "이미 다른 역할로 등록됨", "역할을 바꾸려면 앱 데이터를 지우고 다시 등록")
-                    }
+                val defaultName = when (body.role) {
+                    DeviceRole.PROTECTED -> SENIOR_DEFAULT_NAME
+                    DeviceRole.GUARDIAN -> caller.name?.trim()?.take(NAME_MAX)?.ifEmpty { null } ?: GUARDIAN_DEFAULT_NAME
+                }
+                // 없으면 만들고, 있으면(다른 키로 동시에 온 등록이 먼저 만든 경우 포함) 아무것도 안 함 → 아래에서 갱신
+                val created = Devices.insertIgnore {
+                    it[deviceId] = UUID.randomUUID().toString()
+                    it[firebaseUid] = caller.uid
+                    it[role] = body.role.db
+                    it[displayName] = body.displayName?.trim() ?: defaultName
+                    it[fcmToken] = body.fcmToken
+                    it[appVersionCode] = body.appVersionCode
+                    it[sdkInt] = body.sdkInt
+                    it[manufacturer] = body.manufacturer
+                    it[locale] = body.locale
+                    it[notifyCaution] = false
+                    it[createdAt] = deps.now().utc()
+                }.insertedCount > 0
+                val existing = Devices.selectAll().where { Devices.firebaseUid eq caller.uid }.single()
+                if (existing[Devices.role] != body.role.db) {
+                    throw ApiProblem(HttpStatusCode.Conflict, "role-mismatch", "이미 다른 역할로 등록됨", "역할을 바꾸려면 앱 데이터를 지우고 다시 등록")
+                }
+                if (!created) {
                     Devices.update({ Devices.deviceId eq existing[Devices.deviceId] }) {
                         it[fcmToken] = body.fcmToken
                         it[appVersionCode] = body.appVersionCode
@@ -125,24 +145,6 @@ fun Route.deviceRoutes(deps: Deps) {
                         it[manufacturer] = body.manufacturer
                         it[locale] = body.locale
                         body.displayName?.let { n -> it[displayName] = n.trim() }
-                    }
-                } else {
-                    val defaultName = when (body.role) {
-                        DeviceRole.PROTECTED -> SENIOR_DEFAULT_NAME
-                        DeviceRole.GUARDIAN -> caller.name?.trim()?.take(NAME_MAX)?.ifEmpty { null } ?: GUARDIAN_DEFAULT_NAME
-                    }
-                    Devices.insert {
-                        it[deviceId] = UUID.randomUUID().toString()
-                        it[firebaseUid] = caller.uid
-                        it[role] = body.role.db
-                        it[displayName] = body.displayName?.trim() ?: defaultName
-                        it[fcmToken] = body.fcmToken
-                        it[appVersionCode] = body.appVersionCode
-                        it[sdkInt] = body.sdkInt
-                        it[manufacturer] = body.manufacturer
-                        it[locale] = body.locale
-                        it[notifyCaution] = false
-                        it[createdAt] = deps.now().utc()
                     }
                 }
                 val row = Devices.selectAll().where { Devices.firebaseUid eq caller.uid }.single()
@@ -188,7 +190,10 @@ fun Route.deviceRoutes(deps: Deps) {
                 call.respond(HttpStatusCode.NoContent)
             }
 
-            // (시니어) 검사 완료·보호 상태 보고. 순서가 뒤바뀌어 온 옛 보고는 무시하고, 기기 시계가 앞서 있으면 서버 시각으로 자른다
+            // (시니어) 검사 완료·보호 상태 보고.
+            // 새 보고인지는 기기가 보낸 시각(checkedReportedAt)끼리 비교한다: 순서가 뒤바뀐 옛 보고·같은 본문 재전송은 무시.
+            // 저장하는 lastCheckedAt은 서버 시각을 넘지 않게 자른다(기기 시계가 앞서도 F6 48시간 판정이 밀리지 않게).
+            // 앞서 있던 기기 시계가 바로잡히면(저장된 기기 시각이 서버 시각보다 미래, 새 보고는 아님) 그 보고를 받는다
             put("/status") {
                 val id = call.parameters["deviceId"]!!
                 val body = call.receive<DeviceStatus>()
@@ -196,9 +201,14 @@ fun Route.deviceRoutes(deps: Deps) {
                     transaction(deps.db) {
                         val row = ownDevice(call.caller, id)
                         if (row[Devices.role] != DeviceRole.PROTECTED.db) throw forbidden("시니어 기기만 상태를 보고함")
-                        val checked = minOf(body.checkedAt, deps.now()).utc()
-                        Devices.update({ (Devices.deviceId eq id) and (Devices.lastCheckedAt.isNull() or (Devices.lastCheckedAt lessEq checked)) }) {
-                            it[lastCheckedAt] = checked
+                        val now = deps.now()
+                        val reported = body.checkedAt.utc()
+                        val r = Devices.checkedReportedAt
+                        var newer: Op<Boolean> = r.isNull() or (r less reported)
+                        if (body.checkedAt <= now) newer = newer or (r greater now.utc())
+                        Devices.update({ (Devices.deviceId eq id) and newer }) {
+                            it[checkedReportedAt] = reported
+                            it[lastCheckedAt] = minOf(body.checkedAt, now).utc()
                             it[protection] = body.protection
                         }
                     }

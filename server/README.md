@@ -8,6 +8,8 @@
 
 ## 구현 상태
 
+모든 API 경로는 `/v1` 아래에 있다 (예: `POST /v1/devices`). 상태 확인용 `GET /healthz`만 인증 없이 열려 있다.
+
 | 묶음 | 경로 | 상태 |
 |---|---|---|
 | devices | `POST /devices`, `PATCH·DELETE /devices/{id}`, `PUT /devices/{id}/status` | 구현 |
@@ -42,5 +44,15 @@
 
 1. Neon 가입 → 프로젝트 생성(리전 가까운 곳) → 연결 정보 확인
 2. Google Cloud 콘솔에서 Firebase 프로젝트(`phonedoctor-a33d3`)에 결제 계정 연결 + 예산 알림 (Cloud Run 무료 한도 안이어도 결제 계정 필요)
-3. `gcloud run deploy phonedoctor-api --source server/ --region asia-northeast3 --allow-unauthenticated --set-env-vars ... --set-secrets DATABASE_PASSWORD=...`
+3. Secret Manager에 DB 비밀번호 넣기
+   - `gcloud services enable secretmanager.googleapis.com run.googleapis.com cloudbuild.googleapis.com`
+   - `printf '%s' '<Neon 비밀번호>' | gcloud secrets create phonedoctor-db-password --data-file=-`
+   - Cloud Run 실행 서비스 계정(따로 안 정하면 Compute Engine 기본 서비스 계정 `<프로젝트 번호>-compute@developer.gserviceaccount.com`)에 그 비밀 읽기 권한:
+     `gcloud secrets add-iam-policy-binding phonedoctor-db-password --member=serviceAccount:<서비스 계정> --role=roles/secretmanager.secretAccessor`
+4. 배포
+   - `gcloud run deploy phonedoctor-api --source server/ --region asia-northeast3 --allow-unauthenticated --set-env-vars DATABASE_URL=...,DATABASE_USER=...,FIREBASE_PROJECT_ID=...,FIREBASE_PROJECT_NUMBER=...,APP_CHECK_APP_IDS=... --set-secrets DATABASE_PASSWORD=phonedoctor-db-password:latest`
    - `--allow-unauthenticated`: 인증은 Cloud Run이 아니라 앱 토큰(Firebase)으로 한다
+
+## 정리 작업
+
+- 보관 기간(24시간)이 지난 Idempotency-Key 기록은 서버가 새 POST를 처리한 뒤 인스턴스마다 1시간에 한 번 지운다. 요청이 없으면 쌓이는 기록도 없음
