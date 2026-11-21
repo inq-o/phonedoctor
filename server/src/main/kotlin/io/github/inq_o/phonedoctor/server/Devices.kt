@@ -14,18 +14,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.ResultRow
-import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
-import org.jetbrains.exposed.v1.core.isNull
-import org.jetbrains.exposed.v1.core.Op
-import org.jetbrains.exposed.v1.core.greater
-import org.jetbrains.exposed.v1.core.less
-import org.jetbrains.exposed.v1.core.or
+import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import java.time.Instant
 import java.util.UUID
 
 // openapi.yaml components/schemas 의 devices 부분
@@ -97,8 +93,9 @@ private fun checkName(name: String?) =
 private fun checkToken(token: String?) = check400(token == null || token.isNotBlank()) { "fcmToken이 비어 있음" }
 
 /** 경로의 기기를 읽는다. 없으면 404, 요청자 기기가 아니면 403 */
-fun ownDevice(caller: Caller, deviceId: String): ResultRow {
-    val row = Devices.selectAll().where { Devices.deviceId eq deviceId }.singleOrNull() ?: throw notFound("기기 없음")
+fun ownDevice(caller: Caller, deviceId: String, lock: Boolean = false): ResultRow {
+    val query = Devices.selectAll().where { Devices.deviceId eq deviceId }
+    val row = (if (lock) query.forUpdate(ForUpdateOption.ForUpdate) else query).singleOrNull() ?: throw notFound("기기 없음")
     if (row[Devices.firebaseUid] != caller.uid) throw forbidden("내 기기가 아님")
     return row
 }
@@ -190,26 +187,24 @@ fun Route.deviceRoutes(deps: Deps) {
                 call.respond(HttpStatusCode.NoContent)
             }
 
-            // (시니어) 검사 완료·보호 상태 보고.
-            // 새 보고인지는 기기가 보낸 시각(checkedReportedAt)끼리 비교한다: 순서가 뒤바뀐 옛 보고·같은 본문 재전송은 무시.
-            // 저장하는 lastCheckedAt은 서버 시각을 넘지 않게 자른다(기기 시계가 앞서도 F6 48시간 판정이 밀리지 않게).
-            // 앞서 있던 기기 시계가 바로잡히면(저장된 기기 시각이 서버 시각보다 미래, 새 보고는 아님) 그 보고를 받는다
+            // (시니어) 검사 완료·보호 상태 보고. 판단 규칙은 acceptStatus
             put("/status") {
                 val id = call.parameters["deviceId"]!!
                 val body = call.receive<DeviceStatus>()
                 withContext(Dispatchers.IO) {
                     transaction(deps.db) {
-                        val row = ownDevice(call.caller, id)
+                        // 같은 기기의 보고가 동시에 와도 하나씩 판단하도록 행을 잠근다
+                        val row = ownDevice(call.caller, id, lock = true)
                         if (row[Devices.role] != DeviceRole.PROTECTED.db) throw forbidden("시니어 기기만 상태를 보고함")
                         val now = deps.now()
-                        val reported = body.checkedAt.utc()
-                        val r = Devices.checkedReportedAt
-                        var newer: Op<Boolean> = r.isNull() or (r less reported)
-                        if (body.checkedAt <= now) newer = newer or (r greater now.utc())
-                        Devices.update({ (Devices.deviceId eq id) and newer }) {
-                            it[checkedReportedAt] = reported
-                            it[lastCheckedAt] = minOf(body.checkedAt, now).utc()
-                            it[protection] = body.protection
+                        val maxReported = row[Devices.checkedReportedAt]?.toInstant()
+                        val last = row[Devices.lastCheckedAt]?.toInstant()
+                        if (acceptStatus(body.checkedAt, maxReported, last, now)) {
+                            Devices.update({ Devices.deviceId eq id }) {
+                                it[checkedReportedAt] = maxOf(maxReported ?: body.checkedAt, body.checkedAt).utc()
+                                it[lastCheckedAt] = minOf(body.checkedAt, now).utc()
+                                it[protection] = body.protection
+                            }
                         }
                     }
                 }
@@ -217,4 +212,19 @@ fun Route.deviceRoutes(deps: Deps) {
             }
         }
     }
+}
+
+/**
+ * 상태 보고를 반영할지.
+ * - [maxReported]: 지금까지 받은 보고의 기기 시각 중 가장 큰 값. 이보다 크면 새 보고
+ * - 같거나 작으면 순서가 뒤바뀐 옛 보고·같은 본문 재전송이라 무시
+ * - 예외: 기기 시계가 앞서 있다가 바로잡힌 경우(maxReported가 서버 시각보다 미래, 이번 보고는 서버 시각 이하).
+ *   이때도 저장된 [last]보다 오래된 보고는 받지 않아 마지막 검사 시각이 뒤로 가지 않는다.
+ *   maxReported는 줄이지 않으므로, 바로잡힌 뒤 옛 미래 시각 본문이 재전송돼도 새 보고로 보지 않는다
+ * 저장하는 lastCheckedAt은 서버 시각을 넘지 않게 잘라 기기 시계가 앞서도 F6 48시간 판정이 밀리지 않게 한다
+ */
+fun acceptStatus(checkedAt: Instant, maxReported: Instant?, last: Instant?, now: Instant): Boolean = when {
+    maxReported == null || checkedAt > maxReported -> true
+    maxReported > now && checkedAt <= now -> last == null || checkedAt >= last
+    else -> false
 }

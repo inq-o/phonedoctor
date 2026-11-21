@@ -87,12 +87,22 @@ private fun stored(deps: Deps, uid: String, key: String, method: String, path: S
 
 private val SWEEP_EVERY = Duration.ofHours(1)
 
-/** 보관 기간(24시간)이 지난 키를 지운다. 서버 인스턴스마다 1시간에 한 번, 새 POST를 처리한 뒤에 */
+/**
+ * 보관 기간(24시간)이 지난 키를 지운다. 서버 인스턴스마다 1시간에 한 번, 새 POST를 처리한 뒤에.
+ * 이미 처리한 POST의 응답에 영향을 주지 않게 실패는 기록만 하고, 다음 POST에서 다시 시도한다
+ */
 private fun sweepExpired(deps: Deps) {
     val now = deps.now()
     val last = deps.keysSweptAt.get()
     if (now < last.plus(SWEEP_EVERY) || !deps.keysSweptAt.compareAndSet(last, now)) return
-    transaction(deps.db) {
-        IdempotencyKeys.deleteWhere { IdempotencyKeys.createdAt less now.minus(KEEP).utc() }
+    try {
+        transaction(deps.db) {
+            IdempotencyKeys.deleteWhere { IdempotencyKeys.createdAt less now.minus(KEEP).utc() }
+        }
+    } catch (e: Exception) {
+        deps.keysSweptAt.compareAndSet(now, last)
+        log.warn("만료된 Idempotency-Key 정리 실패, 다음 POST에서 다시 시도", e)
     }
 }
+
+private val log = org.slf4j.LoggerFactory.getLogger("Idempotency")

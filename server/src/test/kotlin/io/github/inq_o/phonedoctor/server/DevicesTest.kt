@@ -272,6 +272,36 @@ class DeviceStatusTest {
     }
 
     @Test
+    fun `시계가 바로잡힌 뒤 옛 미래 시각 본문이 재전송돼도 lastCheckedAt이 앞으로 가지 않음`() = serverTest { clock ->
+        val id = register()
+        val future = """{"checkedAt":"2027-01-01T00:00:00Z","protection":{"notifications":true,"usageAccess":false,"notificationListener":false}}"""
+        client.api(Put, "/devices/$id/status", body = future)
+        clock.instant = clock.instant.plusSeconds(3600)
+        val fixed = clock.instant.minusSeconds(60)
+        client.api(Put, "/devices/$id/status", body = """{"checkedAt":"$fixed","protection":{"notifications":true,"usageAccess":true,"notificationListener":true}}""")
+        clock.instant = clock.instant.plusSeconds(49 * 3600)
+        client.api(Put, "/devices/$id/status", body = future)
+        assertEquals(fixed, deviceRow(id)[Devices.lastCheckedAt]!!.toInstant())
+        assertEquals(true, deviceRow(id)[Devices.protection]!!.usageAccess)
+    }
+
+    @Test
+    fun `보고 반영 규칙`() {
+        val now = Instant.parse("2026-11-21T03:00:00Z")
+        fun t(s: String) = Instant.parse(s)
+        // 처음, 새 보고, 옛 보고·같은 보고
+        assertEquals(true, acceptStatus(t("2026-11-21T02:00:00Z"), null, null, now))
+        assertEquals(true, acceptStatus(t("2026-11-21T02:30:00Z"), t("2026-11-21T02:00:00Z"), t("2026-11-21T02:00:00Z"), now))
+        assertEquals(false, acceptStatus(t("2026-11-21T02:00:00Z"), t("2026-11-21T02:00:00Z"), t("2026-11-21T02:00:00Z"), now))
+        assertEquals(false, acceptStatus(t("2026-11-21T01:00:00Z"), t("2026-11-21T02:00:00Z"), t("2026-11-21T02:00:00Z"), now))
+        // 앞서 있던 시계가 바로잡힘: 저장된 마지막 검사 이후면 받고, 그보다 오래되면 안 받음
+        assertEquals(true, acceptStatus(t("2026-11-21T02:59:00Z"), t("2027-01-01T00:00:00Z"), t("2026-11-21T02:00:00Z"), now))
+        assertEquals(false, acceptStatus(t("2026-11-21T01:59:00Z"), t("2027-01-01T00:00:00Z"), t("2026-11-21T02:00:00Z"), now))
+        // 바로잡힌 뒤 옛 미래 본문 재전송은 새 보고가 아님
+        assertEquals(false, acceptStatus(t("2027-01-01T00:00:00Z"), t("2027-01-01T00:00:00Z"), t("2026-11-21T02:59:00Z"), now))
+    }
+
+    @Test
     fun `보호자 기기·남의 기기는 403, 형식 오류는 400`() = serverTest {
         val senior = register()
         val guardian = register(GUARDIAN, "guardian")

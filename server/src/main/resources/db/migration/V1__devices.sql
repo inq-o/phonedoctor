@@ -13,7 +13,7 @@ CREATE TABLE device (
     created_at       timestamptz NOT NULL,
     last_seen_at     timestamptz,
     last_checked_at  timestamptz,           -- 상태 보고의 검사 시각, 서버 시각을 넘지 않게 자른 값 (F6 기준)
-    checked_reported_at timestamptz,        -- 기기가 보낸 검사 시각 그대로 (새 보고인지 가르는 데만 씀)
+    checked_reported_at timestamptz,        -- 지금까지 받은 보고의 기기 시각 중 가장 큰 값 (새 보고인지 가르는 데만 씀)
     protection       jsonb
 );
 

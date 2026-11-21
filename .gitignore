@@ -13,3 +13,6 @@ __pycache__/
 
 # Firebase 앱 설정 (프로젝트별 키 포함, 커밋하지 않음)
 app/google-services.json
+
+# 서버 배포 환경 변수 (server/README.md 배포 절)
+server/env.yaml
