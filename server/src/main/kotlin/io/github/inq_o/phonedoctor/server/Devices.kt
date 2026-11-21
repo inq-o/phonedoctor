@@ -173,18 +173,18 @@ fun Route.deviceRoutes(deps: Deps) {
                 call.respond(device)
             }
 
-            // 앱 안의 "모든 데이터 지우기". 연결·요청은 DB의 외래 키 연쇄 삭제로 함께 지운다. 이미 없으면 204 (재전송)
+            // 앱 안의 "모든 데이터 지우기". 연결·요청은 DB의 외래 키 연쇄 삭제로 함께 지우고, 연결 상대에게 LINK_REVOKED.
+            // 이미 없으면 204 (재전송)
             delete {
                 val id = call.parameters["deviceId"]!!
-                withContext(Dispatchers.IO) {
+                val pushes = withContext(Dispatchers.IO) {
                     transaction(deps.db) {
-                        val row = Devices.selectAll().where { Devices.deviceId eq id }.singleOrNull()
-                        if (row != null) {
-                            if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
-                            Devices.deleteWhere { Devices.deviceId eq id }
-                        }
+                        val row = Devices.selectAll().where { Devices.deviceId eq id }.singleOrNull() ?: return@transaction emptyList()
+                        if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
+                        revokedPushesOnDelete(id).also { Devices.deleteWhere { Devices.deviceId eq id } }
                     }
                 }
+                withContext(Dispatchers.IO) { deps.sendAll(pushes) }
                 call.respond(HttpStatusCode.NoContent)
             }
 

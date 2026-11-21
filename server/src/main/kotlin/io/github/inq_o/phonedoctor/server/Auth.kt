@@ -85,19 +85,20 @@ private fun touchLastSeen(deps: Deps, uid: String) {
     }
 }
 
+/** ID 토큰 검증과 FCM 전송이 함께 쓰는 Firebase 앱. 인증 정보는 기본 인증 정보(ADC) */
+fun firebaseApp(config: Config): FirebaseApp = FirebaseApp.initializeApp(
+    FirebaseOptions.builder()
+        .setCredentials(GoogleCredentials.getApplicationDefault())
+        .setProjectId(config.firebaseProjectId)
+        .build(),
+)
+
 /**
  * 실제 검증. ID 토큰은 Firebase Admin SDK, App Check 토큰은 공개 키(JWKS)로 직접 검증한다
  * (Java Admin SDK에는 App Check 검증이 없음. 절차: firebase.google.com/docs/app-check/custom-resource-backend)
  */
-class FirebaseVerifier(private val config: Config) : TokenVerifier {
-    private val auth: FirebaseAuth = FirebaseAuth.getInstance(
-        FirebaseApp.initializeApp(
-            FirebaseOptions.builder()
-                .setCredentials(GoogleCredentials.getApplicationDefault())
-                .setProjectId(config.firebaseProjectId)
-                .build(),
-        ),
-    )
+class FirebaseVerifier(private val config: Config, app: FirebaseApp) : TokenVerifier {
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance(app)
     private val jwks: JwkProvider = JwkProviderBuilder(URI("https://firebaseappcheck.googleapis.com/v1/jwks").toURL())
         // 키 서버가 멈춰도 요청이 무기한 기다리지 않게 (기본은 읽기 제한 없음)
         .timeouts(3_000, 3_000)

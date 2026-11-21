@@ -33,6 +33,9 @@
 - `ALERT_NOTICE`: 보호자가 허용한 앱이 증상 기준을 넘었을 때(openapi `kind: notice`, FR-007). 승인 요청이 아니라서 `normal`·별도 채널 `notice`
 - `ALERT_CREATED`·`ALERT_NOTICE`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
+- 연결 메시지(`LINK_*`)는 `linkId`와 보낸 쪽 표시 이름을 담음. 키 이름은 보낸 쪽 역할: 보호자가 보내면 `guardianName`(`LINK_REQUESTED`, 보호자가 끊은 `LINK_REVOKED`), 시니어가 보내면 `protectedName`(`LINK_ACTIVATED`, 시니어가 끊은 `LINK_REVOKED`). 기기 삭제로 끊긴 연결도 `LINK_REVOKED`
+- 서버는 DB 반영이 끝난 뒤 응답 전에 보냄. 전송이 실패해도 요청은 성공 (위 "누락 대비"로 당겨 옴)
+
 ## 3. 페이로드 예시
 
 ```json
@@ -49,6 +52,21 @@
       "source": "symptom",
       "symptomCount": "12",
       "symptomDate": "2026-10-23"
+    }
+  }
+}
+```
+
+```json
+{
+  "message": {
+    "token": "<protected fcm token>",
+    "android": { "priority": "high", "ttl": "86400s" },
+    "data": {
+      "v": "1",
+      "type": "LINK_REQUESTED",
+      "linkId": "6f1c…",
+      "guardianName": "민지"
     }
   }
 }

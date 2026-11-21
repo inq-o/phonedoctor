@@ -47,6 +47,7 @@ data class Config(
 class Deps(
     val db: Database,
     val verifier: TokenVerifier,
+    val pusher: Pusher,
     val clock: Clock = Clock.systemUTC(),
 ) {
     /** 만료된 Idempotency-Key를 마지막으로 지운 시각 (Idempotency.kt) */
@@ -58,7 +59,8 @@ class Deps(
 
 fun main() {
     val config = Config.fromEnv()
-    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config))
+    val firebase = firebaseApp(config)
+    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config, firebase), FcmPusher(firebase))
     embeddedServer(Netty, port = config.port, host = "0.0.0.0") { module(deps) }.start(wait = true)
 }
 
@@ -71,6 +73,7 @@ fun Application.module(deps: Deps) {
         route("/v1") {
             install(FirebaseAuthPlugin) { this.deps = deps }
             deviceRoutes(deps)
+            pairingRoutes(deps)
         }
     }
 }

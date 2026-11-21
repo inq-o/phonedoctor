@@ -67,7 +67,7 @@
 - [ ] T052 [US2] 첫 전체 검사 화면 (O-S3)
 - [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
-  - [ ] pairing
+  - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
   - [ ] alerts
   - [ ] 배포 — Neon·GCP 결제 계정은 사람이 (server/README.md 배포 절)
 - [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`

@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.3.1
+  version: 0.4.0
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -97,7 +97,7 @@ paths:
     delete:
       tags: [devices]
       operationId: deleteDevice
-      summary: 기기 삭제 (앱 안의 "모든 데이터 지우기"). 연결·요청 전부 삭제
+      summary: 기기 삭제 (앱 안의 "모든 데이터 지우기"). 연결·요청 전부 삭제, 해제되지 않은 연결의 상대 기기에 LINK_REVOKED 푸시
       responses:
         '204': { description: 삭제됨 (이미 없어도 204 — 응답 유실 뒤 재전송) }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -134,7 +134,10 @@ paths:
     post:
       tags: [pairing]
       operationId: createPairingCode
-      summary: (시니어) 연결 코드 발급 — 10분 유효, 기존 미사용 코드는 무효화
+      summary: (시니어) 연결 코드 발급 — 10분 유효, 기존 코드는 무효화
+      description: |
+        - 이 기기의 이전 코드(쓴 것 포함)는 지워져, 보호자가 넣으면 404
+        - 같은 `Idempotency-Key` 재전송은 같은 코드
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
@@ -144,7 +147,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PairingCode' }
         '403':
-          description: 보호자 기기는 발급 불가
+          description: 보호자 기기는 발급 불가(type = .../problems/forbidden), 기기 등록 전(type = .../problems/device-not-registered)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -159,6 +162,10 @@ paths:
       tags: [pairing]
       operationId: acceptPairingCode
       summary: (보호자) 코드 입력·QR 스캔 → pending 링크 생성, 시니어 기기에 LINK_REQUESTED 푸시
+      description: |
+        - 쓴 코드로 표시하므로 한 코드로는 보호자 1명만 연결
+        - 같은 시니어와 확인 대기(pending) 중인 링크가 있으면 새로 만들지 않고 그 링크를 돌려주며 LINK_REQUESTED를 다시 보냄 (시니어가 푸시를 놓친 경우)
+        - 시도 횟수는 결과(성공·404·410)와 관계없이 셈. 같은 키 재전송도 한 번으로 셈
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       responses:
@@ -167,13 +174,24 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Link' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 시니어 기기는 입력 불가(type = .../problems/forbidden), 기기 등록 전(type = .../problems/device-not-registered)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '404':
-          description: 코드 없음
+          description: 코드 없음 (type = .../problems/pairing-code-not-found)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: 이 시니어와 이미 연결됨(type = .../problems/already-linked), 시니어의 보호자 수 상한(type = .../problems/guardian-limit, 최대 3명 — data-model §2)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
         '410':
-          description: 코드 만료 (type = .../problems/pairing-code-expired)
+          description: 코드 만료(type = .../problems/pairing-code-expired) 또는 이미 쓴 코드(type = .../problems/pairing-code-used). 시니어 폰에서 새 코드 받기
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -184,6 +202,9 @@ paths:
       tags: [pairing]
       operationId: listLinks
       summary: 내 기기의 연결 목록 (시니어·보호자 공통)
+      description: |
+        - 만든 순서. 해제한 연결(revoked)도 포함하므로 필요하면 `status`로 거름
+        - 시니어 기기 상태(`lastSeenAt`·`lastCheckedAt`·`protection`)는 확정된(active) 링크에만 실림. 시니어가 "연결할게요"를 누르기 전에는 보호자에게 보이지 않게
       parameters:
         - name: status
           in: query
@@ -200,6 +221,12 @@ paths:
                   items:
                     type: array
                     items: { $ref: '#/components/schemas/Link' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 기기 등록 전 (type = .../problems/device-not-registered)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /links/{linkId}/confirm:
     parameters:
@@ -219,8 +246,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Link' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: 이미 revoked
+          description: 이미 해제됨(type = .../problems/link-revoked), 보호자 수 상한(type = .../problems/guardian-limit)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -232,9 +260,13 @@ paths:
       tags: [pairing]
       operationId: revokeLink
       summary: 연결 해제 (양쪽 모두 가능, 시니어는 항상 가능). 상대에게 LINK_REVOKED 푸시, 해당 링크의 요청 데이터 즉시 삭제
+      description: |
+        - 링크는 revoked로 남음 (목록에서 보임). 다시 연결하려면 새 코드로 새 링크
+        - 이미 해제된 링크는 204, 푸시는 처음 한 번만 (재전송)
       responses:
         '204': { description: 해제됨 }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /alerts:
     post:
@@ -474,7 +506,7 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
     TooManyRequests:
-      description: 연결 코드 대입 방지 (기기당 분당 5회, NFR-08)
+      description: 연결 코드 대입 방지 (기기당 분당 5회, NFR-08. type = .../problems/too-many-attempts). `Retry-After` 초 뒤에 다시
       headers:
         Retry-After:
           schema: { type: integer }
