@@ -10,3 +10,6 @@ build/
 .cxx
 ml/data/
 __pycache__/
+
+# Firebase 앱 설정 (프로젝트별 키 포함, 커밋하지 않음)
+app/google-services.json

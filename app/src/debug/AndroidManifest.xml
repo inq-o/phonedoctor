@@ -2,10 +2,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 시험용(debug 빌드에만 있음): App Check 확인에 필요. 출시 빌드에는 인터넷 권한이 없다 -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application>
         <!-- 시험용(debug 빌드에만 있음): adb로 검사를 한 번 돌린다. 출시 빌드에는 들어가지 않는다 -->
         <receiver
             android:name=".debug.ScanNowReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver" />
+        <!-- 시험용(debug 빌드에만 있음): adb로 App Check 토큰을 한 번 받아 기기 무결성 통과 여부를 확인한다 -->
+        <receiver
+            android:name=".debug.AppCheckProbeReceiver"
             android:exported="true"
             tools:ignore="ExportedReceiver" />
     </application>

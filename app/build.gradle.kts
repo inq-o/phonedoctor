@@ -20,6 +20,11 @@ plugins {
     alias(libs.plugins.phonedoctor.hilt)
 }
 
+// Firebase 설정(google-services.json)은 커밋하지 않는다. 파일이 있는 로컬 빌드에서만 붙이고, CI는 Firebase 없이 빌드한다
+if (file("google-services.json").exists()) {
+    apply(plugin = libs.plugins.gms.get().pluginId)
+}
+
 android {
     defaultConfig {
         applicationId = "io.github.inq_o.phonedoctor"
@@ -72,6 +77,9 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    // 기기 무결성 확인용(App Check). 출시 빌드에는 아직 넣지 않는다: 인터넷 권한·외부 전송이 생겨 개인정보처리방침을 먼저 고쳐야 함
+    debugImplementation(platform(libs.firebase.bom))
+    debugImplementation(libs.firebase.appcheck.playintegrity)
 
     ksp(libs.androidx.hilt.compiler)
     kspAndroidTest(libs.hilt.compiler)
