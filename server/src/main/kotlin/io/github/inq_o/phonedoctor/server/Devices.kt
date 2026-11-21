@@ -22,6 +22,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 // openapi.yaml components/schemas 의 devices 부분
@@ -199,10 +200,13 @@ fun Route.deviceRoutes(deps: Deps) {
                         val now = deps.now()
                         val maxReported = row[Devices.checkedReportedAt]?.toInstant()
                         val last = row[Devices.lastCheckedAt]?.toInstant()
-                        if (acceptStatus(body.checkedAt, maxReported, last, now)) {
+                        // 비교와 저장에 같은 값을 쓴다. 받은 값(나노초까지)을 그대로 비교하면 DB(마이크로초)에 잘려 저장된 값보다 커 보여
+                        // 같은 본문 재전송이 새 보고로 받아들여진다. 서버 시각(deps.now)과 같은 ms로 자른다
+                        val checkedAt = body.checkedAt.truncatedTo(ChronoUnit.MILLIS)
+                        if (acceptStatus(checkedAt, maxReported, last, now)) {
                             Devices.update({ Devices.deviceId eq id }) {
-                                it[checkedReportedAt] = maxOf(maxReported ?: body.checkedAt, body.checkedAt).utc()
-                                it[lastCheckedAt] = minOf(body.checkedAt, now).utc()
+                                it[checkedReportedAt] = maxOf(maxReported ?: checkedAt, checkedAt).utc()
+                                it[lastCheckedAt] = minOf(checkedAt, now).utc()
                                 it[protection] = body.protection
                             }
                         }

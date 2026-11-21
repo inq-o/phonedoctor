@@ -529,7 +529,7 @@ components:
       description: (시니어) 보호 동작 상태. 앱 목록·사용 기록 내용은 넣지 않음
       required: [checkedAt, protection]
       properties:
-        checkedAt: { type: string, format: date-time, description: 마지막 검사 완료 시각 }
+        checkedAt: { type: string, format: date-time, description: '마지막 검사 완료 시각. 서버는 밀리초까지만 보고 저장함 (더 잘게 적은 부분은 버림)' }
         protection: { $ref: '#/components/schemas/ProtectionState' }
 
     ProtectionState:

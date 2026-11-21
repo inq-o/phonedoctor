@@ -272,6 +272,17 @@ class DeviceStatusTest {
     }
 
     @Test
+    fun `ms보다 잘게 적힌 미래 시각 본문을 다시 보내도 lastCheckedAt이 앞으로 가지 않음`() = serverTest { clock ->
+        val id = register()
+        val future = """{"checkedAt":"2027-01-01T00:00:00.000000001Z","protection":{"notifications":true,"usageAccess":false,"notificationListener":false}}"""
+        client.api(Put, "/devices/$id/status", body = future)
+        val first = clock.instant
+        clock.instant = clock.instant.plusSeconds(3600)
+        client.api(Put, "/devices/$id/status", body = future)
+        assertEquals(first, deviceRow(id)[Devices.lastCheckedAt]!!.toInstant())
+    }
+
+    @Test
     fun `시계가 바로잡힌 뒤 옛 미래 시각 본문이 재전송돼도 lastCheckedAt이 앞으로 가지 않음`() = serverTest { clock ->
         val id = register()
         val future = """{"checkedAt":"2027-01-01T00:00:00Z","protection":{"notifications":true,"usageAccess":false,"notificationListener":false}}"""
