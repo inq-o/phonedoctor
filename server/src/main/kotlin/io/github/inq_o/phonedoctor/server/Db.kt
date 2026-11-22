@@ -61,6 +61,7 @@ object Links : Table("link") {
     val createdAt = timestampWithTimeZone("created_at")
     val activatedAt = timestampWithTimeZone("activated_at").nullable()
     val revokedAt = timestampWithTimeZone("revoked_at").nullable()
+    val contactLostAt = timestampWithTimeZone("contact_lost_at").nullable()
     override val primaryKey = PrimaryKey(linkId)
 }
 

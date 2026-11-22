@@ -236,7 +236,7 @@ private fun alertRow(alertId: String, lock: Boolean = false): ResultRow? {
 private val alertLinkJoin get() = AlertLinks.join(Links, JoinType.INNER, AlertLinks.linkId, Links.linkId)
 
 /** 요청을 받은 연결 중 지금 active인 것: (linkId, 보호자 기기 ID) */
-private fun activeRecipients(alertId: String): List<Pair<String, String>> =
+fun activeRecipients(alertId: String): List<Pair<String, String>> =
     alertLinkJoin.select(Links.linkId, Links.guardianDeviceId)
         .where { (AlertLinks.alertId eq alertId) and (Links.status eq LinkStatus.ACTIVE.db) }
         .map { it[Links.linkId] to it[Links.guardianDeviceId] }
@@ -294,14 +294,21 @@ private fun alertViews(rows: List<ResultRow>): List<Alert> {
     }
 }
 
-private fun alertView(alertId: String) = alertViews(listOf(alertRow(alertId)!!)).single()
+fun alertView(alertId: String) = alertViews(listOf(alertRow(alertId)!!)).single()
 
-private fun fcmToken(deviceId: String) =
+fun fcmToken(deviceId: String) =
     Devices.select(Devices.fcmToken).where { Devices.deviceId eq deviceId }.single()[Devices.fcmToken]
 
-/** 보호자에게 새 요청을 알리는 푸시 (ALERT_CREATED·ALERT_NOTICE). 문구 고르는 값만 담는다 (push-messages.md §2) */
-private fun newAlertPush(alert: Alert, guardianId: String): Push {
-    val type = if (alert.kind == AlertKind.NOTICE) PushType.ALERT_NOTICE else PushType.ALERT_CREATED
+/**
+ * 보호자에게 요청을 알리는 푸시 (ALERT_CREATED·ALERT_NOTICE, 재알림은 ALERT_REMINDER).
+ * 문구 고르는 값만 담는다 (push-messages.md §2)
+ */
+fun alertPush(alert: Alert, guardianId: String, reminder: Boolean = false): Push {
+    val type = when {
+        reminder -> PushType.ALERT_REMINDER
+        alert.kind == AlertKind.NOTICE -> PushType.ALERT_NOTICE
+        else -> PushType.ALERT_CREATED
+    }
     val data = buildList {
         add("alertId" to alert.alertId)
         add("protectedName" to alert.protectedDevice.displayName)
@@ -400,7 +407,7 @@ fun Route.alertRoutes(deps: Deps) {
                         this[AlertLinks.linkId] = linkId
                     }
                     val view = alertView(alertId)
-                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> newAlertPush(view, g) })
+                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> alertPush(view, g) })
                 }
 
                 // 열린 요청에 합치기: 없던 근거는 붙이고, 증상 근거는 더 최신일 때만 바꾼다. verdict·source·kind는 처음 값
@@ -425,7 +432,7 @@ fun Route.alertRoutes(deps: Deps) {
                 }
                 val view = alertView(alertId)
                 val addedGuardians = added.map { it.second }.toSet()
-                val pushes = added.map { (_, g) -> newAlertPush(view, g) } +
+                val pushes = added.map { (_, g) -> alertPush(view, g) } +
                     if (evidenceChanged) {
                         activeRecipients(alertId).filter { it.second !in addedGuardians }
                             .map { (_, g) -> PushType.ALERT_UPDATED.to(fcmToken(g), "alertId" to alertId) }

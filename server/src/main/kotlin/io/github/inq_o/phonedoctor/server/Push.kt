@@ -26,6 +26,7 @@ enum class PushType(val high: Boolean, val ttl: Duration) {
     ALERT_UPDATED(false, Duration.ofHours(24)),
     DECISION_MADE(true, Duration.ofHours(48)),
     ALERT_RESOLVED(false, Duration.ofHours(24)),
+    CONTACT_LOST(false, Duration.ofHours(24)),
     ;
 
     fun to(token: String, vararg data: Pair<String, String>) =

@@ -28,12 +28,14 @@
 | `ALERT_UPDATED` | 다른 보호자(먼저 온 결정 반영), 보호자 전원(열린 요청에 근거 추가·갱신) | normal | (알림 없음, 목록·상세 갱신) | — |
 | `DECISION_MADE` | 시니어 | high | `alert` | 시니어 앱 상세 (삭제 유도) |
 | `ALERT_RESOLVED` | 보호자 전원 | normal | `result` | 요청 상세 |
+| `CONTACT_LOST` | 보호자 | normal | `link` | 보호자 홈 (연락 끊김 카드, ux-flows F6) |
 | `MODEL_UPDATED` | 시니어 | normal | (알림 없음) | WorkManager로 모델 받기 |
 
 - `ALERT_NOTICE`: 보호자가 허용한 앱이 증상 기준을 넘었을 때(openapi `kind: notice`, FR-007). 승인 요청이 아니라서 `normal`·별도 채널 `notice`
 - `ALERT_CREATED`·`ALERT_NOTICE`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
 - 연결 메시지(`LINK_*`)는 `linkId`와 보낸 쪽 표시 이름을 담음. 키 이름은 보낸 쪽 역할: 보호자가 보내면 `guardianName`(`LINK_REQUESTED`, 보호자가 끊은 `LINK_REVOKED`), 시니어가 보내면 `protectedName`(`LINK_ACTIVATED`, 시니어가 끊은 `LINK_REVOKED`). 기기 삭제로 끊긴 연결도 `LINK_REVOKED`
+- `ALERT_REMINDER`는 `ALERT_CREATED`와 같은 값(24시간 무응답 1번). `CONTACT_LOST`는 `linkId`·`protectedName` — 시니어 기기의 검사 보고가 48시간 없을 때 끊김 한 번에 1번 (새 보고가 온 뒤 다시 끊기면 또)
 - `ALERT_UPDATED`는 `alertId`만. `ALERT_RESOLVED`는 `alertId`·`outcome`·`protectedName`·`appLabel`. `DECISION_MADE`는 아래 예시와 같음(`messageToSenior`는 넣지 않음 — 잠금화면 노출 최소화, 상세 화면에서 `GET /alerts/{id}`)
 - 서버는 DB 반영이 끝난 뒤 응답 전에 보냄. 전송이 실패해도 요청은 성공 (위 "누락 대비"로 당겨 옴)
 

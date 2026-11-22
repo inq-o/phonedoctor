@@ -81,7 +81,7 @@ fun serverTest(clock: MovableClock = MovableClock(), block: suspend ApplicationT
     FakePusher.sent.clear()
     FakePusher.failing = false
     testApplication {
-        application { module(Deps(TestDb.db, FakeVerifier, FakePusher, clock)) }
+        application { module(Deps(TestDb.db, FakeVerifier, FakePusher, clock, scheduler = { it == "tick-ok" })) }
         block(clock)
     }
 }

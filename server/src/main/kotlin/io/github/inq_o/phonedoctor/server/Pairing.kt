@@ -70,7 +70,7 @@ data class LinkList(val items: List<Link>)
 private val CODE_VALID = Duration.ofMinutes(10)
 
 /** 만료 뒤에도 이만큼은 남겨 두어 "만료됨"(410)으로 알려 준다 (data-model §2: 만료 1시간 후 삭제) */
-private val CODE_KEEP_AFTER_EXPIRY = Duration.ofHours(1)
+val CODE_KEEP_AFTER_EXPIRY = Duration.ofHours(1)
 
 /** 시니어 1명에게 연결할 수 있는 보호자 수 상한 (data-model §2). 무료 1명 제한은 구독(T084)을 붙일 때 */
 const val MAX_GUARDIANS = 3

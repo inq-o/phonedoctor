@@ -184,12 +184,7 @@ fun Route.deviceRoutes(deps: Deps) {
                         val row = Devices.selectAll().where { Devices.deviceId eq id }
                             .forUpdate(ForUpdateOption.ForUpdate).singleOrNull() ?: return@transaction emptyList()
                         if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
-                        // 보호자 기기면 연결이 지워진 뒤 받은 연결이 없어진 요청도 지운다 (시니어 기기면 요청은 외래 키 연쇄로 지워짐)
-                        val seniors = Links.select(Links.protectedDeviceId).where { Links.guardianDeviceId eq id }.map { it[Links.protectedDeviceId] }
-                        revokedPushesOnDelete(id).also {
-                            Devices.deleteWhere { Devices.deviceId eq id }
-                            deleteOrphanAlerts(seniors)
-                        }
+                        deleteDevice(id)
                     }
                 }
                 withContext(Dispatchers.IO) { deps.sendAll(pushes) }
@@ -224,6 +219,18 @@ fun Route.deviceRoutes(deps: Deps) {
             }
         }
     }
+}
+
+/**
+ * 기기를 지우고, 해제되지 않은 연결의 상대 기기에 보낼 LINK_REVOKED를 돌려준다.
+ * 연결·요청은 외래 키 연쇄로 함께 지워지고, 보호자 기기면 받은 연결이 없어진 요청도 지운다 (NFR-09)
+ */
+fun deleteDevice(id: String): List<Push> {
+    val seniors = Links.select(Links.protectedDeviceId).where { Links.guardianDeviceId eq id }.map { it[Links.protectedDeviceId] }
+    val pushes = revokedPushesOnDelete(id)
+    Devices.deleteWhere { Devices.deviceId eq id }
+    deleteOrphanAlerts(seniors)
+    return pushes
 }
 
 /**

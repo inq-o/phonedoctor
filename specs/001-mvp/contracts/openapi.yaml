@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.5.0
+  version: 0.5.1
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -840,7 +840,7 @@ components:
         remindAt:
           type: string
           format: date-time
-          description: 보호자 재알림 예정 (생성 + 24h, FR-026). `kind = notice`면 없음
+          description: 보호자 재알림 예정 (생성 + 24h, FR-026). `kind = notice`면 없음. 재알림을 보냈거나 응답·결과·만료로 필요 없어지면 빠짐
 
     FalsePositiveReport:
       type: object
