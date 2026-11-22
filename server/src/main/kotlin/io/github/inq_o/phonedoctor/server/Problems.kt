@@ -9,6 +9,7 @@ import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.CannotTransformContentToTypeException
 import io.ktor.server.plugins.UnsupportedMediaTypeException
 import io.ktor.server.plugins.statuspages.StatusPages
+import io.ktor.server.response.header
 import io.ktor.server.response.respondText
 import io.ktor.util.AttributeKey
 import kotlinx.serialization.json.JsonObject
@@ -29,6 +30,8 @@ class ApiProblem(
     val title: String,
     val detail: String? = null,
     val extra: JsonObject? = null,
+    /** 응답 헤더 (예: 429의 `Retry-After`) */
+    val headers: Map<String, String> = emptyMap(),
 ) : RuntimeException(title)
 
 fun badRequest(detail: String) = ApiProblem(HttpStatusCode.BadRequest, "bad-request", "요청 형식 오류", detail)
@@ -78,6 +81,7 @@ private val ProblemSent = AttributeKey<Unit>("problem-sent")
 
 suspend fun io.ktor.server.application.ApplicationCall.respondProblem(p: ApiProblem) {
     attributes.put(ProblemSent, Unit)
+    p.headers.forEach { (k, v) -> response.header(k, v) }
     val body = buildJsonObject {
         put("type", JsonPrimitive(PROBLEM_BASE + p.slug))
         put("title", JsonPrimitive(p.title))

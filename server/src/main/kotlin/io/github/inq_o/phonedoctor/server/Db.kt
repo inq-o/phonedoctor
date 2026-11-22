@@ -45,6 +45,30 @@ object IdempotencyKeys : Table("idempotency_key") {
     override val primaryKey = PrimaryKey(firebaseUid, key)
 }
 
+object PairingCodes : Table("pairing_code") {
+    val code = text("code")
+    val protectedDeviceId = text("protected_device_id")
+    val expiresAt = timestampWithTimeZone("expires_at")
+    val used = bool("used")
+    override val primaryKey = PrimaryKey(code)
+}
+
+object Links : Table("link") {
+    val linkId = text("link_id")
+    val protectedDeviceId = text("protected_device_id")
+    val guardianDeviceId = text("guardian_device_id")
+    val status = text("status")
+    val createdAt = timestampWithTimeZone("created_at")
+    val activatedAt = timestampWithTimeZone("activated_at").nullable()
+    val revokedAt = timestampWithTimeZone("revoked_at").nullable()
+    override val primaryKey = PrimaryKey(linkId)
+}
+
+object PairingAttempts : Table("pairing_attempt") {
+    val firebaseUid = text("firebase_uid")
+    val attemptedAt = timestampWithTimeZone("attempted_at")
+}
+
 fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)
 
 /** 마이그레이션을 적용하고 Exposed에 연결한다 */

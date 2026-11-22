@@ -22,10 +22,14 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Duration
 import java.util.UUID
 
-/** 응답 상태와 JSON 본문. 같은 Idempotency-Key 재전송에 그대로 돌려주려고 문자열로 들고 있음 */
-class Reply(val status: HttpStatusCode, val body: String)
+/**
+ * 응답 상태와 JSON 본문. 같은 Idempotency-Key 재전송에 그대로 돌려주려고 문자열로 들고 있음.
+ * [pushes]는 커밋 뒤 처음 한 번만 보낸다 (재전송 응답에는 없음)
+ */
+class Reply(val status: HttpStatusCode, val body: String, val pushes: List<Push> = emptyList())
 
-inline fun <reified T> reply(status: HttpStatusCode, value: T) = Reply(status, ApiJson.encodeToString(value))
+inline fun <reified T> reply(status: HttpStatusCode, value: T, pushes: List<Push> = emptyList()) =
+    Reply(status, ApiJson.encodeToString(value), pushes)
 
 private val KEEP = Duration.ofHours(24)
 
@@ -65,7 +69,12 @@ suspend fun ApplicationCall.idempotent(deps: Deps, block: JdbcTransaction.(Calle
             (stored(deps, caller.uid, key, method, path) ?: throw e) to true
         }
     }
-    if (!replayed) withContext(Dispatchers.IO) { sweepExpired(deps) }
+    if (!replayed) {
+        withContext(Dispatchers.IO) {
+            deps.sendAll(reply.pushes)
+            sweepExpired(deps)
+        }
+    }
     if (replayed) response.header("Idempotent-Replayed", "true")
     respondText(reply.body, ContentType.Application.Json, reply.status)
 }

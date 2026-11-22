@@ -38,7 +38,7 @@ object TestDb {
 
     /** 시험마다 빈 표에서 시작 */
     fun reset() = transaction(db) {
-        exec("TRUNCATE device, idempotency_key CASCADE")
+        exec("TRUNCATE device, idempotency_key, pairing_attempt CASCADE")
     }
 }
 
@@ -55,6 +55,20 @@ object FakeVerifier : TokenVerifier {
     override fun verifyAppCheck(token: String) = token == "ok"
 }
 
+/** 보낸 푸시를 모아 두는 가짜. [failing]이면 전송 실패를 흉내 낸다 */
+object FakePusher : Pusher {
+    val sent = java.util.concurrent.CopyOnWriteArrayList<Push>()
+
+    @Volatile var failing = false
+
+    override fun send(push: Push) {
+        if (failing) error("FCM 실패 흉내")
+        sent += push
+    }
+
+    fun types() = sent.map { it.data["type"] }
+}
+
 /** 시각을 옮길 수 있는 시계 */
 class MovableClock(var instant: Instant = Instant.parse("2026-11-21T03:00:00Z")) : Clock() {
     override fun getZone() = ZoneOffset.UTC
@@ -64,8 +78,10 @@ class MovableClock(var instant: Instant = Instant.parse("2026-11-21T03:00:00Z"))
 
 fun serverTest(clock: MovableClock = MovableClock(), block: suspend ApplicationTestBuilder.(MovableClock) -> Unit) {
     TestDb.reset()
+    FakePusher.sent.clear()
+    FakePusher.failing = false
     testApplication {
-        application { module(Deps(TestDb.db, FakeVerifier, clock)) }
+        application { module(Deps(TestDb.db, FakeVerifier, FakePusher, clock)) }
         block(clock)
     }
 }
