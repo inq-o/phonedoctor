@@ -274,7 +274,9 @@ fun Route.pairingRoutes(deps: Deps) {
                         it[status] = LinkStatus.REVOKED.db
                         it[revokedAt] = deps.now().utc()
                     }
-                    // TODO(alerts): 이 연결로 만든 요청 데이터 즉시 삭제 (openapi revokeLink)
+                    // 이 연결로 받은 요청 데이터를 바로 지운다 (다른 보호자도 받은 요청은 남음, NFR-09)
+                    AlertLinks.deleteWhere { AlertLinks.linkId eq linkId }
+                    deleteOrphanAlerts(listOf(row[Links.protectedDeviceId]))
                     listOf(revokedPush(row, byDeviceId = myId))
                 }
             }

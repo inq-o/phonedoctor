@@ -15,7 +15,8 @@
 |---|---|---|
 | devices | `POST /devices`, `PATCH·DELETE /devices/{id}`, `PUT /devices/{id}/status` | 구현 |
 | pairing | `POST /pairing-codes`, `POST /pairing-codes/{code}/accept`, `GET /links`, `POST /links/{id}/confirm`, `DELETE /links/{id}` | 구현 |
-| alerts | `/alerts` | 다음 |
+| alerts | `POST·GET /alerts`, `GET /alerts/{id}`, `POST /alerts/{id}/decision`, `POST /alerts/{id}/outcome` | 구현 |
+| 예약 작업 | 재알림 24시간·만료 7일·삭제 90일·연락 끊김 48시간 (Cloud Scheduler → 내부 경로, ADR-0001) | 다음 |
 | feedback·models | `/feedback/false-positives`, `/models/latest` | 나중 |
 
 ## 시험
@@ -27,7 +28,7 @@
 - Postgres 실행 파일을 시험 안에서 띄운다(zonky embedded-postgres). Docker를 켤 필요 없음
 - 응답 본문을 `openapi.yaml` 스키마와 대조한다(`Contract.check`, JSON Schema 2020-12, 날짜·URI 형식 포함)
 - 토큰은 가짜 검증기(`FakeVerifier`), 푸시는 보낸 것을 모아 두는 가짜(`FakePusher`)로 바꾼다. 실제 Firebase 검증·FCM 전송은 배포 뒤 실기기로 확인
-- 동시 요청 시험(`PairingRaceTest` 등)은 행 잠금을 빼면 실패하는 것을 확인해 둠
+- 동시 요청 시험(`PairingRaceTest`, 요청 동시 생성·동시 응답 등)은 행 잠금을 빼면 실패하는 것을 확인해 둠
 
 ## 환경 변수
 

@@ -74,6 +74,7 @@ fun Application.module(deps: Deps) {
             install(FirebaseAuthPlugin) { this.deps = deps }
             deviceRoutes(deps)
             pairingRoutes(deps)
+            alertRoutes(deps)
         }
     }
 }

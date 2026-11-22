@@ -69,6 +69,40 @@ object PairingAttempts : Table("pairing_attempt") {
     val attemptedAt = timestampWithTimeZone("attempted_at")
 }
 
+object Alerts : Table("alert") {
+    val alertId = text("alert_id")
+    val protectedDeviceId = text("protected_device_id")
+    val status = text("status")
+    val alertSource = text("source")
+    val kind = text("kind")
+    val packageName = text("package_name")
+    val signingCertSha256 = text("signing_cert_sha256")
+    val versionCode = long("version_code")
+    val app = jsonb("app", ApiJson, AppInfo.serializer())
+    val verdict = jsonb("verdict", ApiJson, Verdict.serializer()).nullable()
+    val symptom = jsonb("symptom", ApiJson, SymptomEvidence.serializer()).nullable()
+    val detectedAt = timestampWithTimeZone("detected_at")
+    val createdAt = timestampWithTimeZone("created_at")
+    val updatedAt = timestampWithTimeZone("updated_at")
+    val remindAt = timestampWithTimeZone("remind_at").nullable()
+    val expiresAt = timestampWithTimeZone("expires_at")
+    val deleteAt = timestampWithTimeZone("delete_at")
+    val decision = text("decision").nullable()
+    val messageToSenior = text("message_to_senior").nullable()
+    val decidedById = text("decided_by_id").nullable()
+    val decidedByName = text("decided_by_name").nullable()
+    val decidedAt = timestampWithTimeZone("decided_at").nullable()
+    val outcome = text("outcome").nullable()
+    val outcomeAt = timestampWithTimeZone("outcome_at").nullable()
+    override val primaryKey = PrimaryKey(alertId)
+}
+
+object AlertLinks : Table("alert_link") {
+    val alertId = text("alert_id")
+    val linkId = text("link_id")
+    override val primaryKey = PrimaryKey(alertId, linkId)
+}
+
 fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)
 
 /** 마이그레이션을 적용하고 Exposed에 연결한다 */

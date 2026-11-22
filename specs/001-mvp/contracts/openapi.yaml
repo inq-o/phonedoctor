@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.4.0
+  version: 0.5.0
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -263,6 +263,7 @@ paths:
       description: |
         - 링크는 revoked로 남음 (목록에서 보임). 다시 연결하려면 새 코드로 새 링크
         - 이미 해제된 링크는 204, 푸시는 처음 한 번만 (재전송)
+        - 이 연결로 받은 요청 중 다른 보호자도 받지 않은 것은 삭제. 다른 보호자도 받은 요청은 그 보호자에게 남음 (`linkIds`에서 빠짐)
       responses:
         '204': { description: 해제됨 }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -281,6 +282,9 @@ paths:
           - 이미 `symptom` 근거가 있으면 받은 값이 더 최신일 때만((date, count) 순서로 비교) 통째로 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED(알림 없음). 오래된 값(재전송 순서 뒤바뀜)은 무시. `verdict`는 덮어쓰지 않음
           - `kind`도 처음 값 그대로
         - `kind = notice`: 보호자가 허용한 앱(FR-007)이 증상 기준을 넘음. `source = symptom`만. 보호자 전원에게 ALERT_CREATED 대신 ALERT_NOTICE 푸시, 재알림(`remindAt`) 없음, 7일 뒤 expired. 같은 (packageName, signingCertSha256, versionCode) 조합당 1번(열린 요청 식별 조건과 같음)은 시니어 기기가 지킴
+        - 받는 보호자 = 지금 active인 연결. 증상 근거 없이 설치 시점 CAUTION만 있으면 "주의 단계도 받기"(`notifyCaution`)를 켠 보호자만. 받는 연결은 `linkIds`에 남고, 그 보호자만 요청을 봄
+          - 열린 요청에 합칠 때 새로 받을 대상이 된 보호자(요청 뒤에 연결됨, CAUTION 요청에 증상 근거가 붙음 등)는 `linkIds`에 더하고 그 보호자에게는 ALERT_CREATED(또는 ALERT_NOTICE)
+        - 설치 시점 SAFE 판정은 400 (보내지 않음)
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -300,8 +304,13 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Alert' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 보호자 기기(type = .../problems/forbidden), 기기 등록 전(type = .../problems/device-not-registered)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
         '409':
-          description: active 링크 없음 (type = .../problems/no-active-link)
+          description: active 링크 없음(type = .../problems/no-active-link), CAUTION인데 받을 보호자 없음(type = .../problems/no-recipient — 시니어 기기는 보낸 것으로 처리)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -309,6 +318,9 @@ paths:
       tags: [alerts]
       operationId: listAlerts
       summary: 요청 목록 — 보호자는 연결된 시니어 전체, 시니어는 자기 것. 푸시 누락 대비 pull 용도
+      description: |
+        - 보호자는 지금 active인 연결로 받은 요청만 (`linkIds`). 연결을 끊으면 안 보임
+        - 바뀐 순서(`updatedAt`, 같으면 `alertId`) 오름차순. 앱은 받은 마지막 `updatedAt`을 다음 `updatedSince`로
       parameters:
         - name: status
           in: query
@@ -336,6 +348,12 @@ paths:
                     type: array
                     items: { $ref: '#/components/schemas/Alert' }
                   nextPageToken: { type: string }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403':
+          description: 기기 등록 전 (type = .../problems/device-not-registered)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /alerts/{alertId}:
     parameters:
@@ -343,6 +361,7 @@ paths:
     get:
       tags: [alerts]
       operationId: getAlert
+      description: 볼 수 없는 요청(남의 요청, 끊은 연결로 받은 요청)도 404
       responses:
         '200':
           description: 상세
@@ -362,6 +381,8 @@ paths:
         - 성공 시 시니어 기기에 DECISION_MADE 푸시, 다른 보호자에게 ALERT_UPDATED 푸시
         - 이미 결정된 요청이면 409 + 기존 결정 반환 → 보호자 앱은 "△△님이 먼저 답했어요" 표시
         - `kind = notice` 요청에는 `recommend_uninstall`만 (이미 허용한 앱이라 `allow`는 400)
+        - 같은 보호자가 같은 응답을 다시 보내면(응답 유실 뒤 새 키) 200 + 현재 Alert, 푸시 없음
+        - 응답 없이 끝난 요청(시니어가 먼저 지움, 만료)은 409 (type = .../problems/alert-closed)
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -377,8 +398,9 @@ paths:
               schema: { $ref: '#/components/schemas/Alert' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: 이미 결정됨
+          description: 이미 결정됨 (type = .../problems/already-decided)
           content:
             application/problem+json:
               schema:
@@ -395,6 +417,10 @@ paths:
       tags: [alerts]
       operationId: reportOutcome
       summary: (시니어) 처리 결과 보고 → 보호자에게 ALERT_RESOLVED 푸시
+      description: |
+        - 보호자 응답 전(open)에는 `already_removed`만 (data-model §2 상태 전이). 다른 결과는 409 (type = .../problems/not-decided)
+        - 이미 resolved면 같은 결과는 200(재전송, 푸시 없음), 다른 결과·만료된 요청은 409 (type = .../problems/alert-closed)
+        - `occurredAt`은 서버 시각을 넘지 않게 자름
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -409,6 +435,12 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Alert' }
         '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 응답 전이거나 이미 끝난 요청
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
   /feedback/false-positives:
     post:

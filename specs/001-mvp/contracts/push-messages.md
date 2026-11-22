@@ -12,7 +12,7 @@
 | `onMessageReceived` | 받은 즉시 알림 표시(§2에서 채널이 "알림 없음"인 `ALERT_UPDATED`·`MODEL_UPDATED`는 표시하지 않고 목록 갱신·작업 예약만), 네트워크 호출 금지. 상세는 알림 탭 후 화면에서 `GET /alerts/{id}` | Firebase 권고 |
 | 누락 대비 | 앱 실행·홈 진입 시 `GET /alerts?updatedSince=`(요청)와 `GET /links`(연결: 놓친 `LINK_REQUESTED`·`LINK_ACTIVATED`·`LINK_REVOKED`의 상태)로 당겨오기 | 제조사 배터리 최적화로 FCM 누락 가능 |
 | 개인정보 | 페이로드에 앱 아이콘·근거 상세를 넣지 않음. ID와 짧은 표시 문구만 | 잠금화면 노출 최소화 |
-| TTL | 승인 요청 48시간, 나머지 24시간 | 무응답 처리(FR-026)와 맞춤 |
+| TTL | 승인 요청(`ALERT_CREATED`·`ALERT_REMINDER`)과 응답(`DECISION_MADE`) 48시간, 나머지 24시간 | 무응답 처리(FR-026)와 맞춤 |
 | 버전 | 모든 메시지에 `v: "1"` | 형식 변경 대비 |
 
 ## 2. 메시지 종류
@@ -34,6 +34,7 @@
 - `ALERT_CREATED`·`ALERT_NOTICE`·`ALERT_REMINDER`는 `source`(`install_scan` / `symptom`)를 담고, `symptom` 근거가 있으면 `symptomCount`(= openapi `symptom.count`를 문자열로)와 `symptomDate`(= `symptom.date`, 시니어 기기 현지 날짜 `YYYY-MM-DD`)도 담음 (FCM data 값은 모두 문자열) — 알림 문구를 고르는 용도 (ux-flows §6). `symptomDate`가 받은 날의 오늘이 아니면 "오늘" 대신 날짜를 씀(자정 넘어 도착 대비). 시각·근거 상세는 넣지 않음
 
 - 연결 메시지(`LINK_*`)는 `linkId`와 보낸 쪽 표시 이름을 담음. 키 이름은 보낸 쪽 역할: 보호자가 보내면 `guardianName`(`LINK_REQUESTED`, 보호자가 끊은 `LINK_REVOKED`), 시니어가 보내면 `protectedName`(`LINK_ACTIVATED`, 시니어가 끊은 `LINK_REVOKED`). 기기 삭제로 끊긴 연결도 `LINK_REVOKED`
+- `ALERT_UPDATED`는 `alertId`만. `ALERT_RESOLVED`는 `alertId`·`outcome`·`protectedName`·`appLabel`. `DECISION_MADE`는 아래 예시와 같음(`messageToSenior`는 넣지 않음 — 잠금화면 노출 최소화, 상세 화면에서 `GET /alerts/{id}`)
 - 서버는 DB 반영이 끝난 뒤 응답 전에 보냄. 전송이 실패해도 요청은 성공 (위 "누락 대비"로 당겨 옴)
 
 ## 3. 페이로드 예시

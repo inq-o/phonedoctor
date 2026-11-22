@@ -68,7 +68,8 @@
 - [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
   - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
-  - [ ] alerts
+  - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)
+  - [ ] 예약 작업 — 재알림 24시간·만료 7일·삭제 90일·연락 끊김 48시간 (Cloud Scheduler → 내부 경로, ADR-0001)
   - [ ] 배포 — Neon·GCP 결제 계정은 사람이 (server/README.md 배포 절)
 - [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`

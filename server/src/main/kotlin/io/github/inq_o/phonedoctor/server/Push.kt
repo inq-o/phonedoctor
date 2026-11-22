@@ -18,6 +18,14 @@ enum class PushType(val high: Boolean, val ttl: Duration) {
     LINK_REQUESTED(true, Duration.ofHours(24)),
     LINK_ACTIVATED(true, Duration.ofHours(24)),
     LINK_REVOKED(false, Duration.ofHours(24)),
+
+    // 승인 요청과 그 응답(시니어가 지워야 함)은 48시간, 나머지 24시간 (push-messages.md §1 TTL)
+    ALERT_CREATED(true, Duration.ofHours(48)),
+    ALERT_REMINDER(true, Duration.ofHours(48)),
+    ALERT_NOTICE(false, Duration.ofHours(24)),
+    ALERT_UPDATED(false, Duration.ofHours(24)),
+    DECISION_MADE(true, Duration.ofHours(48)),
+    ALERT_RESOLVED(false, Duration.ofHours(24)),
     ;
 
     fun to(token: String, vararg data: Pair<String, String>) =

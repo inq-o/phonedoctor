@@ -18,6 +18,7 @@ import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -183,7 +184,12 @@ fun Route.deviceRoutes(deps: Deps) {
                         val row = Devices.selectAll().where { Devices.deviceId eq id }
                             .forUpdate(ForUpdateOption.ForUpdate).singleOrNull() ?: return@transaction emptyList()
                         if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
-                        revokedPushesOnDelete(id).also { Devices.deleteWhere { Devices.deviceId eq id } }
+                        // 보호자 기기면 연결이 지워진 뒤 받은 연결이 없어진 요청도 지운다 (시니어 기기면 요청은 외래 키 연쇄로 지워짐)
+                        val seniors = Links.select(Links.protectedDeviceId).where { Links.guardianDeviceId eq id }.map { it[Links.protectedDeviceId] }
+                        revokedPushesOnDelete(id).also {
+                            Devices.deleteWhere { Devices.deviceId eq id }
+                            deleteOrphanAlerts(seniors)
+                        }
                     }
                 }
                 withContext(Dispatchers.IO) { deps.sendAll(pushes) }
