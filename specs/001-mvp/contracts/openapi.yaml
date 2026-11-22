@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.5.1
+  version: 0.5.2
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -13,6 +13,7 @@ info:
     - POST는 `Idempotency-Key` 헤더 필수. 같은 키 재전송 시 첫 응답을 그대로 돌려줌 (오프라인 재전송 대비). 예외는 익명 신고 `/feedback/false-positives` 하나 (해당 경로 설명)
       - 성공(2xx) 응답만 24시간 보관하고, 재전송 응답에는 `Idempotent-Replayed: true` 헤더를 붙임. 실패 응답은 보관하지 않아 같은 키로 다시 보내면 그때 상태로 새로 판단
       - 같은 키를 다른 경로·메서드에 쓰면 422 (type = .../problems/idempotency-key-reused)
+      - 요청(Alert)이 지워지면(연결 해제·기기 삭제·보관 기간) 그 요청을 담은 저장 응답도 지움. 연결을 끊은 보호자의 저장 응답, 지운 기기의 저장 응답도 지움. 이때 같은 키로 다시 보내면 지금 상태로 새로 판단 (NFR-09)
     - 본문이 JSON이 아니면 415, 없는 경로·메서드는 404·405. 모두 같은 오류 형식
     - 서버 구현: Ktor + Cloud Run + Neon (docs/adr/0001-backend.md, Accepted)
   license:

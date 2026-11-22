@@ -44,7 +44,12 @@ data class Config(
                 appCheckAppIds = req("APP_CHECK_APP_IDS").split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
                 schedulerAudience = env["SCHEDULER_AUDIENCE"]?.takeIf { it.isNotBlank() },
                 schedulerServiceAccount = env["SCHEDULER_SERVICE_ACCOUNT"]?.takeIf { it.isNotBlank() },
-            )
+            ).also {
+                // 한쪽만 있으면 예약 작업이 조용히 꺼진 채 돌아 재알림·만료·삭제가 멈춘다. 시작에서 바로 실패
+                check((it.schedulerAudience == null) == (it.schedulerServiceAccount == null)) {
+                    "SCHEDULER_AUDIENCE와 SCHEDULER_SERVICE_ACCOUNT는 함께 설정하거나 둘 다 비워야 함"
+                }
+            }
         }
     }
 }

@@ -187,7 +187,7 @@ flowchart LR
 - 기준 48시간: WorkManager 최소 주기(15분)·Doze 지연과 6시간 간격 상태 보고를 넉넉히 넘는 값. 실측 후 조정
 - 요청이 없다는 것만으로 "지워졌다/꺼졌다"를 확정하지 않음 → 문구는 가능성 표현 유지. 권한이 꺼진 경우는 상태 보고(`protection`)로 따로 보여 줌: "엄마 폰에서 앱 밖 광고 찾기가 꺼져 있을 수 있어요"
 - 근거: 부모 통제 앱 사례의 "Monitoring gaps" 카드 [R2]
-- 서버 쪽 판정 → 예약 작업(15분 간격)이 `Link.lastCheckedAt`(보고가 없으면 연결 확정 시각) 기준으로 판정해 보호자에게 `CONTACT_LOST` 1번 (push-messages.md). 시니어 기기는 `PUT /devices/{id}/status`로 마지막 검사 시각·권한 상태를 6시간 간격 보고 (T055a). 다른 요청만 오는 기기(`lastSeenAt`만 갱신)는 정상으로 보지 않음
+- 서버 쪽 판정 → 예약 작업(15분 간격)이 시니어 기기의 `lastCheckedAt`(openapi `Link.lastCheckedAt`으로 보이는 값, 보고가 없으면 연결 확정 시각) 기준으로 판정해 보호자에게 `CONTACT_LOST` 1번 (push-messages.md). 시니어 기기는 `PUT /devices/{id}/status`로 마지막 검사 시각·권한 상태를 6시간 간격 보고 (T055a). 다른 요청만 오는 기기(`lastSeenAt`만 갱신)는 정상으로 보지 않음
 
 ## 4. 화면 와이어프레임 (ASCII, 360dp 폭 기준)
 

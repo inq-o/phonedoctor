@@ -15,6 +15,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import java.time.Duration
@@ -409,5 +410,104 @@ class AlertRetentionTest {
         val g = client.api(Get, "/links", GUARDIAN).json()["items"]!!.jsonArray[0].jsonObject.o("guardianDevice").s("deviceId")
         assertEquals(HttpStatusCode.NoContent, client.api(Delete, "/devices/$g", GUARDIAN).status)
         assertEquals(0L, transaction(TestDb.db) { Alerts.selectAll().count() })
+    }
+}
+
+/** PR #14 리뷰에서 나온 경합·노출 경우 */
+class AlertReviewFollowupTest {
+    @Test
+    fun `증상 근거가 있는 열린 요청에 주의 판정이 와도 뒤에 연결된 보호자는 받음`() = serverTest {
+        val (l1) = family(GUARDIAN)
+        val a = created(symptom())
+        // 요청 뒤에 G2 연결 (주의 단계 받기 꺼짐)
+        val code = client.api(Post, "/pairing-codes", SENIOR).json().s("code")!!
+        reg(G2, "guardian")
+        val l2 = client.api(Post, "/pairing-codes/$code/accept", G2).json().s("linkId")!!
+        client.api(Post, "/links/$l2/confirm", SENIOR)
+        FakePusher.sent.clear()
+        val merged = create(scan(level = "CAUTION")).contract("Alert")
+        assertEquals(a.id, merged.id)
+        assertEquals(listOf(l1, l2).sorted(), merged.ids())
+        assertEquals("ALERT_CREATED", FakePusher.sent.single { it.token == "fcm-guardian2" }.data["type"])
+    }
+
+    @Test
+    fun `응답과 새 근거가 동시에 와도 응답 뒤에 근거가 끼지 않음`() = serverTest { clock ->
+        family()
+        repeat(8) { round ->
+            val a = created(scan(versionCode = round + 1))
+            val body = symptom(count = 12 + round).replace("\"versionCode\":1", "\"versionCode\":${round + 1}")
+            val (d, _) = coroutineScope {
+                val d = async { decide(a.id) }
+                val c = async { create(body) }
+                d.await() to c.await()
+            }
+            assertEquals(HttpStatusCode.OK, d.status, d.bodyAsText())
+            val decidedView = d.json()
+            val final = client.api(Get, "/alerts/${a.id}", SENIOR).json()
+            // 응답 시점에 없던 증상 근거가 결정된 요청에 붙었으면 위반 (그 근거는 새 요청으로 가야 함)
+            assertEquals(decidedView["symptom"] != null, final["symptom"] != null, "round $round")
+            clock.instant = clock.instant.plusSeconds(1)
+        }
+    }
+
+    @Test
+    fun `연결 해제와 요청 생성이 동시에 와도 해제된 연결에 요청이 남지 않음`() = serverTest {
+        repeat(8) { round ->
+            TestDb.reset()
+            val (link) = family()
+            coroutineScope {
+                listOf(async { client.api(Delete, "/links/$link", SENIOR) }, async { create(scan()) }).awaitAll()
+            }
+            assertEquals(0L, transaction(TestDb.db) { Alerts.selectAll().count() }, "round $round")
+            assertEquals(0L, transaction(TestDb.db) { AlertLinks.selectAll().count() }, "round $round")
+        }
+    }
+
+    @Test
+    fun `두 보호자가 동시에 끊으면 요청은 삭제`() = serverTest {
+        repeat(8) { round ->
+            TestDb.reset()
+            val (l1, l2) = family(GUARDIAN, G2)
+            created()
+            coroutineScope {
+                listOf(async { client.api(Delete, "/links/$l1", GUARDIAN) }, async { client.api(Delete, "/links/$l2", G2) }).awaitAll()
+            }
+            assertEquals(0L, transaction(TestDb.db) { Alerts.selectAll().count() }, "round $round")
+        }
+    }
+
+    @Test
+    fun `연결을 끊은 보호자는 같은 키로 다시 보내도 저장된 요청 내용을 못 받음`() = serverTest {
+        val (l1, _) = family(GUARDIAN, G2)
+        val a = created()
+        val key = UUID.randomUUID().toString()
+        assertEquals(HttpStatusCode.OK, client.api(Post, "/alerts/${a.id}/decision", GUARDIAN, """{"decision":"recommend_uninstall"}""", key = key).status)
+        // 다른 보호자가 남아 요청은 남지만, 끊은 보호자의 저장 응답은 지워짐
+        client.api(Delete, "/links/$l1", GUARDIAN)
+        val replay = client.api(Post, "/alerts/${a.id}/decision", GUARDIAN, """{"decision":"recommend_uninstall"}""", key = key)
+        assertNull(replay.headers["Idempotent-Replayed"])
+        replay.problem(HttpStatusCode.Forbidden, "forbidden")
+    }
+
+    @Test
+    fun `요청이 지워지면 그 요청을 담은 저장 응답도 지워짐`() = serverTest {
+        val (link) = family()
+        val key = UUID.randomUUID().toString()
+        val a = create(scan(), key).json()
+        client.api(Delete, "/links/$link", SENIOR)
+        assertEquals(0L, transaction(TestDb.db) { IdempotencyKeys.selectAll().where { IdempotencyKeys.alertId eq a.id }.count() })
+        // 같은 키 재전송은 지금 상태로 새로 판단 (연결 없음 409), 지워진 요청을 돌려주지 않음
+        create(scan(), key).problem(HttpStatusCode.Conflict, "no-active-link")
+    }
+
+    @Test
+    fun `기기를 지우면 그 기기의 저장 응답도 지워짐`() = serverTest {
+        val key = UUID.randomUUID().toString()
+        val first = client.api(Post, "/devices", SENIOR, """{"role":"protected","fcmToken":"f","appVersionCode":1,"sdkInt":31}""", key = key).json()
+        client.api(Delete, "/devices/${first.s("deviceId")}", SENIOR)
+        val again = client.api(Post, "/devices", SENIOR, """{"role":"protected","fcmToken":"f","appVersionCode":1,"sdkInt":31}""", key = key)
+        assertNull(again.headers["Idempotent-Replayed"])
+        assertNotEquals(first.s("deviceId"), again.json().s("deviceId"))
     }
 }

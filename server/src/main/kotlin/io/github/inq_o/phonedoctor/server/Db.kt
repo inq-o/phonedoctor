@@ -42,6 +42,7 @@ object IdempotencyKeys : Table("idempotency_key") {
     val status = integer("status")
     val body = text("body")
     val createdAt = timestampWithTimeZone("created_at")
+    val alertId = text("alert_id").nullable()
     override val primaryKey = PrimaryKey(firebaseUid, key)
 }
 

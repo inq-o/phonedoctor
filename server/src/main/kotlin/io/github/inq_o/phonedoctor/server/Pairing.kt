@@ -24,6 +24,7 @@ import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -265,8 +266,12 @@ fun Route.pairingRoutes(deps: Deps) {
             val pushes = withContext(Dispatchers.IO) {
                 transaction(deps.db) {
                     val me = myDevice(call.caller)
-                    val row = Links.selectAll().where { Links.linkId eq linkId }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
-                        ?: throw notFound("연결 없음")
+                    val protectedId = Links.select(Links.protectedDeviceId).where { Links.linkId eq linkId }.singleOrNull()
+                        ?.get(Links.protectedDeviceId) ?: throw notFound("연결 없음")
+                    // 잠금 순서: 시니어 기기 → 연결 → 요청 (요청 생성과 같음). 해제와 생성, 두 보호자의 동시 해제가 하나씩 처리돼
+                    // 해제된 연결에 요청이 붙거나 받은 연결이 없는 요청이 남지 않는다
+                    Devices.selectAll().where { Devices.deviceId eq protectedId }.forUpdate(ForUpdateOption.ForUpdate).single()
+                    val row = Links.selectAll().where { Links.linkId eq linkId }.forUpdate(ForUpdateOption.ForUpdate).single()
                     val myId = me[Devices.deviceId]
                     if (myId != row[Links.protectedDeviceId] && myId != row[Links.guardianDeviceId]) throw forbidden("내 연결이 아님")
                     if (row[Links.status] == LinkStatus.REVOKED.db) return@transaction emptyList()
@@ -274,9 +279,13 @@ fun Route.pairingRoutes(deps: Deps) {
                         it[status] = LinkStatus.REVOKED.db
                         it[revokedAt] = deps.now().utc()
                     }
-                    // 이 연결로 받은 요청 데이터를 바로 지운다 (다른 보호자도 받은 요청은 남음, NFR-09)
+                    // 이 연결로 받은 요청 데이터를 바로 지운다 (다른 보호자도 받은 요청은 남음, NFR-09).
+                    // 끊은 보호자가 저장된 응답(요청 내용 포함)을 재전송으로 다시 받지 못하게 그 보호자의 저장 응답도 지운다
+                    val received = AlertLinks.select(AlertLinks.alertId).where { AlertLinks.linkId eq linkId }.map { it[AlertLinks.alertId] }
+                    val guardianUid = Devices.select(Devices.firebaseUid).where { Devices.deviceId eq row[Links.guardianDeviceId] }.single()[Devices.firebaseUid]
+                    IdempotencyKeys.deleteWhere { (IdempotencyKeys.firebaseUid eq guardianUid) and (IdempotencyKeys.alertId inList received) }
                     AlertLinks.deleteWhere { AlertLinks.linkId eq linkId }
-                    deleteOrphanAlerts(listOf(row[Links.protectedDeviceId]))
+                    deleteOrphanAlerts(listOf(protectedId))
                     listOf(revokedPush(row, byDeviceId = myId))
                 }
             }

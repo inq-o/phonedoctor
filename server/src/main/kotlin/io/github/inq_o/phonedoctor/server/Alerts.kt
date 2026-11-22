@@ -326,8 +326,9 @@ fun alertPush(alert: Alert, guardianId: String, reminder: Boolean = false): Push
  * 이번 보고를 받을 active 연결: (linkId, 보호자 기기 ID).
  * 설치 시점 "주의" 판정은 그 보호자가 "주의 단계도 받기"를 켰을 때만 (FR-028)
  */
-private fun eligibleLinks(protectedId: String, body: AlertCreate): List<Pair<String, String>> {
-    val cautionOnly = body.symptom == null && body.verdict?.level == RiskLevel.CAUTION
+private fun eligibleLinks(protectedId: String, body: AlertCreate, existingSymptom: SymptomEvidence?): List<Pair<String, String>> {
+    // 열린 요청에 이미 증상 근거가 있으면 "주의"만 다시 와도 주의 단계 설정과 상관없이 모두 받는다
+    val cautionOnly = body.symptom == null && existingSymptom == null && body.verdict?.level == RiskLevel.CAUTION
     return Links.join(Devices, JoinType.INNER, Links.guardianDeviceId, Devices.deviceId)
         .select(Links.linkId, Links.guardianDeviceId, Devices.notifyCaution)
         .where { (Links.protectedDeviceId eq protectedId) and (Links.status eq LinkStatus.ACTIVE.db) }
@@ -371,12 +372,14 @@ fun Route.alertRoutes(deps: Deps) {
                 val activeCount = Links.selectAll()
                     .where { (Links.protectedDeviceId eq myId) and (Links.status eq LinkStatus.ACTIVE.db) }.count()
                 if (activeCount == 0L) throw ApiProblem(HttpStatusCode.Conflict, "no-active-link", "연결된 보호자 없음")
-                val eligible = eligibleLinks(myId, body)
+                // 응답(decision)과 같은 행에서 하나씩: 응답이 먼저 커밋됐으면 open이 아니어서 새 요청을 만든다
                 val open = Alerts.selectAll().where {
                     (Alerts.protectedDeviceId eq myId) and (Alerts.packageName eq body.app.packageName) and
                         (Alerts.signingCertSha256 eq body.app.signingCertSha256) and (Alerts.versionCode eq body.app.versionCode) and
                         (Alerts.status eq AlertStatus.OPEN.db)
-                }.singleOrNull()
+                }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
+                // 받는 연결 읽기: 연결 해제도 시니어 기기 행을 먼저 잠그므로(Pairing.kt) 여기서 읽은 active 연결은 커밋까지 그대로다
+                val eligible = eligibleLinks(myId, body, open?.get(Alerts.symptom))
 
                 if (open == null) {
                     if (eligible.isEmpty()) {
@@ -407,7 +410,7 @@ fun Route.alertRoutes(deps: Deps) {
                         this[AlertLinks.linkId] = linkId
                     }
                     val view = alertView(alertId)
-                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> alertPush(view, g) })
+                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> alertPush(view, g) }, alertId)
                 }
 
                 // 열린 요청에 합치기: 없던 근거는 붙이고, 증상 근거는 더 최신일 때만 바꾼다. verdict·source·kind는 처음 값
@@ -439,7 +442,7 @@ fun Route.alertRoutes(deps: Deps) {
                     } else {
                         emptyList()
                     }
-                reply(HttpStatusCode.OK, view, pushes)
+                reply(HttpStatusCode.OK, view, pushes, alertId)
             }
         }
 
@@ -514,7 +517,7 @@ fun Route.alertRoutes(deps: Deps) {
                     row.decisionOf()?.let { existing ->
                         // 같은 보호자가 같은 응답을 다시 보냄 (응답 유실 뒤 새 키로 재전송) → 그대로 200, 푸시 없음
                         if (existing.decidedBy.deviceId == myId && existing.decision == body.decision) {
-                            return@idempotent reply(HttpStatusCode.OK, alertViews(listOf(row)).single())
+                            return@idempotent reply(HttpStatusCode.OK, alertViews(listOf(row)).single(), alertId = alertId)
                         }
                         throw ApiProblem(
                             HttpStatusCode.Conflict, "already-decided", "이미 다른 응답이 있음",
@@ -547,7 +550,7 @@ fun Route.alertRoutes(deps: Deps) {
                     )
                     val others = activeRecipients(alertId).filter { it.second != myId }
                         .map { (_, g) -> PushType.ALERT_UPDATED.to(fcmToken(g), "alertId" to alertId) }
-                    reply(HttpStatusCode.OK, view, listOf(senior) + others)
+                    reply(HttpStatusCode.OK, view, listOf(senior) + others, alertId)
                 }
             }
 
@@ -563,7 +566,7 @@ fun Route.alertRoutes(deps: Deps) {
                     when (AlertStatus.of(row[Alerts.status])!!) {
                         AlertStatus.RESOLVED -> {
                             // 같은 결과 재전송 → 200, 푸시 없음
-                            if (row[Alerts.outcome] == body.outcome.db) return@idempotent reply(HttpStatusCode.OK, alertViews(listOf(row)).single())
+                            if (row[Alerts.outcome] == body.outcome.db) return@idempotent reply(HttpStatusCode.OK, alertViews(listOf(row)).single(), alertId = alertId)
                             throw closed
                         }
                         AlertStatus.EXPIRED -> throw closed
@@ -591,7 +594,7 @@ fun Route.alertRoutes(deps: Deps) {
                             "appLabel" to view.app.appLabel,
                         )
                     }
-                    reply(HttpStatusCode.OK, view, pushes)
+                    reply(HttpStatusCode.OK, view, pushes, alertId)
                 }
             }
         }
