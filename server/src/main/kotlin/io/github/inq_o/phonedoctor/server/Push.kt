@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.server
 import com.google.firebase.FirebaseApp
 import com.google.firebase.messaging.AndroidConfig
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.FirebaseMessagingException
 import com.google.firebase.messaging.Message
 import java.time.Duration
 
@@ -50,6 +51,9 @@ fun Deps.sendAll(pushes: List<Push>) {
     for (p in pushes) {
         try {
             pusher.send(p)
+        } catch (e: FirebaseMessagingException) {
+            // UNREGISTERED(앱 삭제·토큰 만료) 같은 영구 오류와 일시 오류를 로그로 가르려고 오류 코드를 남긴다
+            pushLog.warn("푸시 전송 실패 type={} code={}", p.data["type"], e.messagingErrorCode, e)
         } catch (e: Exception) {
             pushLog.warn("푸시 전송 실패 type={}", p.data["type"], e)
         }

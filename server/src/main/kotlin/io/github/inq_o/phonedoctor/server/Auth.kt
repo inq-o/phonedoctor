@@ -90,6 +90,9 @@ fun firebaseApp(config: Config): FirebaseApp = FirebaseApp.initializeApp(
     FirebaseOptions.builder()
         .setCredentials(GoogleCredentials.getApplicationDefault())
         .setProjectId(config.firebaseProjectId)
+        // 기본값은 제한 없음(0). FCM이 멈추면 커밋은 끝났는데 응답이 안 나가므로 끊고 실패로 처리 (Push.kt sendAll)
+        .setConnectTimeout(3_000)
+        .setReadTimeout(5_000)
         .build(),
 )
 

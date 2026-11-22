@@ -179,7 +179,9 @@ fun Route.deviceRoutes(deps: Deps) {
                 val id = call.parameters["deviceId"]!!
                 val pushes = withContext(Dispatchers.IO) {
                     transaction(deps.db) {
-                        val row = Devices.selectAll().where { Devices.deviceId eq id }.singleOrNull() ?: return@transaction emptyList()
+                        // 같은 기기 삭제가 동시에 와도 LINK_REVOKED가 한 번만 가게 행을 잠근다. 뒤 요청은 행이 없어 빈 목록
+                        val row = Devices.selectAll().where { Devices.deviceId eq id }
+                            .forUpdate(ForUpdateOption.ForUpdate).singleOrNull() ?: return@transaction emptyList()
                         if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
                         revokedPushesOnDelete(id).also { Devices.deleteWhere { Devices.deviceId eq id } }
                     }

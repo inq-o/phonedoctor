@@ -395,6 +395,20 @@ class PairingRaceTest {
     }
 
     @Test
+    fun `같은 기기를 동시에 지워도 LINK_REVOKED는 한 번`() = serverTest {
+        repeat(3) { round ->
+            TestDb.reset()
+            FakePusher.sent.clear()
+            val seniorId = device(SENIOR, "protected")
+            device(GUARDIAN, "guardian")
+            linked()
+            val statuses = coroutineScope { List(4) { async { client.api(Delete, "/devices/$seniorId", SENIOR).status } }.awaitAll() }
+            assertEquals(List(4) { HttpStatusCode.NoContent }, statuses, "round $round")
+            assertEquals(1, FakePusher.types().count { it == "LINK_REVOKED" }, "round $round")
+        }
+    }
+
+    @Test
     fun `동시에 몰아 넣어도 분당 5회`() = serverTest {
         device(SENIOR, "protected")
         device(GUARDIAN, "guardian")
