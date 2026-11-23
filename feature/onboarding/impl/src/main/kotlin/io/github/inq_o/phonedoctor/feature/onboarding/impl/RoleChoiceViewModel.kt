@@ -31,8 +31,13 @@ class RoleChoiceViewModel @Inject constructor(private val settings: UserSettings
         }
     }
 
-    /** 다음 화면에서 뒤로 돌아오면 다시 고를 수 있다 */
+    /** 다음 화면으로 넘겼음. 넘어가는 동안 다시 눌러도 저장하지 않는다 */
     fun consumeChosen() {
+        state.value = null
+    }
+
+    /** 화면이 (다시) 보임: 뒤로 돌아오면 다시 고를 수 있다. 화면이 사라진 뒤 끝난 저장의 결과는 버린다 */
+    fun onShown() {
         state.value = null
         saving = false
     }

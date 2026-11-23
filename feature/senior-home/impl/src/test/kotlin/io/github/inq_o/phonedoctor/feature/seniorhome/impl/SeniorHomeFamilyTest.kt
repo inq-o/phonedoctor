@@ -136,7 +136,6 @@ class SeniorHomeFamilyTest {
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
         override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
         override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
-        override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
         override fun cancelLink(linkId: String) = Unit
     }
 }

@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.feature.guardian.impl
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,17 +27,19 @@ import kotlinx.coroutines.launch
 
 /**
  * @param onSignedIn 로그인과 알림 권한 묻기를 마침
- * @param onBack 역할 선택으로 돌아가기
+ * @param onBack 역할 선택(또는 홈)으로 돌아가기. 돌아갈 곳이 없으면 null
  */
 @Composable
 fun GuardianSignInScreen(
     onSignedIn: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
     viewModel: GuardianSignInViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // 로그인하는 동안 뒤로 가면 화면은 닫혀도 Firebase 로그인은 끝나, 알림 권한·코드 입력을 건너뛴 채 보호자가 된다
+    BackHandler(enabled = state.busy) {}
     val scope = rememberCoroutineScope()
     // 허용하든 거부하든 넘어간다. 꺼져 있으면 홈에서 다시 안내한다
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { onSignedIn() }
@@ -75,14 +78,14 @@ fun GuardianSignInScreen(
 internal fun GuardianSignInScreen(
     state: SignInUiState,
     onSignIn: () -> Unit,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     modifier: Modifier = Modifier,
 ) {
     GuardianScreen(
         title = stringResource(R.string.feature_guardian_impl_sign_in_title),
         modifier = modifier,
         actions = {
-            GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack, enabled = !state.busy)
+            if (onBack != null) GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack, enabled = !state.busy)
             GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_sign_in), onSignIn, enabled = !state.busy)
         },
     ) {

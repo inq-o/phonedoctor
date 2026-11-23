@@ -29,6 +29,8 @@ fun RoleChoiceScreen(
     viewModel: RoleChoiceViewModel = hiltViewModel(),
 ) {
     val chosen by viewModel.chosen.collectAsStateWithLifecycle()
+    // 다른 화면에 가려지면 이 화면은 그리지 않으므로, 돌아오면 다시 불린다
+    LaunchedEffect(Unit) { viewModel.onShown() }
     LaunchedEffect(chosen) {
         chosen?.let {
             viewModel.consumeChosen()

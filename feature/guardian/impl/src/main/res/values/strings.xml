@@ -10,6 +10,7 @@
     <string name="feature_guardian_impl_error_network">인터넷에 연결되지 않았어요. 와이파이나 모바일 데이터를 확인하고 다시 해 주세요.</string>
     <string name="feature_guardian_impl_error_busy">지금 서버가 바빠요. 잠시 뒤에 다시 해 주세요.</string>
     <string name="feature_guardian_impl_error_role">이 폰은 부모님 폰으로 쓰고 있어요. 가족 폰을 지키려면 앱 데이터를 지우고 처음부터 다시 시작해 주세요.</string>
+    <string name="feature_guardian_impl_error_signed_out">Google 로그인이 풀렸어요. [가족 연결하기]를 누르면 다시 로그인할 수 있어요.</string>
     <string name="feature_guardian_impl_error_unknown">잘 안 됐어요. 잠시 뒤에 다시 해 주세요.</string>
 
     <!-- O-G1 -->
@@ -29,6 +30,7 @@
     <string name="feature_guardian_impl_code_submit">연결 요청 보내기</string>
     <string name="feature_guardian_impl_code_not_found">없는 코드예요. 부모님 폰의 숫자를 다시 확인해 주세요.</string>
     <string name="feature_guardian_impl_code_expired">코드 시간이 지났어요. 부모님 폰에서 새 코드를 받아 주세요.</string>
+    <string name="feature_guardian_impl_code_used">이미 쓴 코드예요. 연결 요청이 벌써 갔을 수 있으니 홈에서 확인하거나, 부모님 폰에서 새 코드를 받아 주세요.</string>
     <string name="feature_guardian_impl_code_already_linked">이미 연결된 부모님 폰이에요.</string>
     <string name="feature_guardian_impl_code_limit">부모님 폰에 연결된 가족이 이미 3명이에요. 부모님 폰에서 다른 가족과 연결을 끊어야 연결할 수 있어요.</string>
     <string name="feature_guardian_impl_code_too_many">코드를 여러 번 넣어서 잠시 막혔어요. 1분쯤 뒤에 다시 넣어 주세요.</string>

@@ -32,3 +32,10 @@ class DefaultUserSettingsRepository @Inject constructor(
 
     override suspend fun chooseRole(role: DeviceRole) = preferences.setChosenRole(role.name)
 }
+
+/**
+ * 이 폰이 보호자 폰인지. 서버에 등록한 역할이 있으면 그것이 우선이다 (등록한 역할은 모든 데이터 지우기 전에는 바뀌지 않음).
+ * 가족 연결이 꺼진 빌드는 보호자 화면을 쓸 수 없으므로 언제나 시니어 폰. 시작 화면과 주기 검사가 같은 기준을 쓴다
+ */
+fun isGuardianPhone(chosenRole: DeviceRole?, registeredRole: DeviceRole?, familyAvailable: Boolean): Boolean =
+    familyAvailable && (registeredRole ?: chosenRole) == DeviceRole.GUARDIAN

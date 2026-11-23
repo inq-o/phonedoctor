@@ -79,7 +79,11 @@ class LinkWaitingViewModel @AssistedInject constructor(
                 notifier.cancelLink(linkId)
                 LinkWaitingUiState.Connected(name)
             }
-            LinkStatus.REVOKED, null -> LinkWaitingUiState.Declined(name)
+            LinkStatus.REVOKED, null -> {
+                // 거절도 LINK_REVOKED 알림으로 온다. 화면으로 보고 있으니 지운다
+                notifier.cancelLink(linkId)
+                LinkWaitingUiState.Declined(name)
+            }
         }
     }
 

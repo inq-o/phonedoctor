@@ -15,17 +15,27 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import java.io.IOException
 
 /** 화면이 안내할 실패 종류 (목록·연결 끊기) */
-enum class GuardianError { NETWORK, BUSY, WRONG_ROLE, UNKNOWN }
+enum class GuardianError { NETWORK, BUSY, WRONG_ROLE, SIGNED_OUT, UNKNOWN }
 
 internal fun Throwable.toGuardianError(): GuardianError = when (this) {
+    // Firebase 사용자가 없음 (등록한 뒤 사용자가 지워지거나 막힘). IOException이라 먼저 본다
+    is NotSignedInException -> GuardianError.SIGNED_OUT
     is IOException -> GuardianError.NETWORK
-    is ApiException -> if (status == 429 || status >= 500) GuardianError.BUSY else GuardianError.UNKNOWN
+    is ApiException -> when {
+        status == 429 || status >= 500 -> GuardianError.BUSY
+        isRoleMismatch() -> GuardianError.WRONG_ROLE
+        else -> GuardianError.UNKNOWN
+    }
     is RoleMismatchException -> GuardianError.WRONG_ROLE
     else -> GuardianError.UNKNOWN
 }
+
+/** 이 Firebase 사용자가 서버에 다른 역할로 등록돼 있음 (POST /devices 409) */
+internal fun ApiException.isRoleMismatch() = status == 409 && slug == "role-mismatch"
 
 @Composable
 internal fun GuardianError.message(): String = stringResource(
@@ -33,6 +43,7 @@ internal fun GuardianError.message(): String = stringResource(
         GuardianError.NETWORK -> R.string.feature_guardian_impl_error_network
         GuardianError.BUSY -> R.string.feature_guardian_impl_error_busy
         GuardianError.WRONG_ROLE -> R.string.feature_guardian_impl_error_role
+        GuardianError.SIGNED_OUT -> R.string.feature_guardian_impl_error_signed_out
         GuardianError.UNKNOWN -> R.string.feature_guardian_impl_error_unknown
     },
 )

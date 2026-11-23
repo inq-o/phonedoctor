@@ -17,4 +17,12 @@
     <uses-permission
         android:name="com.google.android.providers.gsf.permission.READ_GSERVICES"
         tools:node="remove" />
+
+    <application>
+        <!-- QR 읽기(ML Kit 코드 스캐너)가 앱이 뜰 때마다 도는 초기화. 출시 빌드는 보호자 화면에 갈 수 없어 뺀다 -->
+        <provider
+            android:name="com.google.mlkit.common.internal.MlKitInitProvider"
+            android:authorities="${applicationId}.mlkitinitprovider"
+            tools:node="remove" />
+    </application>
 </manifest>

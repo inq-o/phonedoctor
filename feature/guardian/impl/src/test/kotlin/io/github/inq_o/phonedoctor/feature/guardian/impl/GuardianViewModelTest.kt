@@ -1,12 +1,14 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.lifecycle.SavedStateHandle
 import androidx.credentials.exceptions.NoCredentialException
 import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.GuardianSignInRequiredException
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
+import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -84,7 +86,7 @@ class GuardianViewModelTest {
 
     @Test
     fun codeKeepsSixDigitsOnly() {
-        val vm = EnterCodeViewModel(family)
+        val vm = EnterCodeViewModel(SavedStateHandle(), family)
         vm.onCodeChange("48 2-91a3 77")
         assertEquals("482913", vm.uiState.value.code)
         assertTrue(vm.uiState.value.canSubmit)
@@ -96,7 +98,7 @@ class GuardianViewModelTest {
 
     @Test
     fun submitSendsOnceAndOpensWaiting() = runTest(main.dispatcher) {
-        val vm = EnterCodeViewModel(family)
+        val vm = EnterCodeViewModel(SavedStateHandle(), family)
         val gate = CompletableDeferred<Unit>().also { family.gate["accept"] = it }
         vm.onCodeChange("482913")
         vm.submit()
@@ -118,15 +120,17 @@ class GuardianViewModelTest {
         val cases = listOf(
             apiError(404, "pairing-code-not-found") to CodeError.NOT_FOUND,
             apiError(410, "pairing-code-expired") to CodeError.EXPIRED,
-            apiError(410, "pairing-code-used") to CodeError.EXPIRED,
+            apiError(410, "pairing-code-used") to CodeError.USED,
             apiError(409, "already-linked") to CodeError.ALREADY_LINKED,
             apiError(409, "guardian-limit") to CodeError.LIMIT,
             apiError(429, "too-many-attempts", retryAfter = 42) to CodeError.TOO_MANY,
             apiError(503) to CodeError.BUSY,
             IOException("offline") to CodeError.NETWORK,
             RoleMismatchException(DeviceRole.SENIOR) to CodeError.WRONG_ROLE,
+            // 등록(POST /devices)에서 서버가 다른 역할로 등록된 사용자라고 답함
+            apiError(409, "role-mismatch") to CodeError.WRONG_ROLE,
         )
-        val vm = EnterCodeViewModel(family)
+        val vm = EnterCodeViewModel(SavedStateHandle(), family)
         for ((error, expected) in cases) {
             family.fail["accept"] = error
             vm.onCodeChange("482913")
@@ -149,20 +153,39 @@ class GuardianViewModelTest {
 
     @Test
     fun signedOutGuardianGoesBackToSignIn() = runTest(main.dispatcher) {
-        val vm = EnterCodeViewModel(family)
-        family.fail["accept"] = GuardianSignInRequiredException()
+        // 등록 전(Google 로그인 없음)과 등록 뒤(Firebase 사용자가 없어짐) 모두
+        for (error in listOf(GuardianSignInRequiredException(), NotSignedInException())) {
+            val vm = EnterCodeViewModel(SavedStateHandle(), family)
+            family.fail["accept"] = error
+            vm.onCodeChange("482913")
+            vm.submit()
+            advanceUntilIdle()
+            assertTrue(vm.uiState.value.signInRequired)
+            assertNull(vm.uiState.value.error)
+            vm.consumeSignInRequired()
+            assertFalse(vm.uiState.value.signInRequired)
+        }
+        assertEquals(GuardianError.SIGNED_OUT, NotSignedInException().toGuardianError())
+        assertEquals(GuardianError.WRONG_ROLE, apiError(409, "role-mismatch").toGuardianError())
+    }
+
+    @Test
+    fun typedCodeSurvivesProcessRestore() = runTest(main.dispatcher) {
+        val saved = SavedStateHandle()
+        EnterCodeViewModel(saved, family).onCodeChange("4829")
+        assertEquals("4829", EnterCodeViewModel(saved, family).uiState.value.code)
+
+        val vm = EnterCodeViewModel(saved, family)
         vm.onCodeChange("482913")
         vm.submit()
         advanceUntilIdle()
-        assertTrue(vm.uiState.value.signInRequired)
-        assertNull(vm.uiState.value.error)
-        vm.consumeSignInRequired()
-        assertFalse(vm.uiState.value.signInRequired)
+        // 보낸 코드는 남기지 않는다
+        assertEquals("", EnterCodeViewModel(saved, family).uiState.value.code)
     }
 
     @Test
     fun scannedPairingQrIsSentRightAway() = runTest(main.dispatcher) {
-        val vm = EnterCodeViewModel(family)
+        val vm = EnterCodeViewModel(SavedStateHandle(), family)
         vm.onScanned("https://example.com/?c=482913")
         assertEquals(CodeError.NOT_PAIRING_QR, vm.uiState.value.error)
         vm.onScanned(null)
@@ -230,7 +253,7 @@ class GuardianViewModelTest {
         missing.startWatching()
         runCurrent()
         assertEquals(LinkWaitingUiState.Declined("아빠"), missing.uiState.value)
-        assertTrue(notifier.cancelled.isEmpty())
+        assertEquals(listOf("l1", "gone"), notifier.cancelled)
     }
 
     @Test
@@ -267,12 +290,14 @@ class GuardianViewModelTest {
     }
 
     @Test
-    fun contactLostUsesActivationWhenNoReportYet() {
-        val activated = now.minus(Duration.ofHours(49))
-        assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = activated).isContactLost(now))
-        assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = now.minus(Duration.ofHours(1))).isContactLost(now))
-        assertFalse(link("p", LinkStatus.PENDING, activatedAt = activated).isContactLost(now))
-        assertFalse(link("x", LinkStatus.ACTIVE).isContactLost(now))
+    fun contactLostNeedsAReportAndCountsFromTheLaterOfReportAndLink() {
+        val old = now.minus(Duration.ofHours(49))
+        // 보고가 없는 연결은 경고하지 않는다 (시니어 보고 T055a 전)
+        assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = old).isContactLost(now))
+        assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = old, lastCheckedAt = old).isContactLost(now))
+        // 보고가 오래돼도 방금 연결했으면 연결 시각부터 센다
+        assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = now.minus(Duration.ofHours(1)), lastCheckedAt = old).isContactLost(now))
+        assertFalse(link("p", LinkStatus.PENDING, activatedAt = old, lastCheckedAt = old).isContactLost(now))
     }
 
     @Test

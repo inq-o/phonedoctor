@@ -33,9 +33,6 @@ interface Notifier {
     /** (보호자) 시니어가 연결을 받아들임 (푸시 LINK_ACTIVATED). 탭하면 보호자 홈(G1)이 열린다 */
     fun notifyLinkActivated(linkId: String, seniorName: String?)
 
-    /** (보호자) 시니어 폰의 검사 보고가 이틀째 없음 (푸시 CONTACT_LOST, ux-flows F6). 탭하면 보호자 홈(G1)이 열린다 */
-    fun notifyContactLost(linkId: String, seniorName: String?)
-
     /**
      * 상대가 연결을 끊음 (푸시 LINK_REVOKED). 탭하면 연결 목록(시니어 S5, 보호자 G1)이 열린다.
      * 보호자가 끊었으면 [guardianName], 시니어가 끊었으면 [seniorName]. 기기 삭제로 끊겼으면 둘 다 null일 수 있다
@@ -112,19 +109,6 @@ class SystemNotifier @Inject constructor(
         )
     }
 
-    override fun notifyContactLost(linkId: String, seniorName: String?) {
-        val launch = launchIntent() ?: return
-        launch.putExtra(EXTRA_OPEN_FAMILY, true)
-        launch.data = notificationUri("contact-lost", linkId)
-        val name = seniorNameOrFallback(seniorName)
-        notifyLink(
-            linkId,
-            context.getString(R.string.core_notifications_contact_lost_title, name),
-            context.getString(R.string.core_notifications_contact_lost_text, name),
-            launch,
-        )
-    }
-
     override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
@@ -133,11 +117,13 @@ class SystemNotifier @Inject constructor(
         val senior = seniorName?.trim()?.ifEmpty { null }
         val text = when {
             guardian != null -> context.getString(R.string.core_notifications_link_revoked_text, guardian)
-            // 시니어 이름 뒤에는 "님"을 붙이지 않는다 (기본 이름이 "부모님")
+            // 시니어 이름 뒤에는 "님"을 붙이지 않는다 (기본 이름이 "부모님").
+            // 시니어의 [안 할래요](요청 거절)도 같은 푸시라 "끊겼어요" 대신 지금 상태를 말한다
             senior != null -> context.getString(R.string.core_notifications_link_revoked_by_senior_text, senior)
             else -> context.getString(R.string.core_notifications_link_revoked_unknown_text)
         }
-        notifyLink(linkId, context.getString(R.string.core_notifications_link_revoked_title), text, launch)
+        val title = if (guardian == null && senior != null) R.string.core_notifications_link_revoked_by_senior_title else R.string.core_notifications_link_revoked_title
+        notifyLink(linkId, context.getString(title), text, launch)
     }
 
     override fun cancelLink(linkId: String) {

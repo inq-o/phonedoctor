@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -8,6 +9,7 @@ import io.github.inq_o.phonedoctor.core.data.GuardianSignInRequiredException
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -20,7 +22,7 @@ import java.net.URISyntaxException
 import javax.inject.Inject
 
 /** 코드 입력이 실패한 까닭 (openapi acceptPairingCode) */
-enum class CodeError { NOT_FOUND, EXPIRED, ALREADY_LINKED, LIMIT, TOO_MANY, NOT_PAIRING_QR, SCAN_FAILED, NETWORK, BUSY, WRONG_ROLE, UNKNOWN }
+enum class CodeError { NOT_FOUND, EXPIRED, USED, ALREADY_LINKED, LIMIT, TOO_MANY, NOT_PAIRING_QR, SCAN_FAILED, NETWORK, BUSY, WRONG_ROLE, UNKNOWN }
 
 data class EnterCodeUiState(
     val code: String = "",
@@ -37,17 +39,28 @@ data class EnterCodeUiState(
 }
 
 internal const val CODE_LENGTH = 6
+private const val KEY_CODE = "code"
 
 /** O-G2. 시니어 폰의 숫자 6자리를 넣거나 QR을 읽어 연결을 요청한다 */
 @HiltViewModel
-class EnterCodeViewModel @Inject constructor(private val family: FamilyRepository) : ViewModel() {
-    private val state = MutableStateFlow(EnterCodeUiState())
+class EnterCodeViewModel @Inject constructor(
+    private val saved: SavedStateHandle,
+    private val family: FamilyRepository,
+) : ViewModel() {
+    // 넣던 숫자는 앱이 뒤에서 정리된 뒤 돌아와도 남긴다 (보내는 중 상태는 남기지 않는다: 다시 누르면 같은 키로 보냄)
+    private val state = MutableStateFlow(EnterCodeUiState(code = saved[KEY_CODE] ?: ""))
     val uiState: StateFlow<EnterCodeUiState> = state.asStateFlow()
 
     /** 숫자만, 6자리까지 (붙여 넣은 "482 913"도 받는다) */
     fun onCodeChange(input: String) {
         if (state.value.busy) return
-        state.update { it.copy(code = input.filter { c -> c in '0'..'9' }.take(CODE_LENGTH), error = null, retryAfterSeconds = null) }
+        setCode(input.filter { c -> c in '0'..'9' }.take(CODE_LENGTH))
+        state.update { it.copy(error = null, retryAfterSeconds = null) }
+    }
+
+    private fun setCode(code: String) {
+        saved[KEY_CODE] = code
+        state.update { it.copy(code = code) }
     }
 
     fun submit() {
@@ -57,10 +70,14 @@ class EnterCodeViewModel @Inject constructor(private val family: FamilyRepositor
         viewModelScope.launch {
             try {
                 val link = family.acceptPairingCode(s.code)
-                state.update { it.copy(busy = false, code = "", requested = link) }
+                setCode("")
+                state.update { it.copy(busy = false, requested = link) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: GuardianSignInRequiredException) {
+                state.update { it.copy(busy = false, signInRequired = true) }
+            } catch (e: NotSignedInException) {
+                // 등록한 뒤 Firebase 사용자가 없어짐. 다시 로그인하면 같은 기기로 이어진다
                 state.update { it.copy(busy = false, signInRequired = true) }
             } catch (e: Exception) {
                 state.update {
@@ -78,7 +95,8 @@ class EnterCodeViewModel @Inject constructor(private val family: FamilyRepositor
             state.update { it.copy(error = CodeError.NOT_PAIRING_QR, retryAfterSeconds = null) }
             return
         }
-        state.update { it.copy(code = code, error = null, retryAfterSeconds = null) }
+        setCode(code)
+        state.update { it.copy(error = null, retryAfterSeconds = null) }
         submit()
     }
 
@@ -99,9 +117,11 @@ class EnterCodeViewModel @Inject constructor(private val family: FamilyRepositor
 internal fun Throwable.toCodeError(): CodeError = when (this) {
     is ApiException -> when {
         status == 404 -> CodeError.NOT_FOUND
+        status == 410 && slug == "pairing-code-used" -> CodeError.USED
         status == 410 -> CodeError.EXPIRED
         status == 409 && slug == "already-linked" -> CodeError.ALREADY_LINKED
         status == 409 && slug == "guardian-limit" -> CodeError.LIMIT
+        isRoleMismatch() -> CodeError.WRONG_ROLE
         status == 429 -> CodeError.TOO_MANY
         status >= 500 -> CodeError.BUSY
         else -> CodeError.UNKNOWN

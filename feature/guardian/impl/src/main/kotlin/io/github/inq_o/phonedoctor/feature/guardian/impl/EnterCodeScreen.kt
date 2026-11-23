@@ -91,7 +91,7 @@ internal fun EnterCodeScreen(
         title = stringResource(R.string.feature_guardian_impl_code_title),
         modifier = modifier,
         actions = {
-            if (state.error == CodeError.ALREADY_LINKED) {
+            if (state.error == CodeError.ALREADY_LINKED || state.error == CodeError.USED) {
                 GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_home), onHome)
             } else {
                 GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_code_scan), onScan, enabled = !state.busy)
@@ -123,6 +123,7 @@ internal fun EnterCodeScreen(
 private fun CodeError.message(retryAfterSeconds: Long?): String = when (this) {
     CodeError.NOT_FOUND -> stringResource(R.string.feature_guardian_impl_code_not_found)
     CodeError.EXPIRED -> stringResource(R.string.feature_guardian_impl_code_expired)
+    CodeError.USED -> stringResource(R.string.feature_guardian_impl_code_used)
     CodeError.ALREADY_LINKED -> stringResource(R.string.feature_guardian_impl_code_already_linked)
     CodeError.LIMIT -> stringResource(R.string.feature_guardian_impl_code_limit)
     CodeError.TOO_MANY -> if (retryAfterSeconds != null) {

@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.ScanScheduler
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
+import io.github.inq_o.phonedoctor.core.data.isGuardianPhone
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -36,23 +37,34 @@ enum class StartScreen {
     ROLE_CHOICE,
     SENIOR_ONBOARDING,
     SENIOR_HOME,
+
+    /** 보호자를 골랐고 아직 서버에 등록하기 전. 역할 선택으로 돌아갈 수 있다 */
     GUARDIAN_SIGN_IN,
+
+    /** 보호자로 등록했는데 로그인이 풀림. 역할은 모든 데이터 지우기 전에는 바꿀 수 없어 역할 선택으로 돌아가지 않는다 */
+    GUARDIAN_SIGN_IN_AGAIN,
     GUARDIAN_HOME,
 }
 
 /**
  * 역할 선택이 없는 빌드(출시: 가족 연결 꺼짐)와 역할 선택이 생기기 전에 설정을 끝낸 기기는 시니어.
- * 보호자를 골랐어도 가족 연결이 꺼진 빌드면 시니어 첫 설정부터 (보호자 화면은 서버 없이 쓸 수 없다)
+ * 보호자를 골랐어도 가족 연결이 꺼진 빌드면 시니어 첫 설정부터 (보호자 화면은 서버 없이 쓸 수 없다).
+ * 서버에 등록한 역할이 있으면 고른 역할보다 우선한다 ([isGuardianPhone])
  */
 internal fun startScreen(
     onboardingDone: Boolean,
     chosenRole: DeviceRole?,
+    registeredRole: DeviceRole?,
     familyAvailable: Boolean,
     guardianSignedIn: Boolean,
 ): StartScreen = when {
-    chosenRole == DeviceRole.GUARDIAN && familyAvailable -> if (guardianSignedIn) StartScreen.GUARDIAN_HOME else StartScreen.GUARDIAN_SIGN_IN
+    isGuardianPhone(chosenRole, registeredRole, familyAvailable) -> when {
+        guardianSignedIn -> StartScreen.GUARDIAN_HOME
+        registeredRole == DeviceRole.GUARDIAN -> StartScreen.GUARDIAN_SIGN_IN_AGAIN
+        else -> StartScreen.GUARDIAN_SIGN_IN
+    }
     onboardingDone -> StartScreen.SENIOR_HOME
-    chosenRole == null && familyAvailable -> StartScreen.ROLE_CHOICE
+    chosenRole == null && registeredRole == null && familyAvailable -> StartScreen.ROLE_CHOICE
     else -> StartScreen.SENIOR_ONBOARDING
 }
 
@@ -63,8 +75,8 @@ class MainViewModel @Inject constructor(
     private val family: FamilyRepository,
 ) : ViewModel() {
     /** 설정을 읽기 전에는 null */
-    val start: StateFlow<StartScreen?> = combine(settings.onboardingDone, settings.chosenRole) { done, role ->
-        startScreen(done, role, family.available, family.isGuardianSignedIn)
+    val start: StateFlow<StartScreen?> = combine(settings.onboardingDone, settings.chosenRole, family.role) { done, chosen, registered ->
+        startScreen(done, chosen, registered, family.available, family.isGuardianSignedIn)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     /** 가족 연결을 쓸 수 있는 빌드인지 (역할 선택으로 돌아갈 수 있는지) */

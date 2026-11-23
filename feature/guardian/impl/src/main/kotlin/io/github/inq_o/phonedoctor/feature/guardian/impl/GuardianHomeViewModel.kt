@@ -111,11 +111,16 @@ class GuardianHomeViewModel @Inject constructor(private val family: FamilyReposi
     }
 }
 
-/** 서버의 CONTACT_LOST 판정과 같은 기준: 마지막 검사 보고(없으면 연결 확정 시각)에서 48시간 */
+/** 서버의 CONTACT_LOST 판정(Jobs.kt)과 같은 기준: max(마지막 검사 보고, 연결 확정)에서 48시간 */
 internal val CONTACT_LOST_AFTER: Duration = Duration.ofHours(48)
 
+/**
+ * 검사 보고를 한 번도 받지 않은 연결은 경고하지 않는다: 시니어 폰의 6시간 보고(T055a)가 아직 없어,
+ * 서버처럼 연결 확정 시각으로 재면 모든 연결이 이틀 뒤 "연락 없음"이 된다
+ */
 internal fun FamilyLink.isContactLost(now: Instant): Boolean {
     if (status != LinkStatus.ACTIVE) return false
-    val last = lastCheckedAt ?: activatedAt ?: return false
-    return Duration.between(last, now) >= CONTACT_LOST_AFTER
+    val checked = lastCheckedAt ?: return false
+    val since = listOfNotNull(checked, activatedAt).max()
+    return Duration.between(since, now) >= CONTACT_LOST_AFTER
 }

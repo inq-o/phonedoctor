@@ -76,6 +76,13 @@ class OnboardingViewModelTest {
         assertEquals(listOf(DeviceRole.GUARDIAN), settings.roles)
 
         vm.consumeChosen()
+        // 넘어가는 동안 다시 누른 것은 저장하지 않는다
+        vm.choose(DeviceRole.SENIOR)
+        advanceUntilIdle()
+        assertEquals(null, vm.chosen.value)
+        assertEquals(listOf(DeviceRole.GUARDIAN), settings.roles)
+
+        vm.onShown()
         vm.choose(DeviceRole.SENIOR)
         advanceUntilIdle()
         assertEquals(DeviceRole.SENIOR, vm.chosen.value)
@@ -115,7 +122,6 @@ class OnboardingViewModelTest {
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
         override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
         override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
-        override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
         override fun cancelLink(linkId: String) = Unit
     }
 

@@ -13,7 +13,8 @@ import io.github.inq_o.phonedoctor.feature.guardian.impl.LinkWaitingScreen
 
 /**
  * @param onSignedIn O-G1을 마침 → 홈 위에 코드 입력
- * @param onSignInBack O-G1에서 역할 선택으로 돌아가기
+ * @param canLeaveSignIn O-G1에 [돌아가기]를 보일지 (밑에 화면이 있을 때만)
+ * @param onSignInBack O-G1 [돌아가기]
  * @param onAddFamily G1 [가족 연결하기] → O-G2
  * @param onRequested O-G2에서 연결 요청을 보냄 → O-G3 (코드 입력은 닫는다)
  * @param onSignInRequired O-G2에서 로그인이 풀린 것을 알게 됨 → O-G1
@@ -22,6 +23,7 @@ import io.github.inq_o.phonedoctor.feature.guardian.impl.LinkWaitingScreen
  */
 fun EntryProviderScope<NavKey>.guardianEntries(
     onSignedIn: () -> Unit,
+    canLeaveSignIn: () -> Boolean,
     onSignInBack: () -> Unit,
     onAddFamily: () -> Unit,
     onRequested: (linkId: String, seniorName: String) -> Unit,
@@ -30,7 +32,7 @@ fun EntryProviderScope<NavKey>.guardianEntries(
     onRetry: () -> Unit,
 ) {
     entry<GuardianSignInNavKey> {
-        GuardianSignInScreen(onSignedIn = onSignedIn, onBack = onSignInBack)
+        GuardianSignInScreen(onSignedIn = onSignedIn, onBack = onSignInBack.takeIf { canLeaveSignIn() })
     }
     entry<GuardianHomeNavKey> {
         GuardianHomeScreen(onAddFamily = onAddFamily)
