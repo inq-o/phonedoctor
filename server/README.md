@@ -91,4 +91,4 @@ docker build -t phonedoctor-api:local server/   # Docker Desktop을 켠 뒤
 
 - 요청·연결 코드·오래된 기기는 예약 작업(`Jobs.kt`)이 지운다. 아래는 그 밖의 것
 
-- 보관 기간(24시간)이 지난 Idempotency-Key 기록은 서버가 새 POST를 처리한 뒤 인스턴스마다 1시간에 한 번 지운다. 요청이 없으면 쌓이는 기록도 없음. 정리가 실패해도 POST 응답에는 영향이 없고 다음 POST에서 다시 시도한다
+- 보관 기간(24시간)이 지난 Idempotency-Key 기록은 예약 작업(`/internal/tick`)이 지우고, 서버가 새 POST를 처리한 뒤에도 인스턴스마다 1시간에 한 번 지운다. 정리가 실패해도 POST 응답에는 영향이 없다

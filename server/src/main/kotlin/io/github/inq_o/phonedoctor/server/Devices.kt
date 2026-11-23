@@ -234,6 +234,7 @@ fun deleteDevice(id: String): List<Push> {
     // 지운 기기가 받은 저장 응답도 지운다: 같은 키로 다시 보내도 지워진 데이터가 재전송 응답으로 나가지 않게
     val uid = Devices.select(Devices.firebaseUid).where { Devices.deviceId eq id }.single()[Devices.firebaseUid]
     IdempotencyKeys.deleteWhere { IdempotencyKeys.firebaseUid eq uid }
+    PairingAttempts.deleteWhere { PairingAttempts.firebaseUid eq uid }
     Devices.deleteWhere { Devices.deviceId eq id }
     deleteOrphanAlerts(seniors)
     return pushes
