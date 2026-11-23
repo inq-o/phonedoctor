@@ -5,7 +5,8 @@
     <!-- 시험용(debug 빌드에만 있음): App Check 확인에 필요. 출시 빌드에는 인터넷 권한이 없다 -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <application>
+    <!-- 에뮬레이터에서 맥의 로컬 서버(http://10.0.2.2:8080)를 부를 수 있게 그 주소만 평문 허용 -->
+    <application android:networkSecurityConfig="@xml/network_security_config">
         <!-- 시험용(debug 빌드에만 있음): adb로 검사를 한 번 돌린다. 출시 빌드에는 들어가지 않는다 -->
         <receiver
             android:name=".debug.ScanNowReceiver"

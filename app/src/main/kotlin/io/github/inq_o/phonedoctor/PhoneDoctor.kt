@@ -21,6 +21,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
 import io.github.inq_o.phonedoctor.core.data.ScanScheduler
+import io.github.inq_o.phonedoctor.core.network.FamilyFeature
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -38,5 +39,7 @@ class PhoneDoctor : Application(), Configuration.Provider {
         super.onCreate()
         // 주기 검사는 앱 프로세스가 처음 뜰 때 건다. 한 번도 열지 않은 앱은 작업 할당량이 없어 첫 실행이 필요하다
         scanScheduler.ensurePeriodic()
+        // 가족 연결 서버 요청에 붙일 App Check 공급자. 설치만 하고, 서버 통신은 연결을 시작할 때 처음 한다
+        FamilyFeature.install(this)
     }
 }

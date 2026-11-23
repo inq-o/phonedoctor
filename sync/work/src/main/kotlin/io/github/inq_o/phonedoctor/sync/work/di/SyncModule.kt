@@ -4,7 +4,9 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import io.github.inq_o.phonedoctor.core.data.PushTokenSync
 import io.github.inq_o.phonedoctor.core.data.ScanScheduler
+import io.github.inq_o.phonedoctor.sync.work.WorkManagerPushTokenSync
 import io.github.inq_o.phonedoctor.sync.work.WorkManagerScanScheduler
 
 @Module
@@ -12,4 +14,7 @@ import io.github.inq_o.phonedoctor.sync.work.WorkManagerScanScheduler
 interface SyncModule {
     @Binds
     fun bindsScanScheduler(impl: WorkManagerScanScheduler): ScanScheduler
+
+    @Binds
+    fun bindsPushTokenSync(impl: WorkManagerPushTokenSync): PushTokenSync
 }

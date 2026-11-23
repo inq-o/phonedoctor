@@ -41,6 +41,18 @@
             </intent-filter>
         </activity>
 
+        <!-- 가족 연결 푸시 (push-messages.md). 토큰은 연결을 시작할 때 처음 발급한다(자동 발급 끔) -->
+        <service
+            android:name=".family.FamilyMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+        <meta-data
+            android:name="firebase_messaging_auto_init_enabled"
+            android:value="false" />
+
         <!-- WorkManager는 PhoneDoctor(Configuration.Provider)에서 Hilt 작업 팩토리로 초기화한다 -->
         <provider
             android:name="androidx.startup.InitializationProvider"

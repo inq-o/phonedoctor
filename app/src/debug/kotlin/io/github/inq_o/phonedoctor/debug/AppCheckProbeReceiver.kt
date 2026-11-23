@@ -12,6 +12,8 @@ import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderF
  * 시험용 (debug 빌드 전용). 이 기기가 App Check(Play Integrity, Google Play 밖 배포 설정)를 통과하는지 확인한다.
  * 결과는 logcat `PhoneDoctorAppCheck` 태그로 남긴다. 토큰 값은 남기지 않는다.
  *
+ * 이 프로세스의 App Check 공급자를 Play Integrity로 바꿔 놓는다(디버그 빌드 기본은 Debug 공급자). 확인 뒤 가족 연결을 시험하려면 앱을 다시 띄운다.
+ *
  * 앱을 먼저 화면에 띄운 뒤 보낸다. 오래 안 쓴 앱(대기 버킷 rare 이하)은 백그라운드에서 망이 막혀 UnknownHostException이 난다.
  *
  * adb shell monkey -p io.github.inq_o.phonedoctor -c android.intent.category.LAUNCHER 1
