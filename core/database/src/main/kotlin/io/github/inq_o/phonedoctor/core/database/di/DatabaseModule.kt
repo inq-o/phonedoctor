@@ -12,6 +12,7 @@ import io.github.inq_o.phonedoctor.core.database.AllowEntryDao
 import io.github.inq_o.phonedoctor.core.database.AppDatabase
 import io.github.inq_o.phonedoctor.core.database.DetectorStateDao
 import io.github.inq_o.phonedoctor.core.database.ScanRunDao
+import io.github.inq_o.phonedoctor.core.database.SiteNotificationDao
 import io.github.inq_o.phonedoctor.core.database.SymptomEventDao
 import javax.inject.Singleton
 
@@ -32,6 +33,9 @@ class DatabaseModule {
 
     @Provides
     fun provideAllowEntryDao(db: AppDatabase): AllowEntryDao = db.allowEntryDao()
+
+    @Provides
+    fun provideSiteNotificationDao(db: AppDatabase): SiteNotificationDao = db.siteNotificationDao()
 
     @Provides
     @Singleton

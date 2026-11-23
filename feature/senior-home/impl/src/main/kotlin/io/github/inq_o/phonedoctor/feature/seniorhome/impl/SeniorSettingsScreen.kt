@@ -44,6 +44,7 @@ import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 @Composable
 fun SeniorSettingsScreen(
     onFamilyClick: () -> Unit,
+    onSitesClick: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SeniorSettingsViewModel = hiltViewModel(),
@@ -56,6 +57,7 @@ fun SeniorSettingsScreen(
         state = state,
         onRename = viewModel::rename,
         onFamilyClick = onFamilyClick,
+        onSitesClick = onSitesClick,
         onOpenTextSize = { context.openTextSize() },
         onDeleteAll = viewModel::deleteAll,
         onBack = onBack,
@@ -78,6 +80,7 @@ internal fun SeniorSettingsScreen(
     state: SeniorSettingsUiState,
     onRename: (String) -> Unit,
     onFamilyClick: () -> Unit,
+    onSitesClick: () -> Unit,
     onOpenTextSize: () -> Unit,
     onDeleteAll: () -> Unit,
     onBack: () -> Unit,
@@ -111,6 +114,12 @@ internal fun SeniorSettingsScreen(
                 }
                 Section(stringResource(R.string.feature_senior_home_impl_settings_family_title)) {
                     PdOutlinedButton(stringResource(R.string.feature_senior_home_impl_settings_family_open), onFamilyClick)
+                }
+            }
+            if (state.siteAlertsAvailable) {
+                Section(stringResource(R.string.feature_senior_home_impl_settings_sites_title)) {
+                    Body(stringResource(R.string.feature_senior_home_impl_settings_sites_body))
+                    PdOutlinedButton(stringResource(R.string.feature_senior_home_impl_settings_sites_open), onSitesClick)
                 }
             }
             Section(stringResource(R.string.feature_senior_home_impl_settings_text_title)) {
@@ -230,11 +239,11 @@ private fun DeleteDialog(onDelete: () -> Unit, onKeep: () -> Unit) {
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 private fun SettingsPreview() {
-    PhoneDoctorTheme { SeniorSettingsScreen(SeniorSettingsUiState(familyAvailable = true, displayName = "엄마"), {}, {}, {}, {}, {}) }
+    PhoneDoctorTheme { SeniorSettingsScreen(SeniorSettingsUiState(familyAvailable = true, displayName = "엄마", siteAlertsAvailable = true), {}, {}, {}, {}, {}, {}) }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800, fontScale = 2f)
 @Composable
 private fun SettingsReleaseLargeFontPreview() {
-    PhoneDoctorTheme { SeniorSettingsScreen(SeniorSettingsUiState(familyAvailable = false), {}, {}, {}, {}, {}) }
+    PhoneDoctorTheme { SeniorSettingsScreen(SeniorSettingsUiState(familyAvailable = false), {}, {}, {}, {}, {}, {}) }
 }

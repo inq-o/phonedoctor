@@ -37,8 +37,15 @@ class OnboardingViewModelTest {
     @After
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun vm(familyAvailable: Boolean) =
-        OnboardingViewModel(FakeUsageAccess(), FakeNotifier(), settings, scheduler, FakeFamily(familyAvailable))
+    private fun vm(familyAvailable: Boolean, siteAlerts: Boolean = false) =
+        OnboardingViewModel(FakeUsageAccess(), FakeNotifier(), settings, scheduler, FakeFamily(familyAvailable), siteAlerts)
+
+    @Test
+    fun notificationAccessStepOnlyWhenSiteAlertsAreOnAndBeforeFamily() {
+        val steps = vm(familyAvailable = true, siteAlerts = true).uiState.value.steps
+        assertEquals(listOf(OnboardingStep.NOTIFICATION_ACCESS, OnboardingStep.FAMILY), steps.takeLast(2))
+        assertTrue(OnboardingStep.NOTIFICATION_ACCESS !in vm(familyAvailable = true).uiState.value.steps)
+    }
 
     @Test
     fun familyStepOnlyWhenFamilyAvailable() {
@@ -131,6 +138,8 @@ class OnboardingViewModelTest {
         override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
         override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
         override fun cancelGuardianAlert(alertId: String) = Unit
+        override fun notifySiteAds(alert: io.github.inq_o.phonedoctor.core.model.SiteAlert, stillOn: Boolean) = Unit
+        override fun cancelSite(site: String) = Unit
     }
 
     /** 첫 설정은 서버를 부르지 않는다: 부르면 실패 */

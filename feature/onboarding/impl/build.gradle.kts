@@ -11,6 +11,7 @@ dependencies {
     implementation(projects.core.data)
     implementation(projects.core.notifications)
     implementation(projects.feature.onboarding.api)
+    implementation(projects.feature.seniorSites.api)
 
     implementation(libs.androidx.activity.compose)
 

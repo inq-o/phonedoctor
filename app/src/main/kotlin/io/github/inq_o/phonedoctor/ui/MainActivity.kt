@@ -95,7 +95,9 @@ class MainActivity : ComponentActivity() {
         val alertId = intent.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L)
         val linkId = intent.getStringExtra(SystemNotifier.EXTRA_LINK_ID)
         val requestId = intent.getStringExtra(SystemNotifier.EXTRA_REQUEST_ID)
+        val site = intent.getStringExtra(SystemNotifier.EXTRA_SITE)
         when {
+            !site.isNullOrBlank() -> viewModel.open(PendingOpen.Site(site, intent.dataString ?: site))
             alertId > 0 -> viewModel.open(PendingOpen.Alert(alertId))
             !requestId.isNullOrBlank() -> viewModel.open(PendingOpen.GuardianRequest(requestId))
             !linkId.isNullOrBlank() -> viewModel.open(PendingOpen.LinkRequest(linkId))

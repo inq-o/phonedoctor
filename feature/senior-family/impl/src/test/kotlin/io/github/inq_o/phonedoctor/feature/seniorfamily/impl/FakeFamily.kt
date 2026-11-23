@@ -97,4 +97,6 @@ internal class FakeNotifier : Notifier {
     override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
     override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
     override fun cancelGuardianAlert(alertId: String) = Unit
+    override fun notifySiteAds(alert: io.github.inq_o.phonedoctor.core.model.SiteAlert, stillOn: Boolean) = Unit
+    override fun cancelSite(site: String) = Unit
 }

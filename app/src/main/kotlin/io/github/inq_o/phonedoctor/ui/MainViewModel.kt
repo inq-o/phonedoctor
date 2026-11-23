@@ -8,6 +8,7 @@ import io.github.inq_o.phonedoctor.core.data.ScanScheduler
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import io.github.inq_o.phonedoctor.core.data.isGuardianPhone
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.SiteAlertsFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +34,9 @@ sealed interface PendingOpen {
 
     /** (보호자) 요청 상세 G2 */
     data class GuardianRequest(val alertId: String) : PendingOpen
+
+    /** (시니어) 광고 알림을 보내는 사이트. 그 사이트 알림 설정을 바로 연다 (US10) */
+    data class Site(val site: String, val openRequest: String?) : PendingOpen
 }
 
 /** 앱을 열 때 처음 보일 화면 */
@@ -96,6 +100,11 @@ class MainViewModel @Inject constructor(
 
     fun open(target: PendingOpen) {
         // 가족 연결을 쓸 수 없는 빌드(출시)는 다른 앱이 보낸 인텐트로도 연결 화면을 열지 않는다
+        // 사이트 알림은 이 기능이 켜진 빌드에서만
+        if (target is PendingOpen.Site) {
+            if (SiteAlertsFeature.ENABLED) pending.value = target
+            return
+        }
         if (target !is PendingOpen.Alert && !family.available) return
         pending.value = target
     }

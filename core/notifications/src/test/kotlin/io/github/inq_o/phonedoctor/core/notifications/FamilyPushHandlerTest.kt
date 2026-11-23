@@ -93,5 +93,7 @@ class FamilyPushHandlerTest {
             calls += "resolved:$alertId:$outcome:$seniorName:$appLabel"
         }
         override fun cancelGuardianAlert(alertId: String) = Unit
+        override fun notifySiteAds(alert: io.github.inq_o.phonedoctor.core.model.SiteAlert, stillOn: Boolean) = Unit
+        override fun cancelSite(site: String) = Unit
     }
 }
