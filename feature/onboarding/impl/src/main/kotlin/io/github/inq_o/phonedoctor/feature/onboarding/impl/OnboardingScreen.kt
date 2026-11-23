@@ -35,7 +35,7 @@ import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 
 @Composable
 fun OnboardingScreen(
-    onFinished: () -> Unit,
+    onFinished: (connectFamily: Boolean) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
@@ -46,7 +46,7 @@ fun OnboardingScreen(
         onPauseOrDispose {}
     }
     LaunchedEffect(state.finished) {
-        if (state.finished) onFinished()
+        if (state.finished) onFinished(state.connectFamily)
     }
     // 허용하든 거부하든 다음 단계로 간다. 거부해도 홈 화면에는 그대로 보인다
     val notificationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { viewModel.next() }
@@ -62,6 +62,7 @@ fun OnboardingScreen(
         },
         onOpenUsageSettings = { context.startFirst(viewModel.usageAccessSettingsIntents) },
         onNext = viewModel::next,
+        onConnectFamily = { viewModel.finish(connectFamily = true) },
         modifier = modifier,
     )
 }
@@ -85,6 +86,7 @@ internal fun OnboardingScreen(
     onAllowNotifications: () -> Unit,
     onOpenUsageSettings: () -> Unit,
     onNext: () -> Unit,
+    onConnectFamily: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 첫 설정 중에는 뒤로 가기로 앱이 닫히지 않게 한다 (앞 단계로도 돌아가지 않음: 고지는 이미 읽음)
@@ -106,6 +108,10 @@ internal fun OnboardingScreen(
                         PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
                         PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_usage_open), onOpenUsageSettings)
                     }
+                OnboardingStep.FAMILY -> {
+                    PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
+                    PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_family_connect), onConnectFamily)
+                }
             }
         },
     ) {
@@ -137,6 +143,12 @@ internal fun OnboardingScreen(
                     Body(stringResource(R.string.feature_onboarding_impl_usage_body))
                     Body(stringResource(R.string.feature_onboarding_impl_usage_how))
                 }
+            OnboardingStep.FAMILY -> {
+                Title(stringResource(R.string.feature_onboarding_impl_family_title))
+                Body(stringResource(R.string.feature_onboarding_impl_family_body))
+                Body(stringResource(R.string.feature_onboarding_impl_family_scope))
+                Body(stringResource(R.string.feature_onboarding_impl_family_later))
+            }
         }
     }
 }
@@ -157,7 +169,7 @@ private fun Body(text: String) {
 @Composable
 private fun DisclosurePreview() {
     PhoneDoctorTheme {
-        OnboardingScreen(OnboardingUiState(OnboardingStep.entries), onAgree = {}, onAllowNotifications = {}, onOpenUsageSettings = {}, onNext = {})
+        OnboardingScreen(OnboardingUiState(OnboardingStep.entries), onAgree = {}, onAllowNotifications = {}, onOpenUsageSettings = {}, onNext = {}, onConnectFamily = {})
     }
 }
 
@@ -165,6 +177,6 @@ private fun DisclosurePreview() {
 @Composable
 private fun UsageAccessLargeFontPreview() {
     PhoneDoctorTheme {
-        OnboardingScreen(OnboardingUiState(OnboardingStep.entries, index = 2), onAgree = {}, onAllowNotifications = {}, onOpenUsageSettings = {}, onNext = {})
+        OnboardingScreen(OnboardingUiState(OnboardingStep.entries, index = 2), onAgree = {}, onAllowNotifications = {}, onOpenUsageSettings = {}, onNext = {}, onConnectFamily = {})
     }
 }

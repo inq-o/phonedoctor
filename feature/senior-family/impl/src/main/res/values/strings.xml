@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="feature_senior_family_impl_home">홈으로</string>
+    <string name="feature_senior_family_impl_later">나중에 할게요</string>
+    <string name="feature_senior_family_impl_retry">다시 해 볼게요</string>
+    <string name="feature_senior_family_impl_fallback_name">가족</string>
+
+    <!-- 실패 안내: 무엇이·왜·어떻게 (ux-flows 오류 문구 구조) -->
+    <string name="feature_senior_family_impl_error_network">인터넷에 연결되지 않았어요. 와이파이나 데이터를 켜고 다시 해 주세요.</string>
+    <string name="feature_senior_family_impl_error_busy">지금은 연결할 수 없어요. 잠시 뒤에 다시 해 주세요.</string>
+    <string name="feature_senior_family_impl_error_role">이 폰은 가족 폰을 지키는 폰으로 등록돼 있어요. 부모님 폰에서 코드를 받아 주세요.</string>
+    <string name="feature_senior_family_impl_error_unknown">문제가 생겨 하지 못했어요. 잠시 뒤에 다시 해 주세요.</string>
+
+    <!-- O-S4 연결 코드 -->
+    <string name="feature_senior_family_impl_code_title">가족 폰에서 이 코드를 넣어 주세요</string>
+    <string name="feature_senior_family_impl_code_how">가족 폰에서 폰주치의를 열고 [가족 폰을 지켜요]를 고른 뒤, 아래 그림을 찍거나 숫자를 넣으면 돼요.</string>
+    <string name="feature_senior_family_impl_code_loading">코드를 받고 있어요</string>
+    <string name="feature_senior_family_impl_code_qr_description">연결용 QR 그림</string>
+    <string name="feature_senior_family_impl_code_until">%1$s까지 쓸 수 있어요.</string>
+    <string name="feature_senior_family_impl_code_waiting">가족이 코드를 넣으면 이 폰에서 연결할지 물어볼게요.</string>
+    <string name="feature_senior_family_impl_code_failed_title">코드를 받지 못했어요</string>
+    <string name="feature_senior_family_impl_code_expired_title">코드 시간이 지났어요</string>
+    <string name="feature_senior_family_impl_code_expired_body">새 코드를 받아서 가족 폰에 넣어 주세요.</string>
+    <string name="feature_senior_family_impl_code_new">새 코드 받기</string>
+
+    <!-- S3 연결 확인 -->
+    <string name="feature_senior_family_impl_confirm_title">%1$s님과 연결할까요?</string>
+    <string name="feature_senior_family_impl_confirm_body">연결하면 위험한 앱이 생겼을 때 %1$s님 폰에도 알림이 가요. 다른 앱 목록·사진·문자는 보내지 않아요.</string>
+    <string name="feature_senior_family_impl_confirm_no">안 할래요</string>
+    <string name="feature_senior_family_impl_confirm_yes">연결할게요</string>
+    <string name="feature_senior_family_impl_confirm_load_failed">연결 요청을 불러오지 못했어요</string>
+    <string name="feature_senior_family_impl_connected_title">%1$s님과 연결했어요</string>
+    <string name="feature_senior_family_impl_connected_body">확인이 필요한 앱이 생기면 %1$s님께도 알려 드려요.</string>
+    <string name="feature_senior_family_impl_declined_title">연결하지 않았어요</string>
+    <string name="feature_senior_family_impl_declined_body">나중에 연결하고 싶으면 홈 화면의 [가족] 버튼에서 새 코드를 받아 주세요.</string>
+    <string name="feature_senior_family_impl_gone_title">이 연결 요청은 없어졌어요</string>
+    <string name="feature_senior_family_impl_gone_body">가족이 요청을 취소했거나 이미 끊긴 연결이에요. 다시 연결하려면 홈 화면의 [가족] 버튼에서 새 코드를 받아 주세요.</string>
+    <string name="feature_senior_family_impl_limit_title">가족은 3명까지 연결할 수 있어요</string>
+    <string name="feature_senior_family_impl_limit_body">다른 가족과 연결을 끊은 뒤 다시 해 주세요.</string>
+
+    <!-- S5 가족 연결 관리 -->
+    <string name="feature_senior_family_impl_links_title">가족 연결</string>
+    <string name="feature_senior_family_impl_links_empty">가족을 연결하면 위험한 앱을 같이 확인할 수 있어요.</string>
+    <string name="feature_senior_family_impl_links_scope">가족에게는 확인이 필요한 앱의 이름과 이유만 보내요. 다른 앱 목록·사진·문자·위치는 보내지 않아요.</string>
+    <string name="feature_senior_family_impl_links_load_failed">가족 연결을 불러오지 못했어요</string>
+    <string name="feature_senior_family_impl_links_since">%1$d년 %2$d월 %3$d일부터 연결돼 있어요</string>
+    <string name="feature_senior_family_impl_links_pending">연결할지 답을 기다리고 있어요</string>
+    <string name="feature_senior_family_impl_links_answer">답하기</string>
+    <string name="feature_senior_family_impl_links_revoke">연결 끊기</string>
+    <string name="feature_senior_family_impl_links_add">가족 연결하기</string>
+    <string name="feature_senior_family_impl_links_full">가족은 3명까지 연결할 수 있어요.</string>
+    <string name="feature_senior_family_impl_links_revoked">%1$s님과 연결을 끊었어요.</string>
+    <string name="feature_senior_family_impl_links_revoke_failed">연결을 끊지 못했어요.</string>
+    <string name="feature_senior_family_impl_revoke_dialog_title">%1$s님과 연결을 끊을까요?</string>
+    <string name="feature_senior_family_impl_revoke_dialog_body">%1$s님은 더 이상 알림을 받지 않아요.</string>
+    <string name="feature_senior_family_impl_revoke_dialog_keep">그대로 두기</string>
+</resources>

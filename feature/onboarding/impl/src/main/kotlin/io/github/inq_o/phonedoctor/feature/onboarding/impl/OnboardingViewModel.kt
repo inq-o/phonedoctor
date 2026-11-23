@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.ScanScheduler
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
@@ -16,13 +17,22 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-enum class OnboardingStep { DISCLOSURE, NOTIFICATION, USAGE_ACCESS }
+enum class OnboardingStep {
+    DISCLOSURE,
+    NOTIFICATION,
+    USAGE_ACCESS,
+
+    /** O-S4 가족 연결 안내. 가족 연결을 쓸 수 있는 빌드에서만. 건너뛸 수 있다 */
+    FAMILY,
+}
 
 data class OnboardingUiState(
     val steps: List<OnboardingStep>,
     val index: Int = 0,
     val usageAccessGranted: Boolean = false,
     val finished: Boolean = false,
+    /** 끝낼 때 [가족 연결하기]를 눌렀으면 true. 홈 위에 연결 코드 화면을 연다 */
+    val connectFamily: Boolean = false,
 ) {
     val step: OnboardingStep get() = steps[index]
 }
@@ -33,14 +43,16 @@ class OnboardingViewModel @Inject constructor(
     private val notifier: Notifier,
     private val settings: UserSettingsRepository,
     private val scheduler: ScanScheduler,
+    family: FamilyRepository,
 ) : ViewModel() {
     private val state = MutableStateFlow(
         OnboardingUiState(
-            // 알림 권한 요청 창은 Android 13부터 있다. 그 전 기기는 단계를 건너뛴다
-            steps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifier.canNotify()) {
-                listOf(OnboardingStep.DISCLOSURE, OnboardingStep.NOTIFICATION, OnboardingStep.USAGE_ACCESS)
-            } else {
-                listOf(OnboardingStep.DISCLOSURE, OnboardingStep.USAGE_ACCESS)
+            steps = buildList {
+                add(OnboardingStep.DISCLOSURE)
+                // 알림 권한 요청 창은 Android 13부터 있다. 그 전 기기는 단계를 건너뛴다
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifier.canNotify()) add(OnboardingStep.NOTIFICATION)
+                add(OnboardingStep.USAGE_ACCESS)
+                if (family.available) add(OnboardingStep.FAMILY)
             },
             usageAccessGranted = usageAccess.isGranted(),
         ),
@@ -63,14 +75,21 @@ class OnboardingViewModel @Inject constructor(
         }
     }
 
-    /** 사용 기록 보기를 켜지 않아도 끝낼 수 있다. 홈에서 다시 안내한다 (US11 인수 조건 4) */
-    fun finish() {
+    /**
+     * 사용 기록 보기를 켜지 않아도 끝낼 수 있다. 홈에서 다시 안내한다 (US11 인수 조건 4).
+     * [connectFamily]: 마지막 단계에서 [가족 연결하기]를 누름. 연결 코드는 홈으로 넘어간 뒤 그 화면이 받는다
+     */
+    fun finish(connectFamily: Boolean = false) {
+        if (finishing) return
+        finishing = true
         viewModelScope.launch {
             settings.completeOnboarding(DISCLOSURE_VERSION)
             scheduler.scanNow("onboarding")
-            state.update { it.copy(finished = true) }
+            state.update { it.copy(finished = true, connectFamily = connectFamily) }
         }
     }
+
+    private var finishing = false
 
     companion object {
         /** 고지 문구가 바뀌면 올린다 */

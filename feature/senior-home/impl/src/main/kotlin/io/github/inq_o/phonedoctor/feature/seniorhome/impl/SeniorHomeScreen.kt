@@ -47,15 +47,25 @@ import io.github.inq_o.phonedoctor.core.model.AppIdentity
 import io.github.inq_o.phonedoctor.core.model.ScanRun
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
+import io.github.inq_o.phonedoctor.core.model.FamilyLink
+import io.github.inq_o.phonedoctor.core.model.LinkStatus
+import java.time.Instant
 
 @Composable
 fun SeniorHomeScreen(
     onAlertClick: (Long) -> Unit,
     onHistoryClick: () -> Unit,
+    onFamilyClick: () -> Unit,
+    onLinkRequestClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SeniorHomeViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val family by viewModel.family.collectAsStateWithLifecycle()
     val context = LocalContext.current
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -67,6 +77,9 @@ fun SeniorHomeScreen(
         onHistoryClick = onHistoryClick,
         onScanNow = viewModel::scanNow,
         onOpenUsageSettings = { context.startFirst(viewModel.usageAccessSettingsIntents) },
+        family = family,
+        onFamilyClick = onFamilyClick,
+        onLinkRequestClick = onLinkRequestClick,
         modifier = modifier,
     )
 }
@@ -90,16 +103,37 @@ internal fun SeniorHomeScreen(
     onScanNow: () -> Unit,
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
+    family: HomeFamily = HomeFamily(available = false),
+    onFamilyClick: () -> Unit = {},
+    onLinkRequestClick: (String) -> Unit = {},
 ) {
     val history = stringResource(R.string.feature_senior_home_impl_history)
     SeniorScreen(
         modifier = modifier,
         topBar = {
-            Text(
-                text = stringResource(R.string.feature_senior_home_impl_app_name),
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = stringResource(R.string.feature_senior_home_impl_app_name),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f).padding(vertical = 8.dp),
+                )
+                // 가족 관리는 이 버튼으로 (S5). 아이콘과 글자를 함께 (ux-flows S1 상단바)
+                if (family.available) {
+                    OutlinedButton(
+                        onClick = onFamilyClick,
+                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+                        modifier = Modifier.heightIn(min = 56.dp),
+                    ) {
+                        Icon(Icons.Filled.Person, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.feature_senior_home_impl_family), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
         },
         actions = {
             when (state) {
@@ -125,6 +159,12 @@ internal fun SeniorHomeScreen(
         },
     ) {
         Spacer(Modifier.height(8.dp))
+        if (state !is SeniorHomeUiState.Loading) {
+            family.pending?.let { link ->
+                LinkRequestCard(link.guardianName, onClick = { onLinkRequestClick(link.linkId) })
+                Spacer(Modifier.height(16.dp))
+            }
+        }
         when (state) {
             SeniorHomeUiState.Loading -> Unit
             is SeniorHomeUiState.UsageAccessOff -> {
@@ -142,6 +182,11 @@ internal fun SeniorHomeScreen(
                     StatusCircle(StatusKind.OK)
                     Headline(stringResource(R.string.feature_senior_home_impl_ok_title))
                     Body(lastScanSentence(state.lastScan))
+                    if (family.guardians.isNotEmpty()) {
+                        val fallback = stringResource(R.string.feature_senior_home_impl_family)
+                        val names = family.guardians.joinToString(", ") { it.trim().ifEmpty { fallback } }
+                        Body(stringResource(R.string.feature_senior_home_impl_guardians, names))
+                    }
                     Body(stringResource(R.string.feature_senior_home_impl_scope))
                     if (!state.notificationsOn) Body(stringResource(R.string.feature_senior_home_impl_notifications_off))
                 } else {
@@ -212,6 +257,30 @@ private fun AlertCard(alert: SymptomAlert, onClick: () -> Unit) {
     }
 }
 
+@Composable
+private fun guardianName(name: String): String = name.trim().ifEmpty { stringResource(R.string.feature_senior_home_impl_family) }
+
+/** 가족의 연결 요청. 카드 전체가 버튼이다 */
+@Composable
+private fun LinkRequestCard(name: String, onClick: () -> Unit) {
+    OutlinedCard(
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.primary),
+        modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp).semantics { role = Role.Button },
+    ) {
+        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Person, contentDescription = null, modifier = Modifier.size(40.dp))
+            Spacer(Modifier.width(16.dp))
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(R.string.feature_senior_home_impl_link_request_title, guardianName(name)), style = MaterialTheme.typography.titleLarge)
+                Text(stringResource(R.string.feature_senior_home_impl_link_request_body), style = MaterialTheme.typography.bodyLarge)
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
+        }
+    }
+}
+
 private val PreviewAlert = SymptomAlert(
     1, AppIdentity("com.example.cleaner", "00", 1), "초고속 클리너", AlertStatus.OPEN, null,
     LocalDate.now().toString(), 5, 1, 0, 0, "preview", 0, 0,
@@ -222,6 +291,21 @@ private val PreviewAlert = SymptomAlert(
 private fun OkPreview() {
     PhoneDoctorTheme {
         SeniorHomeScreen(SeniorHomeUiState.Ready(emptyList(), null, scanning = false, notificationsOn = true), {}, {}, {}, {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 720)
+@Composable
+private fun FamilyPreview() {
+    PhoneDoctorTheme {
+        SeniorHomeScreen(
+            SeniorHomeUiState.Ready(emptyList(), null, scanning = false, notificationsOn = true), {}, {}, {}, {},
+            family = HomeFamily(
+                available = true,
+                guardians = listOf("민지"),
+                pending = FamilyLink("l2", LinkStatus.PENDING, "엄마", "철수", Instant.now(), null, null),
+            ),
+        )
     }
 }
 

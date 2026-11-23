@@ -45,7 +45,7 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleAlertIntent(intent)
+        if (savedInstanceState == null) handleNotificationIntent(intent)
         setContent {
             PhoneDoctorTheme {
                 Surface(
@@ -53,13 +53,13 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
-                    val pendingAlertId by viewModel.pendingAlertId.collectAsStateWithLifecycle()
+                    val pendingOpen by viewModel.pendingOpen.collectAsStateWithLifecycle()
                     // 설정을 읽기 전에는 아무 화면도 그리지 않는다 (첫 설정 화면이 잠깐 보였다 사라지지 않게)
                     onboardingDone?.let { done ->
                         MainNavigation(
                             onboardingDone = done,
-                            pendingAlertId = pendingAlertId,
-                            onAlertOpened = viewModel::consumePendingAlert,
+                            pendingOpen = pendingOpen,
+                            onOpened = viewModel::consumePendingOpen,
                         )
                     }
                 }
@@ -69,7 +69,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleAlertIntent(intent)
+        handleNotificationIntent(intent)
     }
 
     override fun onStart() {
@@ -77,9 +77,15 @@ class MainActivity : ComponentActivity() {
         viewModel.onAppOpened()
     }
 
-    /** 알림을 눌러 들어왔으면 그 앱 상세 화면으로 간다 */
-    private fun handleAlertIntent(intent: Intent?) {
-        val id = intent?.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L) ?: -1L
-        if (id > 0) viewModel.openAlert(id)
+    /** 알림을 눌러 들어왔으면 그 알림의 화면으로 간다 */
+    private fun handleNotificationIntent(intent: Intent?) {
+        intent ?: return
+        val alertId = intent.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L)
+        val linkId = intent.getStringExtra(SystemNotifier.EXTRA_LINK_ID)
+        when {
+            alertId > 0 -> viewModel.open(PendingOpen.Alert(alertId))
+            !linkId.isNullOrBlank() -> viewModel.open(PendingOpen.LinkRequest(linkId))
+            intent.getBooleanExtra(SystemNotifier.EXTRA_OPEN_FAMILY, false) -> viewModel.open(PendingOpen.FamilyLinks)
+        }
     }
 }

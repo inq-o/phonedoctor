@@ -27,27 +27,38 @@ import io.github.inq_o.phonedoctor.feature.onboarding.api.navigation.OnboardingN
 import io.github.inq_o.phonedoctor.feature.onboarding.impl.navigation.onboardingEntry
 import io.github.inq_o.phonedoctor.feature.seniorappdetail.api.navigation.AppDetailNavKey
 import io.github.inq_o.phonedoctor.feature.seniorappdetail.impl.navigation.appDetailEntry
+import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.FamilyLinksNavKey
+import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.LinkConfirmNavKey
+import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.PairingCodeNavKey
+import io.github.inq_o.phonedoctor.feature.seniorfamily.impl.navigation.seniorFamilyEntries
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.ScanHistoryNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.impl.navigation.seniorHomeEntries
 
 /**
- * 첫 설정을 끝냈으면 홈, 아니면 첫 설정부터 시작한다. 알림을 눌러 들어온 경우 [pendingAlertId]의 앱 상세를 홈 위에 연다.
+ * 첫 설정을 끝냈으면 홈, 아니면 첫 설정부터 시작한다. 알림을 눌러 들어온 경우 [pendingOpen]의 화면을 홈 위에 연다.
  */
 @Composable
 fun MainNavigation(
     onboardingDone: Boolean,
-    pendingAlertId: Long?,
-    onAlertOpened: () -> Unit,
+    pendingOpen: PendingOpen?,
+    onOpened: () -> Unit,
 ) {
     // 시작 화면은 처음 한 번만 정한다. 첫 설정이 끝나면 아래 onFinished에서 홈으로 바꾼다
     val backStack = rememberNavBackStack(if (onboardingDone) SeniorHomeNavKey else OnboardingNavKey)
 
-    LaunchedEffect(pendingAlertId, onboardingDone) {
-        if (pendingAlertId != null && onboardingDone) {
-            backStack.removeAll { it is AppDetailNavKey }
-            backStack.add(AppDetailNavKey(pendingAlertId))
-            onAlertOpened()
+    LaunchedEffect(pendingOpen, onboardingDone) {
+        if (pendingOpen != null && onboardingDone) {
+            // 같은 종류의 화면이 이미 쌓여 있으면 지우고 새로 연다 (알림을 여러 번 눌러도 한 장만)
+            val key = when (pendingOpen) {
+                is PendingOpen.Alert -> AppDetailNavKey(pendingOpen.alertId)
+                is PendingOpen.LinkRequest -> LinkConfirmNavKey(pendingOpen.linkId)
+                PendingOpen.FamilyLinks -> FamilyLinksNavKey
+            }
+            // 연결 확인을 열면 연결 코드 화면도 닫는다 (코드는 이미 쓰였다)
+            backStack.removeAll { it::class == key::class || (key is LinkConfirmNavKey && it is PairingCodeNavKey) }
+            backStack.add(key)
+            onOpened()
         }
     }
 
@@ -60,17 +71,30 @@ fun MainNavigation(
         ),
         entryProvider = entryProvider {
             onboardingEntry(
-                onFinished = {
+                onFinished = { connectFamily ->
                     backStack.clear()
                     backStack.add(SeniorHomeNavKey)
+                    if (connectFamily) backStack.add(PairingCodeNavKey)
                 },
             )
             seniorHomeEntries(
                 onAlertClick = { backStack.add(AppDetailNavKey(it)) },
                 onHistoryClick = { backStack.add(ScanHistoryNavKey) },
+                onFamilyClick = { backStack.add(FamilyLinksNavKey) },
+                onLinkRequestClick = { backStack.add(LinkConfirmNavKey(it)) },
                 onBack = { backStack.removeLastOrNull() },
             )
             appDetailEntry(onBack = { backStack.removeLastOrNull() })
+            seniorFamilyEntries(
+                onAddFamily = { backStack.add(PairingCodeNavKey) },
+                onAnswer = { backStack.add(LinkConfirmNavKey(it)) },
+                // 코드 화면은 닫고 연결 확인으로. 확인 뒤 [홈으로]는 코드 화면을 연 곳(홈·S5)으로 돌아간다
+                onLinkRequested = { linkId ->
+                    backStack.removeAll { it is PairingCodeNavKey || it is LinkConfirmNavKey }
+                    backStack.add(LinkConfirmNavKey(linkId))
+                },
+                onBack = { backStack.removeLastOrNull() },
+            )
         }
     )
 }
