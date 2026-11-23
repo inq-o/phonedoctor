@@ -68,11 +68,12 @@
 - [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
   - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
-  - [ ] alerts
+  - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)
+  - [x] 예약 작업 — 재알림 24시간·만료 7일·삭제 90일·연락 끊김 48시간·기기 180일 (Cloud Scheduler → `/internal/tick`, ADR-0001)
   - [ ] 배포 — Neon·GCP 결제 계정은 사람이 (server/README.md 배포 절)
 - [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`
-- [ ] T055a [US4] 연락 끊김 경고 (F6) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
+- [ ] T055a [US4] 연락 끊김 경고 (F6, 서버 판정·알림은 T053 예약 작업으로 완료) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
 - [ ] T057 [P] 개인정보처리방침 공개 — 초안 `docs/privacy-policy.md`(인터넷 권한 없음, 기기 밖 전송 없음 기준). 공개 주소(GitHub Pages 등)는 확인 후. 서버를 붙이면 다시 고침
 - [x] T058 [P] 공개 고지 화면 (O-S1, FR-041) — 첫 설정 1단계 "폰주치의가 하는 일" (PR #5)

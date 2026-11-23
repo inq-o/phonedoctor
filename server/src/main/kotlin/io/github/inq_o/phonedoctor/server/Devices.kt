@@ -15,9 +15,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -183,7 +185,7 @@ fun Route.deviceRoutes(deps: Deps) {
                         val row = Devices.selectAll().where { Devices.deviceId eq id }
                             .forUpdate(ForUpdateOption.ForUpdate).singleOrNull() ?: return@transaction emptyList()
                         if (row[Devices.firebaseUid] != call.caller.uid) throw forbidden("내 기기가 아님")
-                        revokedPushesOnDelete(id).also { Devices.deleteWhere { Devices.deviceId eq id } }
+                        deleteDevice(id)
                     }
                 }
                 withContext(Dispatchers.IO) { deps.sendAll(pushes) }
@@ -218,6 +220,23 @@ fun Route.deviceRoutes(deps: Deps) {
             }
         }
     }
+}
+
+/**
+ * 기기를 지우고, 해제되지 않은 연결의 상대 기기에 보낼 LINK_REVOKED를 돌려준다.
+ * 연결·요청은 외래 키 연쇄로 함께 지워지고, 보호자 기기면 받은 연결이 없어진 요청도 지운다 (NFR-09)
+ */
+fun deleteDevice(id: String): List<Push> {
+    val seniors = Links.select(Links.protectedDeviceId).where { Links.guardianDeviceId eq id }.map { it[Links.protectedDeviceId] }.distinct().sorted()
+    // 보호자 기기면 연결 상대 시니어 기기를 먼저 잠근다 (연결 해제·요청 생성과 같은 잠금 순서, 정렬해 교착 방지)
+    if (seniors.isNotEmpty()) Devices.selectAll().where { Devices.deviceId inList seniors }.orderBy(Devices.deviceId).forUpdate(ForUpdateOption.ForUpdate).toList()
+    val pushes = revokedPushesOnDelete(id)
+    // 지운 기기가 받은 저장 응답도 지운다: 같은 키로 다시 보내도 지워진 데이터가 재전송 응답으로 나가지 않게
+    val uid = Devices.select(Devices.firebaseUid).where { Devices.deviceId eq id }.single()[Devices.firebaseUid]
+    IdempotencyKeys.deleteWhere { IdempotencyKeys.firebaseUid eq uid }
+    Devices.deleteWhere { Devices.deviceId eq id }
+    deleteOrphanAlerts(seniors)
+    return pushes
 }
 
 /**

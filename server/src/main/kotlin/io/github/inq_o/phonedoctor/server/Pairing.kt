@@ -24,6 +24,7 @@ import org.jetbrains.exposed.v1.core.vendors.ForUpdateOption
 import org.jetbrains.exposed.v1.jdbc.deleteWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.insertIgnore
+import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
@@ -70,7 +71,7 @@ data class LinkList(val items: List<Link>)
 private val CODE_VALID = Duration.ofMinutes(10)
 
 /** 만료 뒤에도 이만큼은 남겨 두어 "만료됨"(410)으로 알려 준다 (data-model §2: 만료 1시간 후 삭제) */
-private val CODE_KEEP_AFTER_EXPIRY = Duration.ofHours(1)
+val CODE_KEEP_AFTER_EXPIRY = Duration.ofHours(1)
 
 /** 시니어 1명에게 연결할 수 있는 보호자 수 상한 (data-model §2). 무료 1명 제한은 구독(T084)을 붙일 때 */
 const val MAX_GUARDIANS = 3
@@ -265,6 +266,13 @@ fun Route.pairingRoutes(deps: Deps) {
             val pushes = withContext(Dispatchers.IO) {
                 transaction(deps.db) {
                     val me = myDevice(call.caller)
+                    val protectedId = Links.select(Links.protectedDeviceId).where { Links.linkId eq linkId }.singleOrNull()
+                        ?.get(Links.protectedDeviceId) ?: throw notFound("연결 없음")
+                    // 잠금 순서: 시니어 기기 → 연결 → 요청 (요청 생성과 같음). 해제와 생성, 두 보호자의 동시 해제가 하나씩 처리돼
+                    // 해제된 연결에 요청이 붙거나 받은 연결이 없는 요청이 남지 않는다
+                    // 그사이 기기 삭제로 연결이 지워졌으면 404 (500이 아니라)
+                    Devices.selectAll().where { Devices.deviceId eq protectedId }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
+                        ?: throw notFound("연결 없음")
                     val row = Links.selectAll().where { Links.linkId eq linkId }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
                         ?: throw notFound("연결 없음")
                     val myId = me[Devices.deviceId]
@@ -274,7 +282,13 @@ fun Route.pairingRoutes(deps: Deps) {
                         it[status] = LinkStatus.REVOKED.db
                         it[revokedAt] = deps.now().utc()
                     }
-                    // TODO(alerts): 이 연결로 만든 요청 데이터 즉시 삭제 (openapi revokeLink)
+                    // 이 연결로 받은 요청 데이터를 바로 지운다 (다른 보호자도 받은 요청은 남음, NFR-09).
+                    // 끊은 보호자가 저장된 응답(요청 내용 포함)을 재전송으로 다시 받지 못하게 그 보호자의 저장 응답도 지운다
+                    val received = AlertLinks.select(AlertLinks.alertId).where { AlertLinks.linkId eq linkId }.map { it[AlertLinks.alertId] }
+                    val guardianUid = Devices.select(Devices.firebaseUid).where { Devices.deviceId eq row[Links.guardianDeviceId] }.single()[Devices.firebaseUid]
+                    IdempotencyKeys.deleteWhere { (IdempotencyKeys.firebaseUid eq guardianUid) and (IdempotencyKeys.alertId inList received) }
+                    AlertLinks.deleteWhere { AlertLinks.linkId eq linkId }
+                    deleteOrphanAlerts(listOf(protectedId))
                     listOf(revokedPush(row, byDeviceId = myId))
                 }
             }

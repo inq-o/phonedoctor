@@ -42,6 +42,7 @@ object IdempotencyKeys : Table("idempotency_key") {
     val status = integer("status")
     val body = text("body")
     val createdAt = timestampWithTimeZone("created_at")
+    val alertId = text("alert_id").nullable()
     override val primaryKey = PrimaryKey(firebaseUid, key)
 }
 
@@ -61,12 +62,47 @@ object Links : Table("link") {
     val createdAt = timestampWithTimeZone("created_at")
     val activatedAt = timestampWithTimeZone("activated_at").nullable()
     val revokedAt = timestampWithTimeZone("revoked_at").nullable()
+    val contactLostBaseline = timestampWithTimeZone("contact_lost_baseline").nullable()
     override val primaryKey = PrimaryKey(linkId)
 }
 
 object PairingAttempts : Table("pairing_attempt") {
     val firebaseUid = text("firebase_uid")
     val attemptedAt = timestampWithTimeZone("attempted_at")
+}
+
+object Alerts : Table("alert") {
+    val alertId = text("alert_id")
+    val protectedDeviceId = text("protected_device_id")
+    val status = text("status")
+    val alertSource = text("source")
+    val kind = text("kind")
+    val packageName = text("package_name")
+    val signingCertSha256 = text("signing_cert_sha256")
+    val versionCode = long("version_code")
+    val app = jsonb("app", ApiJson, AppInfo.serializer())
+    val verdict = jsonb("verdict", ApiJson, Verdict.serializer()).nullable()
+    val symptom = jsonb("symptom", ApiJson, SymptomEvidence.serializer()).nullable()
+    val detectedAt = timestampWithTimeZone("detected_at")
+    val createdAt = timestampWithTimeZone("created_at")
+    val updatedAt = timestampWithTimeZone("updated_at")
+    val remindAt = timestampWithTimeZone("remind_at").nullable()
+    val expiresAt = timestampWithTimeZone("expires_at")
+    val deleteAt = timestampWithTimeZone("delete_at")
+    val decision = text("decision").nullable()
+    val messageToSenior = text("message_to_senior").nullable()
+    val decidedById = text("decided_by_id").nullable()
+    val decidedByName = text("decided_by_name").nullable()
+    val decidedAt = timestampWithTimeZone("decided_at").nullable()
+    val outcome = text("outcome").nullable()
+    val outcomeAt = timestampWithTimeZone("outcome_at").nullable()
+    override val primaryKey = PrimaryKey(alertId)
+}
+
+object AlertLinks : Table("alert_link") {
+    val alertId = text("alert_id")
+    val linkId = text("link_id")
+    override val primaryKey = PrimaryKey(alertId, linkId)
 }
 
 fun Instant.utc(): OffsetDateTime = atOffset(ZoneOffset.UTC)

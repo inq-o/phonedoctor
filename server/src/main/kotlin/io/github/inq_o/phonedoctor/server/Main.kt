@@ -27,6 +27,9 @@ data class Config(
     val firebaseProjectNumber: String,
     /** App Check 토큰의 `sub`로 받을 Firebase 앱 ID */
     val appCheckAppIds: Set<String>,
+    /** 예약 작업 경로(`/internal/tick`)를 부르는 Cloud Scheduler의 OIDC 대상·서비스 계정. 둘 다 있어야 켜짐 */
+    val schedulerAudience: String?,
+    val schedulerServiceAccount: String?,
 ) {
     companion object {
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
@@ -39,7 +42,14 @@ data class Config(
                 firebaseProjectId = req("FIREBASE_PROJECT_ID"),
                 firebaseProjectNumber = req("FIREBASE_PROJECT_NUMBER"),
                 appCheckAppIds = req("APP_CHECK_APP_IDS").split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
-            )
+                schedulerAudience = env["SCHEDULER_AUDIENCE"]?.takeIf { it.isNotBlank() },
+                schedulerServiceAccount = env["SCHEDULER_SERVICE_ACCOUNT"]?.takeIf { it.isNotBlank() },
+            ).also {
+                // 한쪽만 있으면 예약 작업이 조용히 꺼진 채 돌아 재알림·만료·삭제가 멈춘다. 시작에서 바로 실패
+                check((it.schedulerAudience == null) == (it.schedulerServiceAccount == null)) {
+                    "SCHEDULER_AUDIENCE와 SCHEDULER_SERVICE_ACCOUNT는 함께 설정하거나 둘 다 비워야 함"
+                }
+            }
         }
     }
 }
@@ -49,6 +59,8 @@ class Deps(
     val verifier: TokenVerifier,
     val pusher: Pusher,
     val clock: Clock = Clock.systemUTC(),
+    /** 없으면 예약 작업 경로를 꺼 둔다 */
+    val scheduler: SchedulerAuth? = null,
 ) {
     /** 만료된 Idempotency-Key를 마지막으로 지운 시각 (Idempotency.kt) */
     val keysSweptAt = AtomicReference(Instant.EPOCH)
@@ -60,7 +72,12 @@ class Deps(
 fun main() {
     val config = Config.fromEnv()
     val firebase = firebaseApp(config)
-    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config, firebase), FcmPusher(firebase))
+    val scheduler = if (config.schedulerAudience != null && config.schedulerServiceAccount != null) {
+        GoogleOidcAuth(config.schedulerAudience, config.schedulerServiceAccount)
+    } else {
+        null
+    }
+    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config, firebase), FcmPusher(firebase), scheduler = scheduler)
     embeddedServer(Netty, port = config.port, host = "0.0.0.0") { module(deps) }.start(wait = true)
 }
 
@@ -70,10 +87,12 @@ fun Application.module(deps: Deps) {
     installProblems()
     routing {
         get("/healthz") { call.respondText("ok") }
+        jobRoutes(deps)
         route("/v1") {
             install(FirebaseAuthPlugin) { this.deps = deps }
             deviceRoutes(deps)
             pairingRoutes(deps)
+            alertRoutes(deps)
         }
     }
 }

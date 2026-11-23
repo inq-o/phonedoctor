@@ -26,10 +26,14 @@ import java.util.UUID
  * 응답 상태와 JSON 본문. 같은 Idempotency-Key 재전송에 그대로 돌려주려고 문자열로 들고 있음.
  * [pushes]는 커밋 뒤 처음 한 번만 보낸다 (재전송 응답에는 없음)
  */
-class Reply(val status: HttpStatusCode, val body: String, val pushes: List<Push> = emptyList())
+class Reply(val status: HttpStatusCode, val body: String, val pushes: List<Push> = emptyList(), val alertId: String? = null)
 
-inline fun <reified T> reply(status: HttpStatusCode, value: T, pushes: List<Push> = emptyList()) =
-    Reply(status, ApiJson.encodeToString(value), pushes)
+/**
+ * [alertId]: 응답 본문에 담긴 요청. 저장한 응답을 그 요청에 묶어, 요청이 지워지면(연결 해제·기기 삭제·보관 기간) 저장 응답도
+ * 함께 지워진다(외래 키 연쇄). 지워진 요청 내용이 재전송 응답으로 다시 나가지 않게 (NFR-09)
+ */
+inline fun <reified T> reply(status: HttpStatusCode, value: T, pushes: List<Push> = emptyList(), alertId: String? = null) =
+    Reply(status, ApiJson.encodeToString(value), pushes, alertId)
 
 private val KEEP = Duration.ofHours(24)
 
@@ -58,6 +62,7 @@ suspend fun ApplicationCall.idempotent(deps: Deps, block: JdbcTransaction.(Calle
                         it[IdempotencyKeys.path] = path
                         it[status] = r.status.value
                         it[body] = r.body
+                        it[IdempotencyKeys.alertId] = r.alertId
                         it[createdAt] = deps.now().utc()
                     }
                 }
