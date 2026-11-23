@@ -168,7 +168,8 @@ class RetrofitNetworkTest {
         assertEquals(null, req.headers["Authorization"])
         assertEquals(null, req.headers["X-PhoneDoctor-Anonymous"])
         assertEquals(null, req.headers["Idempotency-Key"])
-        assertEquals("app-check", req.headers["X-Firebase-AppCheck"])
+        // 다른 요청과 같은 값이 아닌, 한 번 쓰는 App Check 토큰
+        assertEquals("app-check-once", req.headers["X-Firebase-AppCheck"])
         Contract.check("FalsePositiveReport", req.body!!.utf8())
     }
 
@@ -321,5 +322,10 @@ private class FakeTokens : AuthTokens {
     override suspend fun appCheckToken(): String {
         appCheckFailure?.let { throw it }
         return "app-check"
+    }
+
+    override suspend fun limitedUseAppCheckToken(): String {
+        appCheckFailure?.let { throw it }
+        return "app-check-once"
     }
 }

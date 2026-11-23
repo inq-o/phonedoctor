@@ -13,6 +13,12 @@ interface AuthTokens {
 
     /** App Check 토큰 (Play Integrity) */
     suspend fun appCheckToken(): String
+
+    /**
+     * 한 번 쓰고 버리는 App Check 토큰. 익명 요청에 쓴다: 캐시 토큰은 1시간 동안 다른 요청과 같은 값이라
+     * 그 값으로 익명 신고와 로그인한 요청을 이을 수 있다
+     */
+    suspend fun limitedUseAppCheckToken(): String
 }
 
 /**
@@ -28,4 +34,6 @@ internal class FirebaseAuthTokens @Inject constructor() : AuthTokens {
     }
 
     override suspend fun appCheckToken(): String = FirebaseAppCheck.getInstance().getAppCheckToken(false).await().token
+
+    override suspend fun limitedUseAppCheckToken(): String = FirebaseAppCheck.getInstance().limitedUseAppCheckToken.await().token
 }

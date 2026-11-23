@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -99,6 +100,25 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { it[FALSE_POSITIVE_FEEDBACK] = enabled }
     }
 
+    /**
+     * (보호자) 오탐 신고를 이미 맡긴 요청 (`요청ID:근거종류`). 같은 요청에 다시 답해도 한 번만 보낸다 (openapi: 서버는 키를 받지 않으므로 기기가 지킴).
+     * 요청은 90일 뒤 서버에서 지워지므로 오래된 것은 앞에서부터 버린다
+     */
+    val reportedFalsePositives: Flow<Set<String>> = store.data.map { it[REPORTED_FALSE_POSITIVES] ?: emptySet() }
+
+    /** 처음 맡기는 것이면 true (적어 둔다) */
+    suspend fun markFalsePositiveReported(id: String): Boolean {
+        var added = false
+        store.edit {
+            val now = it[REPORTED_FALSE_POSITIVES] ?: emptySet()
+            if (id !in now) {
+                added = true
+                it[REPORTED_FALSE_POSITIVES] = (now + id).toList().takeLast(REPORTED_MAX).toSet()
+            }
+        }
+        return added
+    }
+
     suspend fun clearChosenRole() {
         store.edit { it.remove(CHOSEN_ROLE) }
     }
@@ -125,6 +145,8 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val NOTIFY_CAUTION = booleanPreferencesKey("notifyCaution")
         val DELETION_PENDING = booleanPreferencesKey("deletionPending")
         val FALSE_POSITIVE_FEEDBACK = booleanPreferencesKey("falsePositiveFeedback")
+        val REPORTED_FALSE_POSITIVES = stringSetPreferencesKey("reportedFalsePositives")
+        const val REPORTED_MAX = 500
     }
 }
 

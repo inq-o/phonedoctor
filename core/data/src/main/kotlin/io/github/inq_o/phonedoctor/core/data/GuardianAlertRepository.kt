@@ -19,6 +19,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDecision
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
@@ -64,9 +65,12 @@ data class FalsePositive(
     val detectorVersion: String?,
 )
 
-/** 오탐 신고를 망이 될 때까지 재시도하며 보낸다 (sync:work). 요청 하나에 한 번만 */
+/**
+ * 오탐 신고를 망이 될 때까지 재시도하며 보낸다 (sync:work). [id]마다 한 번.
+ * 응답(로그인한 요청)과 시각으로 이어지지 않게 몇 시간 늦춰 보낸다
+ */
 fun interface FalsePositiveReporter {
-    fun schedule(alertId: String, report: FalsePositive)
+    fun schedule(id: String, report: FalsePositive)
 }
 
 /** 먼저 온 응답만 유효하다 (FR-024). [answer]는 먼저 답한 응답 */
@@ -134,9 +138,16 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
         return try {
             val alert = guarded { network.decideAlert(key, alertId, body) }
             keysLock.withLock { pendingKeys.remove(op) }
-            // 괜찮은 앱이라고 답함 = 판정이 틀렸을 수 있음. 켜 두었으면 앱·판·판정기만 익명으로 알린다 (요청마다 한 번)
-            if (decision == FamilyDecision.ALLOW && preferences.falsePositiveFeedback.first()) {
-                alert.toFalsePositive()?.let { falsePositives.schedule(alertId, it) }
+            // 괜찮은 앱이라고 답함 = 판정이 틀렸을 수 있음. 켜 두었으면 근거마다 익명으로 알린다 (요청·근거마다 한 번).
+            // 부가 기능이라 실패해도 응답은 성공으로 (서버는 이미 반영함)
+            if (decision == FamilyDecision.ALLOW) {
+                try {
+                    reportFalsePositives(alertId, alert)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // 다음 기회 없음: 신고 하나를 놓칠 뿐이다
+                }
             }
             alert.toModel()
         } catch (e: IOException) {
@@ -156,6 +167,14 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
                 e.status == 409 && e.slug == "alert-closed" -> throw AlertClosedException()
                 else -> throw e
             }
+        }
+    }
+
+    private suspend fun reportFalsePositives(alertId: String, alert: NetworkAlert) {
+        if (!preferences.falsePositiveFeedback.first()) return
+        for (report in alert.toFalsePositives()) {
+            val id = "$alertId:${if (report.installScan) "install_scan" else "symptom"}"
+            if (preferences.markFalsePositiveReported(id)) falsePositives.schedule(id, report)
         }
     }
 
@@ -180,19 +199,18 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     }
 }
 
-/** 판정 근거가 있을 때만 (계약: install_scan은 모델 판·점수·근거, symptom은 감지 규칙 판 필수) */
-internal fun NetworkAlert.toFalsePositive(): FalsePositive? {
-    val v = verdict
-    return when {
-        source == NetworkAlertSource.INSTALL_SCAN && v != null -> FalsePositive(
-            true, app.packageName, app.versionCode, app.signingCertSha256, v.modelVersion, v.score, v.reasons.map { it.code }, null,
-        )
-        symptom != null -> FalsePositive(
-            false, app.packageName, app.versionCode, app.signingCertSha256, null, null, null, symptom!!.detectorVersion,
-        )
-        else -> null
-    }
-}
+/**
+ * 요청에 붙은 근거마다 신고 하나 (계약: install_scan은 모델 판·점수·근거, symptom은 감지 규칙 판).
+ * 서버는 열린 요청에 다른 근거를 합치므로(source는 처음 값) 둘 다 있을 수 있다
+ */
+internal fun NetworkAlert.toFalsePositives(): List<FalsePositive> = listOfNotNull(
+    verdict?.let { v ->
+        FalsePositive(true, app.packageName, app.versionCode, app.signingCertSha256, v.modelVersion, v.score, v.reasons.map { it.code }, null)
+    },
+    symptom?.let { s ->
+        FalsePositive(false, app.packageName, app.versionCode, app.signingCertSha256, null, null, null, s.detectorVersion)
+    },
+)
 
 internal fun NetworkDecision.toAnswer(): FamilyAnswer? {
     val type = when (decision) {

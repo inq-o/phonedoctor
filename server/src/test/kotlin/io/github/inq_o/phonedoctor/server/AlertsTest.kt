@@ -153,6 +153,8 @@ class CreateAlertTest {
             symptom(date = "11/21"),
             scan().replace("\"score\":0.91", "\"score\":1.5"),
             scan().replace("초고속 클리너", "가".repeat(61)),
+            scan(pkg = "no-dots"),
+            scan(pkg = "com." + "a".repeat(300)),
         )
         for (body in bad) create(body).problem(HttpStatusCode.BadRequest, "bad-request")
         assertEquals(0, FakePusher.sent.size)

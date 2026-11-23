@@ -1,6 +1,12 @@
 package io.github.inq_o.phonedoctor.server
 
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.http.ContentType
+import io.ktor.http.HttpMethod.Companion.Get
 import io.ktor.http.HttpMethod.Companion.Post
+import io.ktor.http.contentType
 import io.ktor.http.HttpStatusCode
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
@@ -33,13 +39,41 @@ class FeedbackTest {
         val noDetector = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert"}"""
         val noModel = """{"source":"install_scan","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","reasonCodes":[]}"""
         val badCert = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"XYZ","detectorVersion":"v"}"""
-        for (body in listOf(noDetector, noModel, badCert)) {
+        val longVersion = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","detectorVersion":"${"x".repeat(65)}"}"""
+        val unknownCode = """{"source":"install_scan","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","modelVersion":"m1","score":0.9,"reasonCodes":["MADE_UP"]}"""
+        val tooMany = """{"source":"install_scan","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","modelVersion":"m1","score":0.9,"reasonCodes":["SIDELOADED","AD_SDK_HEAVY","BOOT_AUTOSTART","DEVICE_ADMIN"]}"""
+        val badScore = """{"source":"install_scan","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","modelVersion":"m1","score":3,"reasonCodes":[]}"""
+        val symptomWithCodes = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","detectorVersion":"v","reasonCodes":["SIDELOADED"]}"""
+        val badPackage = """{"source":"symptom","packageName":"no dots here","versionCode":7,"signingCertSha256":"$cert","detectorVersion":"v"}"""
+        for (body in listOf(noDetector, noModel, badCert, longVersion, unknownCode, tooMany, badScore, symptomWithCodes, badPackage)) {
             assertEquals(HttpStatusCode.BadRequest, client.api(Post, "/feedback/false-positives", token = null, key = null, body = body).status)
         }
         val ok = """{"source":"install_scan","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","modelVersion":"m1","score":0.9,"reasonCodes":["SIDELOADED","AD_SDK_HEAVY","AD_SDK_HEAVY"]}"""
         assertEquals(HttpStatusCode.Accepted, client.api(Post, "/feedback/false-positives", token = null, key = null, body = ok).status)
         val row = transaction(TestDb.db) { FalsePositives.selectAll().single() }
         assertEquals("AD_SDK_HEAVY,SIDELOADED", row[FalsePositives.reasonCodes])
+    }
+
+    @Test
+    fun `경로를 비틀면 로그인 검사를 건너뛰지 않는다`() = serverTest {
+        val doubled = client.post("/v1//feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            contentType(ContentType.Application.Json)
+            setBody(symptom)
+        }
+        assertEquals(HttpStatusCode.Unauthorized, doubled.status)
+        assertEquals(HttpStatusCode.MethodNotAllowed, client.api(Get, "/feedback/false-positives", token = null).status)
+    }
+
+    @Test
+    fun `큰 본문과 잦은 신고는 막는다`() = serverTest {
+        val big = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","detectorVersion":"v","pad":"${"x".repeat(5000)}"}"""
+        assertEquals(HttpStatusCode.PayloadTooLarge, client.api(Post, "/feedback/false-positives", token = null, key = null, body = big).status)
+        val from: io.ktor.client.request.HttpRequestBuilder.() -> Unit = { header("X-Forwarded-For", "203.0.113.9") }
+        repeat(30) {
+            assertEquals(HttpStatusCode.Accepted, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = from).status)
+        }
+        assertEquals(HttpStatusCode.TooManyRequests, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = from).status)
     }
 
     @Test

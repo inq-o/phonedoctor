@@ -206,15 +206,44 @@ class GuardianAlertRepositoryTest {
         assertTrue(reported.isEmpty())
         repo.decide("a1", FamilyDecision.ALLOW, null)
         val (id, report) = reported.single()
-        assertEquals("a1", id)
+        assertEquals("a1:symptom", id)
         assertEquals("com.ad", report.packageName)
         assertEquals(7L, report.versionCode)
         assertEquals("usage-test", report.detectorVersion)
         assertEquals(false, report.installScan)
 
-        repo.setFalsePositiveFeedback(false)
+        // 같은 요청에 다시 답해도 한 번만
         repo.decide("a1", FamilyDecision.ALLOW, null)
         assertEquals(1, reported.size)
+
+        server.single = alert("a2")
+        repo.setFalsePositiveFeedback(false)
+        repo.decide("a2", FamilyDecision.ALLOW, null)
+        assertEquals(1, reported.size)
+    }
+
+    @Test
+    fun `근거가 합쳐진 요청은 근거마다 알린다`() = runTest {
+        server.single = alert("a1").copy(
+            verdict = NetworkVerdict(NetworkRiskLevel.CAUTION, 0.7, "2026.11.1", listOf(NetworkReason("SIDELOADED", 0.4))),
+        )
+        repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(listOf("a1:install_scan", "a1:symptom"), reported.map { it.first })
+        val scan = reported.first().second
+        assertEquals(listOf("SIDELOADED"), scan.reasonCodes)
+        assertEquals("2026.11.1", scan.modelVersion)
+        assertEquals(0.7, scan.score)
+    }
+
+    @Test
+    fun `신고를 맡기다 실패해도 응답은 성공`() = runTest {
+        server.single = alert("a1")
+        val repo = DefaultGuardianAlertRepository(true, server, UserPreferences(
+            PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
+                tmp.newFile("prefs-fail.preferences_pb").also { it.delete() }
+            },
+        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }) { _, _ -> error("WorkManager 오류") }
+        assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.ALLOW, null).status)
     }
 
     @Test
