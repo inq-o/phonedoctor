@@ -21,10 +21,13 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkLink
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkPairingCode
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,12 +46,15 @@ class FamilyRepositoryTest {
 
     private val network = FakeNetwork()
     private val account = FakeAccount()
+    private val push = FakePushTokens()
+    private lateinit var prefs: UserPreferences
 
     private fun TestScope.repo(available: Boolean = true): DefaultFamilyRepository {
         val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
             tmp.newFile("prefs.preferences_pb").also { it.delete() }
         }
-        return DefaultFamilyRepository(available, network, UserPreferences(store), account, { "fcm-1" }, FakeDeviceInfo)
+        prefs = UserPreferences(store)
+        return DefaultFamilyRepository(available, network, prefs, account, push, FakeDeviceInfo)
     }
 
     @Test
@@ -75,7 +81,8 @@ class FamilyRepositoryTest {
         assertEquals(NetworkDeviceRole.PROTECTED, body.role)
         assertEquals("fcm-1", body.fcmToken)
         assertEquals(DeviceRole.SENIOR, repo.role.first())
-        // 요청마다 새 Idempotency-Key
+        assertTrue(push.autoRefreshOn)
+        // 코드 요청은 매번 새 Idempotency-Key
         assertEquals(network.keys.size, network.keys.toSet().size)
     }
 
@@ -151,16 +158,8 @@ class FamilyRepositoryTest {
         assertNull(repo.role.first())
         assertFalse(account.isSignedIn)
         assertEquals(1, account.deleted)
-    }
-
-    @Test
-    fun `서버에 이미 없는 기기(404)도 지운 것으로 본다`() = runTest {
-        val repo = repo()
-        repo.createPairingCode()
-        network.deleteError = ApiException(404, "not-found", null, null, null, null)
-        repo.deleteAllData()
-        assertNull(repo.role.first())
-        assertEquals(1, account.deleted)
+        assertFalse(push.autoRefreshOn)
+        assertEquals(1, push.deleted)
     }
 
     @Test
@@ -220,6 +219,113 @@ class FamilyRepositoryTest {
         }
         assertEquals(emptyList<String>(), network.calls)
     }
+
+    @Test
+    fun `Google 로그인한 채 시니어를 고르면 로그아웃하고 익명으로 등록한다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        account.anonymous = false
+        repo.createPairingCode()
+        assertEquals(1, account.signOuts)
+        assertTrue(account.isAnonymous)
+        assertEquals(NetworkDeviceRole.PROTECTED, network.registrations.single().role)
+    }
+
+    @Test
+    fun `응답을 못 받은 코드 입력은 다시 보낼 때 같은 키를 쓴다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        network.fail["acceptPairingCode"] = IOException("끊김")
+        runCatching { repo.acceptPairingCode("482913") }
+        repo.acceptPairingCode("482913")
+        val keys = network.keysOf("acceptPairingCode")
+        assertEquals(2, keys.size)
+        assertEquals(keys[0], keys[1])
+        // 성공한 뒤 같은 코드를 다시 넣으면 새 동작
+        repo.acceptPairingCode("482913")
+        assertTrue(network.keysOf("acceptPairingCode")[2] != keys[0])
+    }
+
+    @Test
+    fun `서버가 거절한 코드 입력은 다음에 새 키를 쓴다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        network.fail["acceptPairingCode"] = ApiException(410, "pairing-code-expired", null, null, null, null)
+        runCatching { repo.acceptPairingCode("482913") }
+        repo.acceptPairingCode("482913")
+        val keys = network.keysOf("acceptPairingCode")
+        assertTrue(keys[0] != keys[1])
+    }
+
+    @Test
+    fun `등록 응답을 못 받았어도 모든 데이터 지우기가 서버 기기를 지운다`() = runTest {
+        val repo = repo()
+        network.fail["registerDevice"] = IOException("응답 유실")
+        runCatching { repo.createPairingCode() }
+        assertNull(repo.role.first())
+        repo.deleteAllData()
+        // 같은 키로 다시 등록해 ID를 알아낸 뒤 지운다
+        val keys = network.keysOf("registerDevice")
+        assertEquals(keys[0], keys[1])
+        assertEquals(listOf("dev-1"), network.deleted)
+        assertNull(prefs.pendingRegistrationRole.first())
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
+    fun `서버가 거절한 등록은 지울 때 다시 보내지 않는다`() = runTest {
+        val repo = repo()
+        network.fail["registerDevice"] = ApiException(400, "bad-request", null, null, null, null)
+        runCatching { repo.createPairingCode() }
+        assertNull(prefs.pendingRegistrationRole.first())
+        repo.deleteAllData()
+        assertEquals(1, network.keysOf("registerDevice").size)
+        assertEquals(emptyList<String>(), network.deleted)
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
+    fun `서버가 지운 기기는 다시 등록하고 한 번 더 보낸다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.fail["createPairingCode"] = ApiException(403, "device-not-registered", null, null, null, null)
+        repo.createPairingCode()
+        assertEquals(2, network.registrations.size)
+        assertEquals(listOf("registerDevice", "createPairingCode", "createPairingCode", "registerDevice", "createPairingCode"), network.calls)
+    }
+
+    @Test
+    fun `서버가 지운 기기의 목록은 비우고 로컬 등록도 지운다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.fail["listLinks"] = ApiException(403, "device-not-registered", null, null, null, null)
+        assertEquals(emptyList<Any>(), repo.links())
+        assertNull(repo.role.first())
+    }
+
+    @Test
+    fun `토큰 갱신 때 서버에 기기가 없으면(404) 로컬 등록을 지운다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.fail["updateDevice"] = ApiException(404, "not-found", null, null, null, null)
+        repo.updatePushToken("fcm-2")
+        assertNull(repo.role.first())
+    }
+
+    @Test
+    fun `코드 요청은 한 번에 하나씩 보낸다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        val gate = CompletableDeferred<Unit>()
+        network.gate = gate
+        val first = async { repo.createPairingCode() }
+        val second = async { repo.createPairingCode() }
+        runCurrent()
+        assertEquals(1, network.inFlight)
+        gate.complete(Unit)
+        first.await(); second.await()
+        assertEquals(1, network.maxInFlight)
+    }
 }
 
 private object FakeDeviceInfo : DeviceInfo {
@@ -234,6 +340,7 @@ private class FakeAccount : FamilyAccount {
     var anonymous = false
     var deleted = 0
     var deleteError: Exception? = null
+    var signOuts = 0
     override val isSignedIn get() = signedIn
     override val isAnonymous get() = signedIn && anonymous
 
@@ -242,10 +349,29 @@ private class FakeAccount : FamilyAccount {
         anonymous = true
     }
 
+    override fun signOut() {
+        signOuts++
+        signedIn = false
+        anonymous = false
+    }
+
     override suspend fun deleteUser() {
         deleteError?.let { throw it }
         if (signedIn) deleted++
         signedIn = false
+    }
+}
+
+private class FakePushTokens : PushTokens {
+    var autoRefreshOn = false
+    var deleted = 0
+    override suspend fun token() = "fcm-1"
+    override fun setAutoRefresh(enabled: Boolean) {
+        autoRefreshOn = enabled
+    }
+
+    override suspend fun delete() {
+        deleted++
     }
 }
 
@@ -258,6 +384,22 @@ private class FakeNetwork : PhoneDoctorNetworkDataSource {
     var deleteError: Exception? = null
     var linkStatus = NetworkLinkStatus.PENDING
 
+    /** 다음 한 번 그 호출에서 던질 오류 */
+    val fail = mutableMapOf<String, Exception>()
+    private val keyLog = mutableListOf<Pair<String, String>>()
+    fun keysOf(op: String) = keyLog.filter { it.first == op }.map { it.second }
+
+    /** 코드 요청을 붙잡아 두는 문. 동시에 몇 개가 들어와 있는지 센다 */
+    var gate: CompletableDeferred<Unit>? = null
+    var inFlight = 0
+    var maxInFlight = 0
+
+    private fun record(op: String, key: String? = null) {
+        calls += op
+        key?.let { keys += it; keyLog += op to it }
+        fail.remove(op)?.let { throw it }
+    }
+
     private fun link() = NetworkLink(
         linkId = "link-1",
         status = linkStatus,
@@ -268,12 +410,12 @@ private class FakeNetwork : PhoneDoctorNetworkDataSource {
     )
 
     override suspend fun registerDevice(key: String, body: NetworkDeviceRegistration): NetworkDevice {
-        calls += "registerDevice"; keys += key; registrations += body
+        record("registerDevice", key); registrations += body
         return NetworkDevice("dev-1", body.role, "엄마", createdAt = "2026-11-23T00:00:00Z")
     }
 
     override suspend fun updateDevice(deviceId: String, body: NetworkDeviceUpdate): NetworkDevice {
-        calls += "updateDevice"; updates += deviceId to body
+        record("updateDevice"); updates += deviceId to body
         return NetworkDevice(deviceId, NetworkDeviceRole.PROTECTED, "엄마", createdAt = "2026-11-23T00:00:00Z")
     }
 
@@ -284,22 +426,28 @@ private class FakeNetwork : PhoneDoctorNetworkDataSource {
     }
 
     override suspend fun createPairingCode(key: String): NetworkPairingCode {
-        calls += "createPairingCode"; keys += key
+        record("createPairingCode", key)
+        gate?.let {
+            inFlight++
+            maxInFlight = maxOf(maxInFlight, inFlight)
+            it.await()
+            inFlight--
+        }
         return NetworkPairingCode("482913", "phonedoctor://pair?code=482913", "2026-11-23T01:10:00Z")
     }
 
     override suspend fun acceptPairingCode(key: String, code: String): NetworkLink {
-        calls += "acceptPairingCode"; keys += key
+        record("acceptPairingCode", key)
         return link()
     }
 
     override suspend fun listLinks(status: NetworkLinkStatus?): List<NetworkLink> {
-        calls += "listLinks"
+        record("listLinks")
         return listOf(link())
     }
 
     override suspend fun confirmLink(key: String, linkId: String): NetworkLink {
-        calls += "confirmLink"; keys += key
+        record("confirmLink", key)
         return link()
     }
 

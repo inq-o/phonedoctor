@@ -11,6 +11,7 @@ dependencies {
     ksp(libs.androidx.hilt.compiler)
 
     implementation(projects.core.data)
+    implementation(projects.core.network)
     implementation(projects.core.notifications)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.work.runtime.ktx)

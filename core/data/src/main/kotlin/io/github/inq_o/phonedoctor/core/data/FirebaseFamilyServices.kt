@@ -19,6 +19,8 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
         auth.signInAnonymously().await()
     }
 
+    override fun signOut() = auth.signOut()
+
     override suspend fun deleteUser() {
         // Google 사용자는 로그인한 지 오래되면 FirebaseAuthRecentLoginRequiredException. 화면이 다시 로그인시킨 뒤 다시 부른다
         auth.currentUser?.delete()?.await()
@@ -27,8 +29,19 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
 }
 
 internal class FirebasePushTokens @Inject constructor() : PushTokens {
-    // 자동 발급은 꺼 두었다(앱 매니페스트 firebase_messaging_auto_init_enabled). 처음 부를 때 발급된다
-    override suspend fun token(): String = FirebaseMessaging.getInstance().token.await()
+    private val messaging get() = FirebaseMessaging.getInstance()
+
+    // 자동 발급은 기본으로 꺼 두었다(앱 매니페스트 firebase_messaging_auto_init_enabled). 처음 부를 때 발급된다
+    override suspend fun token(): String = messaging.token.await()
+
+    // 켠 값은 SDK가 저장해 다음 실행에도 유지된다. 켜 두면 앱 업데이트·토큰 만료 때 SDK가 새 토큰을 받아 onNewToken으로 알린다
+    override fun setAutoRefresh(enabled: Boolean) {
+        messaging.isAutoInitEnabled = enabled
+    }
+
+    override suspend fun delete() {
+        messaging.deleteToken().await()
+    }
 }
 
 internal class AndroidDeviceInfo @Inject constructor(@ApplicationContext private val context: Context) : DeviceInfo {

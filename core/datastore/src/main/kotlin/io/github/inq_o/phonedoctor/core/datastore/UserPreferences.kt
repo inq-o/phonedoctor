@@ -35,6 +35,13 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         }
     }
 
+    /** 기기 등록을 보냈는데 아직 응답을 못 받은 역할. 응답 유실 뒤에도 모든 데이터 지우기가 서버 기기를 찾게 남긴다 */
+    val pendingRegistrationRole: Flow<String?> = store.data.map { it[PENDING_ROLE] }
+
+    suspend fun setPendingRegistrationRole(role: String?) {
+        store.edit { if (role == null) it.remove(PENDING_ROLE) else it[PENDING_ROLE] = role }
+    }
+
     suspend fun setOnboardingDone(done: Boolean) {
         store.edit { it[ONBOARDING_DONE] = done }
     }
@@ -48,6 +55,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val DISCLOSURE_VERSION = intPreferencesKey("disclosureAcceptedVersion")
         val DEVICE_ID = stringPreferencesKey("deviceId")
         val DEVICE_ROLE = stringPreferencesKey("deviceRole")
+        val PENDING_ROLE = stringPreferencesKey("pendingRegistrationRole")
     }
 }
 

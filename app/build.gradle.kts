@@ -68,9 +68,14 @@ androidComponents {
                 )
                 val found = banned.filter { "android:name=\"$it\"" in text }
                 check(found.isEmpty()) { "출시 빌드에 통신 권한이 있음: $found (app/src/release/AndroidManifest.xml 참고)" }
+                // FCM 토큰은 연결을 시작할 때 처음 발급한다 (켜져 있으면 앱 시작 때 발급·전송)
+                val autoInitOff = Regex("""android:name="firebase_messaging_auto_init_enabled"\s+android:value="false"""")
+                check(autoInitOff.containsMatchIn(text)) { "FCM 자동 발급이 꺼져 있지 않음 (app/src/main/AndroidManifest.xml)" }
             }
         }
-        tasks.matching { it.name == "test" }.configureEach { dependsOn(verify) }
+        // CI의 ./gradlew test와, 로컬에서 출시 APK를 만들 때(assembleRelease 등) 둘 다
+        val name = variant.name.replaceFirstChar { it.uppercase() }
+        tasks.matching { it.name in setOf("test", "assemble$name", "bundle$name") }.configureEach { dependsOn(verify) }
     }
 }
 

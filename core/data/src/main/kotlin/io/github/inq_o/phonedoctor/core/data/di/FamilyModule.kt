@@ -1,9 +1,11 @@
 package io.github.inq_o.phonedoctor.core.data.di
 
+import android.content.Context
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.inq_o.phonedoctor.core.data.AndroidDeviceInfo
 import io.github.inq_o.phonedoctor.core.data.DefaultFamilyRepository
@@ -36,6 +38,6 @@ internal interface FamilyModule {
     companion object {
         @Provides
         @FamilyEnabled
-        fun providesFamilyEnabled(): Boolean = FamilyFeature.ENABLED
+        fun providesFamilyEnabled(@ApplicationContext context: Context): Boolean = FamilyFeature.isAvailable(context)
     }
 }
