@@ -50,7 +50,7 @@ class FamilyRepositoryTest {
     private val linkEvents = FakeLinkEvents()
     private var cancelledReports = 0
     private val reporter = object : FalsePositiveReporter {
-        override fun schedule(id: String, report: FalsePositive) = Unit
+        override fun schedule(id: String, report: FalsePositive, generation: Long, deadline: Long, delayMillis: Long) = Unit
         override fun cancelAll() {
             cancelledReports++
         }
@@ -63,7 +63,7 @@ class FamilyRepositoryTest {
             tmp.newFile("prefs.preferences_pb").also { it.delete() }
         }
         prefs = UserPreferences(store)
-        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents, reporter)
+        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents, FalsePositiveGate(prefs, reporter))
     }
 
     @Test
@@ -200,6 +200,19 @@ class FamilyRepositoryTest {
         assertEquals(1, cancelledReports)
         assertTrue(prefs.falsePositiveFeedback.first())
         assertTrue(prefs.reportedFalsePositives.first().isEmpty())
+        // 세대는 되돌리지 않는다 (지우기 전에 맡긴 신고가 되살아나지 않게)
+        assertEquals(1L, prefs.falsePositiveGeneration.first())
+    }
+
+    @Test
+    fun `지우기가 서버에서 실패해도 오탐 신고는 먼저 무효가 된다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.deleteError = IOException("망 끊김")
+        runCatching { repo.deleteAllData() }
+        assertEquals(1, cancelledReports)
+        assertEquals(1L, prefs.falsePositiveGeneration.first())
+        assertTrue(prefs.deletionPending.first())
     }
 
     @Test

@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.server
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.contentLength
+import io.ktor.http.BadContentTypeFormatException
 import io.ktor.http.ContentType
 import io.ktor.server.request.contentType
 import io.ktor.server.request.receiveChannel
@@ -23,7 +24,6 @@ import org.jetbrains.exposed.v1.jdbc.upsert
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
-import java.util.concurrent.ConcurrentHashMap
 
 /** 오탐 익명 신고 집계 (V6__false_positive.sql) */
 object FalsePositives : Table("false_positive") {
@@ -65,37 +65,56 @@ private const val BODY_MAX = 4_096L
  * 주소는 이 서버 메모리에만 두고 저장하지 않는다 (인스턴스가 다시 뜨면 비워짐). 집계 수치는 참고용이지 자동 허용 근거가 아니다
  */
 private const val PER_SOURCE_PER_HOUR = 30
-private val recent = ConcurrentHashMap<String, MutableList<Instant>>()
 private const val SOURCES_MAX = 10_000
 
+/** 주소별 최근 신고 시각. 한 자물쇠로 묶어 표 크기 판단과 기록이 어긋나지 않게 */
+private val recent = HashMap<String, ArrayDeque<Instant>>()
+private var prunedAt: Instant = Instant.EPOCH
+
 /**
- * 보낸 곳 주소. Cloud Run 앞단(Google Front End)은 실제 접속 주소를 X-Forwarded-For **맨 뒤**에 덧붙인다.
- * 앞쪽 값은 보낸 쪽이 마음대로 넣을 수 있어 쓰지 않는다 (매번 바꿔 제한을 피하지 못하게)
+ * 보낸 곳 주소. 앞단 프록시는 실제 접속 주소를 X-Forwarded-For **오른쪽 끝**에 덧붙인다 (Cloud Run 직접이면 맨 끝,
+ * 외부 부하 분산기 뒤면 그 앞 = [hops] 2). 더 왼쪽 값은 보낸 쪽이 마음대로 넣을 수 있어 쓰지 않는다.
+ * IPv6는 /64로 묶는다 (한 회선이 주소를 바꿔 가며 제한을 피하지 못하게)
  */
-internal fun sourceOf(forwardedFor: String?, remoteHost: String): String =
-    forwardedFor?.substringAfterLast(',')?.trim()?.ifEmpty { null } ?: remoteHost
+internal fun sourceOf(forwardedFor: String?, remoteHost: String, hops: Int = 1): String {
+    val parts = forwardedFor?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
+    val ip = parts.getOrNull(parts.size - hops) ?: remoteHost
+    return bucket(ip)
+}
+
+private fun bucket(ip: String): String {
+    if (':' !in ip) return ip
+    val addr = runCatching { java.net.InetAddress.getByName(ip.removePrefix("[").substringBefore(']').substringBefore('%')) }.getOrNull()
+    if (addr !is java.net.Inet6Address) return ip
+    val b = addr.address
+    return (0 until 8).joinToString(":") { "%02x".format(b[it]) } + "::/64"
+}
 
 /** 시험마다 비운다 */
-internal fun clearFeedbackLimits() = recent.clear()
+internal fun clearFeedbackLimits() = synchronized(recent) {
+    recent.clear()
+    prunedAt = Instant.EPOCH
+}
 
-internal fun allow(source: String, now: Instant): Boolean {
+/**
+ * 시간당 [PER_SOURCE_PER_HOUR]건. 표가 [SOURCES_MAX]개로 차면 조용해진 주소를 비우고(1분에 한 번만, 요청마다 다 훑지 않게),
+ * 그래도 가득하면 **새 주소만** 받지 않는다 (이미 있는 주소의 기록은 건드리지 않음)
+ */
+internal fun allow(source: String, now: Instant): Boolean = synchronized(recent) {
     val since = now.minus(Duration.ofHours(1))
-    var ok = false
-    recent.compute(source) { _, list ->
-        val kept = (list ?: mutableListOf()).filterTo(mutableListOf()) { it > since }
-        ok = kept.size < PER_SOURCE_PER_HOUR
-        if (ok) kept += now
-        kept.ifEmpty { null }
-    }
-    // 오래 조용한 주소는 버린다 (메모리가 늘지 않게). 그래도 가득하면 새 주소는 받지 않는다 (한 시간 뒤 비워짐)
-    if (recent.size > SOURCES_MAX) {
-        recent.entries.removeIf { e -> e.value.all { it <= since } }
-        if (recent.size > SOURCES_MAX) {
-            recent.remove(source)
-            return false
+    var list = recent[source]
+    if (list == null) {
+        if (recent.size >= SOURCES_MAX && now.isAfter(prunedAt.plusSeconds(60))) {
+            prunedAt = now
+            recent.values.removeIf { q -> q.all { it <= since } }
         }
+        if (recent.size >= SOURCES_MAX) return@synchronized false
+        list = ArrayDeque<Instant>().also { recent[source] = it }
     }
-    return ok
+    while (list.isNotEmpty() && list.first() <= since) list.removeFirst()
+    if (list.size >= PER_SOURCE_PER_HOUR) return@synchronized false
+    list.addLast(now)
+    true
 }
 
 private val CERT = Regex("^[0-9a-f]{64}$")
@@ -132,9 +151,19 @@ fun Route.feedbackRoutes(deps: Deps) {
     post("/feedback/false-positives") {
         val tooLarge = ApiProblem(HttpStatusCode.PayloadTooLarge, "too-large", "본문이 너무 큼")
         if ((call.request.contentLength() ?: 0L) > BODY_MAX) throw tooLarge
-        val source = sourceOf(call.request.headers["X-Forwarded-For"], call.request.origin.remoteHost)
+        val source = sourceOf(call.request.headers["X-Forwarded-For"], call.request.origin.remoteHost, deps.proxyHops)
         if (!allow(source, deps.now())) throw ApiProblem(HttpStatusCode.TooManyRequests, "too-many-reports", "신고가 너무 잦음", headers = mapOf("Retry-After" to "3600"))
-        if (call.request.contentType().withoutParameters() != ContentType.Application.Json) throw unsupportedMedia()
+        // call.receive와 같게: 형식이 깨진 Content-Type은 400, JSON(…+json 포함)이 아니면 415. 본문은 UTF-8만 (RFC 8259)
+        val type = try {
+            call.request.contentType()
+        } catch (e: BadContentTypeFormatException) {
+            throw badRequest("Content-Type 형식 오류")
+        }
+        val json = type.match(ContentType.Application.Json) ||
+            (type.contentType == "application" && type.contentSubtype.endsWith("+json"))
+        if (!json) throw unsupportedMedia()
+        val charset = type.parameter("charset")
+        if (charset != null && !charset.equals("utf-8", ignoreCase = true) && !charset.equals("utf8", ignoreCase = true)) throw unsupportedMedia()
         // 길이를 밝히지 않은(chunked) 본문도 상한까지만 읽는다
         val bytes = call.receiveChannel().readRemaining(BODY_MAX + 1).readByteArray()
         if (bytes.size > BODY_MAX) throw tooLarge

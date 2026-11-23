@@ -47,6 +47,7 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.IOException
+import java.time.Instant
 
 class GuardianAlertRepositoryTest {
     @get:Rule
@@ -55,10 +56,12 @@ class GuardianAlertRepositoryTest {
     private val server = AlertServer()
     private var stores = 0
     private val reported = mutableListOf<Pair<String, FalsePositive>>()
+    private val timing = mutableListOf<Pair<Long, Long>>() // (마감, 늦출 시간)
     private var cancelled = 0
     private val reporter = object : FalsePositiveReporter {
-        override fun schedule(id: String, report: FalsePositive) {
+        override fun schedule(id: String, report: FalsePositive, generation: Long, deadline: Long, delayMillis: Long) {
             reported += id to report
+            timing += deadline to delayMillis
         }
 
         override fun cancelAll() {
@@ -66,6 +69,9 @@ class GuardianAlertRepositoryTest {
         }
     }
     private lateinit var prefs: UserPreferences
+    private lateinit var gate: FalsePositiveGate
+    private val now = Instant.parse("2026-11-23T04:00:00Z").toEpochMilli()
+    private val hour = 3_600_000L
 
     private suspend fun TestScope.repo(role: String? = "GUARDIAN", available: Boolean = true): DefaultGuardianAlertRepository {
         val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
@@ -73,7 +79,8 @@ class GuardianAlertRepositoryTest {
         }
         prefs = UserPreferences(store)
         role?.let { prefs.setRegisteredDevice(RegisteredDevice("dev-2", it)) }
-        return DefaultGuardianAlertRepository(available, server, prefs, reporter)
+        gate = FalsePositiveGate(prefs, reporter).also { it.clock = { now } }
+        return DefaultGuardianAlertRepository(available, server, prefs, gate)
     }
 
     @Test
@@ -246,6 +253,46 @@ class GuardianAlertRepositoryTest {
         server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to mine)), null)
         repo().decide("a1", FamilyDecision.ALLOW, null)
         assertEquals(listOf("a1:symptom"), reported.map { it.first })
+        // 마감은 서버가 기록한 첫 응답 시각(03:00) + 24시간, 늦출 시간은 1시간 ~ 마감 1시간 전
+        val (deadline, delay) = timing.single()
+        assertEquals(Instant.parse("2026-11-24T03:00:00Z").toEpochMilli(), deadline)
+        assertTrue(delay >= hour && delay <= deadline - now - hour)
+    }
+
+    @Test
+    fun `오래전에 한 답을 다시 보내면 마감이 지나 맡기지 않는다`() = runTest {
+        server.single = alert("a1", status = NetworkAlertStatus.DECIDED)
+        val old = Json.encodeToJsonElement(
+            NetworkDecision.serializer(),
+            NetworkDecision(NetworkDecisionType.ALLOW, null, NetworkDeviceSummary("dev-2", "민지"), "2026-11-21T04:00:00Z"),
+        )
+        server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to old)), null)
+        repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertTrue(reported.isEmpty())
+        // 마감 1시간 안쪽(1시간 넘게 늦출 수 없음)도 맡기지 않는다
+        server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to Json.encodeToJsonElement(
+            NetworkDecision.serializer(),
+            NetworkDecision(NetworkDecisionType.ALLOW, null, NetworkDeviceSummary("dev-2", "민지"), "2026-11-22T06:00:00Z"),
+        ))), null)
+        repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertTrue(reported.isEmpty())
+    }
+
+    @Test
+    fun `응답을 기다리는 사이 껐다 켜도 그 응답의 신고는 맡기지 않는다`() = runTest {
+        server.single = alert("a1")
+        val repo = repo()
+        server.onDecide = {
+            repo.setFalsePositiveFeedback(false)
+            repo.setFalsePositiveFeedback(true)
+        }
+        repo.decide("a1", FamilyDecision.ALLOW, null)
+        assertTrue(reported.isEmpty())
+        // 다음 응답은 다시 맡긴다
+        server.onDecide = null
+        server.single = alert("a2")
+        repo.decide("a2", FamilyDecision.ALLOW, null)
+        assertEquals(listOf("a2:symptom"), reported.map { it.first })
     }
 
     @Test
@@ -264,14 +311,16 @@ class GuardianAlertRepositoryTest {
     @Test
     fun `신고를 맡기다 실패해도 응답은 성공`() = runTest {
         server.single = alert("a1")
-        val repo = DefaultGuardianAlertRepository(true, server, UserPreferences(
+        val p = UserPreferences(
             PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
                 tmp.newFile("prefs-fail.preferences_pb").also { it.delete() }
             },
-        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }, object : FalsePositiveReporter {
-            override fun schedule(id: String, report: FalsePositive) = error("WorkManager 오류")
+        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }
+        val failing = FalsePositiveGate(p, object : FalsePositiveReporter {
+            override fun schedule(id: String, report: FalsePositive, generation: Long, deadline: Long, delayMillis: Long) = error("WorkManager 오류")
             override fun cancelAll() = Unit
         })
+        val repo = DefaultGuardianAlertRepository(true, server, p, failing)
         assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.ALLOW, null).status)
     }
 
@@ -308,6 +357,8 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
     var pages: List<List<NetworkAlert>> = emptyList()
     var single: NetworkAlert? = null
     val statuses = mutableListOf<NetworkAlertStatus?>()
+    /** 응답이 서버에 가 있는 동안 할 일 */
+    var onDecide: (suspend () -> Unit)? = null
 
     private fun record(op: String) {
         calls += op
@@ -328,6 +379,7 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
     }
 
     override suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate): NetworkAlert {
+        onDecide?.invoke()
         keys += key
         bodies += body
         record("decideAlert")

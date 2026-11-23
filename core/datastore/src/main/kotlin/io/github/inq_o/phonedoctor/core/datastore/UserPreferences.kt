@@ -106,7 +106,14 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
      */
     val reportedFalsePositives: Flow<Set<String>> = store.data.map { it[REPORTED_FALSE_POSITIVES] ?: emptySet() }
 
-    /** 모든 데이터 지우기: 신고 설정과 보낸 표시를 처음 상태로 */
+    /** 오탐 신고 세대: 끄거나 모든 데이터를 지울 때 올린다. 그 전에 맡긴 신고는 보내지 않는다 (지워도 되돌리지 않음) */
+    val falsePositiveGeneration: Flow<Long> = store.data.map { it[FALSE_POSITIVE_GENERATION] ?: 0L }
+
+    suspend fun bumpFalsePositiveGeneration() {
+        store.edit { it[FALSE_POSITIVE_GENERATION] = (it[FALSE_POSITIVE_GENERATION] ?: 0L) + 1 }
+    }
+
+    /** 모든 데이터 지우기: 신고 설정과 보낸 표시를 처음 상태로 (세대는 그대로 두어 옛 신고가 되살아나지 않게) */
     suspend fun clearFalsePositiveState() {
         store.edit {
             it.remove(FALSE_POSITIVE_FEEDBACK)
@@ -154,6 +161,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val DELETION_PENDING = booleanPreferencesKey("deletionPending")
         val FALSE_POSITIVE_FEEDBACK = booleanPreferencesKey("falsePositiveFeedback")
         val REPORTED_FALSE_POSITIVES = stringSetPreferencesKey("reportedFalsePositives")
+        val FALSE_POSITIVE_GENERATION = longPreferencesKey("falsePositiveGeneration")
         const val REPORTED_MAX = 500
     }
 }

@@ -4,6 +4,8 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
 import io.ktor.http.HttpMethod.Companion.Get
 import io.ktor.http.HttpMethod.Companion.Post
 import io.ktor.http.content.OutgoingContent
@@ -106,6 +108,27 @@ class FeedbackTest {
         }
         assertEquals(HttpStatusCode.UnsupportedMediaType, text.status)
         assertEquals(HttpStatusCode.BadRequest, client.api(Post, "/feedback/false-positives", token = null, key = null, body = "{").status)
+        // 클라이언트가 Content-Type을 고치지 않게 본문 객체에 그대로 싣는다
+        suspend fun typed(type: String, body: String = symptom) = client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            setBody(object : OutgoingContent.ByteArrayContent() {
+                override val headers = headersOf(HttpHeaders.ContentType, type)
+                override fun bytes() = body.encodeToByteArray()
+            })
+        }.status
+        // 깨진 Content-Type은 400 (500 아님), …+json은 받음, UTF-8 아닌 문자 집합·모르는 문자 집합은 415
+        assertEquals(HttpStatusCode.BadRequest, typed("garbage"))
+        assertEquals(HttpStatusCode.Accepted, typed("application/problem+json"))
+        assertEquals(HttpStatusCode.Accepted, typed("application/json; charset=utf-8"))
+        assertEquals(HttpStatusCode.UnsupportedMediaType, typed("application/json; charset=utf-16"))
+        assertEquals(HttpStatusCode.UnsupportedMediaType, typed("application/json; charset=nope-9"))
+        // 상한 경계: 4096바이트는 받고 4097은 413
+        val pad = { n: Int -> symptom.dropLast(1) + " ".repeat(n - symptom.length) + "}" }
+        assertEquals(HttpStatusCode.Accepted, typed("application/json", pad(4096)))
+        assertEquals(HttpStatusCode.PayloadTooLarge, client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            setBody(chunked(pad(4097)))
+        }.status)
     }
 
     @Test
@@ -119,6 +142,13 @@ class FeedbackTest {
         assertEquals("203.0.113.9", sourceOf("1.2.3.4, 203.0.113.9", "x"))
         assertEquals("x", sourceOf(null, "x"))
         assertEquals("x", sourceOf(" ", "x"))
+        // 외부 부하 분산기 뒤(PROXY_HOPS=2): 끝은 부하 분산기, 그 앞이 접속 주소
+        assertEquals("198.51.100.7", sourceOf("1.2.3.4, 198.51.100.7, 35.191.0.1", "x", hops = 2))
+        assertEquals("x", sourceOf("35.191.0.1", "x", hops = 2))
+        // IPv6는 /64로 묶는다
+        assertEquals(sourceOf("2001:db8:1:2::1", "x"), sourceOf("2001:db8:1:2:ffff::9", "x"))
+        assertEquals("20:01:0d:b8:00:01:00:02::/64", sourceOf("2001:db8:1:2::abcd", "x"))
+        assertTrue(sourceOf("2001:db8:1:3::1", "x") != sourceOf("2001:db8:1:2::1", "x"))
     }
 
     @Test

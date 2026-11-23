@@ -26,6 +26,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
 import java.io.IOException
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -70,7 +71,8 @@ data class FalsePositive(
  * 응답(로그인한 요청)과 시각으로 이어지지 않게 몇 시간 늦춰 보낸다
  */
 interface FalsePositiveReporter {
-    fun schedule(id: String, report: FalsePositive)
+    /** [generation]·[deadline]은 보낼 때 [FalsePositiveGate.send]가 다시 본다. [delayMillis] 뒤에 보낸다 */
+    fun schedule(id: String, report: FalsePositive, generation: Long, deadline: Long, delayMillis: Long)
 
     /** 아직 보내지 않은 신고를 모두 거둔다 (설정을 끄거나 모든 데이터를 지울 때) */
     fun cancelAll()
@@ -90,14 +92,13 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     @FamilyEnabled private val available: Boolean,
     private val network: PhoneDoctorNetworkDataSource,
     private val preferences: UserPreferences,
-    private val falsePositives: FalsePositiveReporter,
+    private val falsePositives: FalsePositiveGate,
 ) : GuardianAlertRepository {
     override val falsePositiveFeedback: Flow<Boolean> = preferences.falsePositiveFeedback
 
     override suspend fun setFalsePositiveFeedback(enabled: Boolean) {
-        preferences.setFalsePositiveFeedback(enabled)
-        // 끄면 이미 맡겨 둔 것도 보내지 않는다 (작업도 보낼 때 설정을 다시 본다)
-        if (!enabled) falsePositives.cancelAll()
+        // 끄면 세대를 올려 이미 맡긴 것과 응답을 기다리는 중인 것도 보내지 않는다
+        if (enabled) preferences.setFalsePositiveFeedback(true) else falsePositives.invalidate { preferences.setFalsePositiveFeedback(false) }
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -138,6 +139,8 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
         val message = messageToSenior?.trim()?.take(MESSAGE_TO_SENIOR_MAX)?.ifEmpty { null }
         val op = "decide:$alertId:${decision.wire}:$message"
         val key = keysLock.withLock { pendingKeys.getOrPut(op) { UUID.randomUUID().toString() } }
+        // 응답을 보내기 전 세대: 기다리는 사이 끄거나 지우면 이 응답의 신고는 맡기지 않는다
+        val generation = falsePositives.generation()
         val body = NetworkDecisionCreate(
             if (decision == FamilyDecision.ALLOW) NetworkDecisionType.ALLOW else NetworkDecisionType.RECOMMEND_UNINSTALL,
             message,
@@ -147,7 +150,7 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
             keysLock.withLock { pendingKeys.remove(op) }
             // 괜찮은 앱이라고 답함 = 판정이 틀렸을 수 있음. 켜 두었으면 근거마다 익명으로 알린다 (요청·근거마다 한 번).
             // 부가 기능이라 실패해도 응답은 성공으로 (서버는 이미 반영함)
-            if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert)
+            if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert, generation, alert.decision?.decidedAt)
             alert.toModel()
         } catch (e: IOException) {
             throw e // 서버가 처리했는지 모름 → 다시 누르면 같은 키
@@ -161,7 +164,8 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
                     if (existing != null && existing.decidedBy.deviceId == registeredDevice()?.deviceId && existing.decision == body.decision) {
                         val alert = guarded { network.getAlert(alertId) }
                         // 앱이 다시 켜져 키를 잃은 뒤 같은 답을 다시 보낸 경우: 첫 응답에서 못 맡긴 신고를 여기서 맡긴다 (보낸 표시가 있으면 건너뜀)
-                        if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert)
+                        // 마감은 처음 답한 시각(서버 기록)부터 센다
+                        if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert, generation, existing.decidedAt)
                         return alert.toModel()
                     }
                     throw AlreadyAnsweredException(existing?.toAnswer())
@@ -173,9 +177,9 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     }
 
     /** 부가 기능이라 실패해도 응답은 성공으로 (서버는 이미 반영함). 신고 하나를 놓칠 뿐이다 */
-    private suspend fun reportQuietly(alertId: String, alert: NetworkAlert) {
+    private suspend fun reportQuietly(alertId: String, alert: NetworkAlert, generation: Long, decidedAt: String?) {
         try {
-            reportFalsePositives(alertId, alert)
+            reportFalsePositives(alertId, alert, generation, decidedAt)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -183,11 +187,12 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
         }
     }
 
-    private suspend fun reportFalsePositives(alertId: String, alert: NetworkAlert) {
-        if (!preferences.falsePositiveFeedback.first()) return
+    private suspend fun reportFalsePositives(alertId: String, alert: NetworkAlert, generation: Long, decidedAt: String?) {
+        // 서버 응답 시각을 모르면(응답에 없음) 지금으로
+        val answered = decidedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: falsePositives.clock()
         for (report in alert.toFalsePositives()) {
             val id = "$alertId:${if (report.installScan) "install_scan" else "symptom"}"
-            if (preferences.markFalsePositiveReported(id)) falsePositives.schedule(id, report)
+            falsePositives.schedule(id, report, generation, answered)
         }
     }
 
