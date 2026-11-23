@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.tasks.await
@@ -22,6 +23,14 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
             auth.signInAnonymously().await()
         } catch (e: FirebaseNetworkException) {
             // 화면이 서버 통신 실패와 같은 "인터넷 연결" 안내를 하게 IOException으로 바꾼다
+            throw IOException(e)
+        }
+    }
+
+    override suspend fun signInWithGoogle(idToken: String) {
+        try {
+            auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await()
+        } catch (e: FirebaseNetworkException) {
             throw IOException(e)
         }
     }

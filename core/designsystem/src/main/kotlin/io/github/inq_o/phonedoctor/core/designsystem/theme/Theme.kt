@@ -82,3 +82,9 @@ fun PhoneDoctorTheme(
         )
     }
 }
+
+/** 보호자 화면 글자 크기. 색은 감싼 테마(PhoneDoctorTheme)를 그대로 쓴다 */
+@Composable
+fun GuardianTheme(content: @Composable () -> Unit) {
+    MaterialTheme(colorScheme = MaterialTheme.colorScheme, typography = GuardianTypography, content = content)
+}

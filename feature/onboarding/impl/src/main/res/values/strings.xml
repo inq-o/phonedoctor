@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="feature_onboarding_impl_role_title">어느 폰을 지킬까요?</string>
+    <string name="feature_onboarding_impl_role_senior">이 폰을 지켜요</string>
+    <string name="feature_onboarding_impl_role_senior_body">이 폰에 깔린 앱을 살펴보고, 광고를 띄우거나 위험한 앱을 찾으면 알려 드려요. 부모님 폰이라면 이쪽이에요.</string>
+    <string name="feature_onboarding_impl_role_guardian">가족 폰을 지켜요</string>
+    <string name="feature_onboarding_impl_role_guardian_body">부모님 폰에 확인이 필요한 앱이 생기면 이 폰으로 알려 드려요. 부모님 폰에도 폰주치의를 깔고 연결해야 해요.</string>
+
     <string name="feature_onboarding_impl_step">%1$d단계 중 %2$d단계</string>
 
     <string name="feature_onboarding_impl_disclosure_title">폰주치의가 하는 일</string>

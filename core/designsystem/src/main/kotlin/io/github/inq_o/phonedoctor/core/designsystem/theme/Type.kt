@@ -64,3 +64,15 @@ val Typography = Typography(
         lineHeight = 28.sp,
     ),
 )
+
+// 보호자 화면 기준 (ux-flows.md §5): 상태 문장 22sp, 본문 16sp, 버튼 16sp. Material 3 기본 크기에 어절 단위 줄바꿈만 더한다
+private val Default = Typography()
+
+val GuardianTypography = Typography(
+    headlineSmall = Default.headlineSmall.copy(fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    titleLarge = Default.titleLarge.copy(lineBreak = KoreanLineBreak),
+    titleMedium = Default.titleMedium.copy(fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    bodyLarge = Default.bodyLarge.copy(lineBreak = KoreanLineBreak),
+    bodyMedium = Default.bodyMedium.copy(lineBreak = KoreanLineBreak),
+    labelLarge = Default.labelLarge.copy(fontSize = 16.sp, lineHeight = 24.sp),
+)

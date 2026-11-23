@@ -111,6 +111,30 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `보호자 Google 로그인은 서버를 부르지 않고 익명 사용자를 바꾼다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        account.anonymous = true
+        assertFalse(repo.isGuardianSignedIn)
+        repo.signInGuardian("google-id-token")
+        assertTrue(repo.isGuardianSignedIn)
+        assertEquals(emptyList<String>(), network.calls)
+    }
+
+    @Test
+    fun `시니어로 등록한 기기는 보호자로 로그인하지 않는다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        try {
+            repo.signInGuardian("google-id-token")
+            fail()
+        } catch (e: RoleMismatchException) {
+            assertEquals(DeviceRole.SENIOR, e.registered)
+        }
+        assertTrue(account.isAnonymous)
+    }
+
+    @Test
     fun `다른 역할로 등록한 기기는 거절한다`() = runTest {
         val repo = repo()
         repo.createPairingCode()
@@ -365,6 +389,11 @@ private class FakeAccount : FamilyAccount {
     override suspend fun signInAnonymously() {
         signedIn = true
         anonymous = true
+    }
+
+    override suspend fun signInWithGoogle(idToken: String) {
+        signedIn = true
+        anonymous = false
     }
 
     override fun signOut() {

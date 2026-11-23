@@ -19,11 +19,19 @@ package io.github.inq_o.phonedoctor.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
+import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
+import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.EnterCodeNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianHomeNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSignInNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.LinkWaitingNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.impl.navigation.guardianEntries
 import io.github.inq_o.phonedoctor.feature.onboarding.api.navigation.OnboardingNavKey
+import io.github.inq_o.phonedoctor.feature.onboarding.api.navigation.RoleChoiceNavKey
 import io.github.inq_o.phonedoctor.feature.onboarding.impl.navigation.onboardingEntry
 import io.github.inq_o.phonedoctor.feature.seniorappdetail.api.navigation.AppDetailNavKey
 import io.github.inq_o.phonedoctor.feature.seniorappdetail.impl.navigation.appDetailEntry
@@ -35,39 +43,62 @@ import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.ScanHistory
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.impl.navigation.seniorHomeEntries
 
+/** 처음 쌓을 화면. 첫 설정·로그인 화면 밑에는 역할 선택을 깔아 뒤로 가기로 다시 고를 수 있게 한다 */
+internal fun startStack(start: StartScreen, familyAvailable: Boolean): List<NavKey> = when (start) {
+    StartScreen.ROLE_CHOICE -> listOf(RoleChoiceNavKey)
+    StartScreen.SENIOR_ONBOARDING -> if (familyAvailable) listOf(RoleChoiceNavKey, OnboardingNavKey) else listOf(OnboardingNavKey)
+    StartScreen.SENIOR_HOME -> listOf(SeniorHomeNavKey)
+    StartScreen.GUARDIAN_SIGN_IN -> listOf(RoleChoiceNavKey, GuardianSignInNavKey)
+    StartScreen.GUARDIAN_HOME -> listOf(GuardianHomeNavKey)
+}
+
 /**
- * 첫 설정을 끝냈으면 홈, 아니면 첫 설정부터 시작한다. 알림을 눌러 들어온 경우 [pendingOpen]의 화면을 홈 위에 연다.
+ * 알림을 눌러 연 화면을 놓을 스택. 홈이 맨 밑에 있을 때만(첫 설정·로그인 중이 아닐 때) 연다: 설정을 마치며 스택을 홈으로 바꿀 때
+ * 함께 지워지지 않게. null이면 아직 열 수 없음. 빈 목록이면 이 역할에 없는 화면이라 버린다
+ */
+internal fun pendingStack(root: NavKey?, target: PendingOpen): List<NavKey>? = when (root) {
+    // 알림으로 연 화면은 홈 바로 위에: [홈으로]·뒤로가 예상대로 홈으로 가고, 같은 화면이 여러 장 쌓이지 않게
+    SeniorHomeNavKey -> listOf(
+        SeniorHomeNavKey,
+        when (target) {
+            is PendingOpen.Alert -> AppDetailNavKey(target.alertId)
+            is PendingOpen.LinkRequest -> LinkConfirmNavKey(target.linkId)
+            PendingOpen.FamilyLinks -> FamilyLinksNavKey
+        },
+    )
+    // 보호자의 연결 알림(연결됨·끊김·연락 끊김)은 연결 목록이 있는 홈으로. 시니어 알림은 보호자 폰에 오지 않는다
+    GuardianHomeNavKey -> if (target == PendingOpen.FamilyLinks) listOf(GuardianHomeNavKey) else emptyList()
+    else -> null
+}
+
+/**
+ * [start]의 화면부터 시작한다. 알림을 눌러 들어온 경우 [pendingOpen]의 화면을 홈 위에 연다.
+ * @param guardianSignedIn O1에서 보호자를 골랐을 때 로그인 화면을 건너뛸지
  */
 @Composable
 fun MainNavigation(
-    onboardingDone: Boolean,
+    start: StartScreen,
+    familyAvailable: Boolean,
+    guardianSignedIn: () -> Boolean,
     pendingOpen: PendingOpen?,
     onOpened: () -> Unit,
 ) {
-    // 시작 화면은 처음 한 번만 정한다. 첫 설정이 끝나면 아래 onFinished에서 홈으로 바꾼다
-    val backStack = rememberNavBackStack(if (onboardingDone) SeniorHomeNavKey else OnboardingNavKey)
-
-    // 첫 설정 화면이 스택에 있는 동안은 열지 않는다: 설정을 마치며 스택을 홈으로 바꿀 때 함께 지워지지 않게
-    val inOnboarding = backStack.any { it is OnboardingNavKey }
-    LaunchedEffect(pendingOpen, onboardingDone, inOnboarding) {
-        if (pendingOpen != null && onboardingDone && !inOnboarding) {
-            // 알림으로 연 화면은 홈 바로 위에: [홈으로]·뒤로가 예상대로 홈으로 가고, 같은 화면이 여러 장 쌓이지 않게
-            backStack.clear()
-            backStack.add(SeniorHomeNavKey)
-            backStack.add(
-                when (pendingOpen) {
-                    is PendingOpen.Alert -> AppDetailNavKey(pendingOpen.alertId)
-                    is PendingOpen.LinkRequest -> LinkConfirmNavKey(pendingOpen.linkId)
-                    PendingOpen.FamilyLinks -> FamilyLinksNavKey
-                },
-            )
-            onOpened()
-        }
-    }
-    val toHome: () -> Unit = {
+    // 시작 화면은 처음 한 번만 정한다. 이후에는 아래 콜백들이 스택을 바꾼다
+    val backStack = rememberNavBackStack(*startStack(start, familyAvailable).toTypedArray())
+    fun reset(vararg keys: NavKey) {
         backStack.clear()
-        backStack.add(SeniorHomeNavKey)
+        backStack.addAll(keys)
     }
+
+    val root = backStack.firstOrNull()
+    LaunchedEffect(pendingOpen, root) {
+        val target = pendingOpen ?: return@LaunchedEffect
+        val stack = pendingStack(root, target) ?: return@LaunchedEffect
+        if (stack.isNotEmpty()) reset(*stack.toTypedArray())
+        onOpened()
+    }
+    val toSeniorHome: () -> Unit = { reset(SeniorHomeNavKey) }
+    val toGuardianHome: () -> Unit = { reset(GuardianHomeNavKey) }
 
     NavDisplay(
         backStack = backStack,
@@ -78,10 +109,15 @@ fun MainNavigation(
         ),
         entryProvider = entryProvider {
             onboardingEntry(
+                onRoleChosen = { role ->
+                    when {
+                        role == DeviceRole.SENIOR -> backStack.add(OnboardingNavKey)
+                        guardianSignedIn() -> reset(GuardianHomeNavKey)
+                        else -> backStack.add(GuardianSignInNavKey)
+                    }
+                },
                 onFinished = { connectFamily ->
-                    backStack.clear()
-                    backStack.add(SeniorHomeNavKey)
-                    if (connectFamily) backStack.add(PairingCodeNavKey)
+                    if (connectFamily) reset(SeniorHomeNavKey, PairingCodeNavKey) else reset(SeniorHomeNavKey)
                 },
             )
             seniorHomeEntries(
@@ -100,8 +136,30 @@ fun MainNavigation(
                     backStack.removeAll { it is PairingCodeNavKey || it is LinkConfirmNavKey }
                     backStack.add(LinkConfirmNavKey(linkId))
                 },
-                onHome = toHome,
+                onHome = toSeniorHome,
                 onBack = { backStack.removeLastOrNull() },
+            )
+            guardianEntries(
+                // 뒤로 가기로 로그인 화면에 돌아오지 않게 홈 위에 코드 입력을 연다
+                onSignedIn = { reset(GuardianHomeNavKey, EnterCodeNavKey) },
+                onSignInBack = {
+                    if (backStack.size > 1) backStack.removeLastOrNull() else reset(RoleChoiceNavKey)
+                },
+                onAddFamily = { backStack.add(EnterCodeNavKey) },
+                // 코드 입력은 닫고 대기 화면으로 (뒤로 가면 홈)
+                onRequested = { linkId, seniorName ->
+                    backStack.removeAll { it is EnterCodeNavKey || it is LinkWaitingNavKey }
+                    backStack.add(LinkWaitingNavKey(linkId, seniorName))
+                },
+                onSignInRequired = {
+                    backStack.removeAll { it is EnterCodeNavKey }
+                    backStack.add(GuardianSignInNavKey)
+                },
+                onHome = toGuardianHome,
+                onRetry = {
+                    backStack.removeAll { it is LinkWaitingNavKey }
+                    backStack.add(EnterCodeNavKey)
+                },
             )
         }
     )

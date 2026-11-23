@@ -17,11 +17,18 @@ class FamilyPushHandlerTest {
     }
 
     @Test
+    fun guardianLinkMessagesUseSeniorName() {
+        assertTrue(handler.handle(mapOf("v" to "1", "type" to "LINK_ACTIVATED", "linkId" to "l1", "protectedName" to "엄마")))
+        assertTrue(handler.handle(mapOf("v" to "1", "type" to "CONTACT_LOST", "linkId" to "l2", "protectedName" to "아빠")))
+        assertEquals(listOf("activated:l1:엄마", "lost:l2:아빠"), notifier.calls)
+    }
+
+    @Test
     fun linkRevokedUsesSenderNameEitherKey() {
         handler.handle(mapOf("v" to "1", "type" to "LINK_REVOKED", "linkId" to "l1", "guardianName" to "민지"))
         handler.handle(mapOf("v" to "1", "type" to "LINK_REVOKED", "linkId" to "l2", "protectedName" to "엄마"))
         handler.handle(mapOf("v" to "1", "type" to "LINK_REVOKED", "linkId" to "l3"))
-        assertEquals(listOf("revoked:l1:민지", "revoked:l2:엄마", "revoked:l3:null"), notifier.calls)
+        assertEquals(listOf("revoked:l1:민지:null", "revoked:l2:null:엄마", "revoked:l3:null:null"), notifier.calls)
     }
 
     @Test
@@ -42,8 +49,14 @@ class FamilyPushHandlerTest {
         override fun notifyLinkRequested(linkId: String, guardianName: String?) {
             calls += "requested:$linkId:$guardianName"
         }
-        override fun notifyLinkRevoked(linkId: String, name: String?) {
-            calls += "revoked:$linkId:$name"
+        override fun notifyLinkActivated(linkId: String, seniorName: String?) {
+            calls += "activated:$linkId:$seniorName"
+        }
+        override fun notifyContactLost(linkId: String, seniorName: String?) {
+            calls += "lost:$linkId:$seniorName"
+        }
+        override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) {
+            calls += "revoked:$linkId:$guardianName:$seniorName"
         }
         override fun cancelLink(linkId: String) = Unit
     }

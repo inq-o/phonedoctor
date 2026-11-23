@@ -46,6 +46,8 @@ internal class FakeFamily : FamilyRepository {
         return PairingCode(code, "phonedoctor://pair?c=$code", codeExpiresAt)
     }
 
+    override val isGuardianSignedIn = false
+    override suspend fun signInGuardian(googleIdToken: String) = error("부르지 않음")
     override suspend fun acceptPairingCode(code: String): FamilyLink = error("시니어 화면에서 부르지 않음")
 
     override suspend fun links(): List<FamilyLink> {
@@ -76,7 +78,9 @@ internal class FakeNotifier : Notifier {
     override fun notifyAlert(alert: SymptomAlert) = Unit
     override fun cancelAlert(alertId: Long) = Unit
     override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
-    override fun notifyLinkRevoked(linkId: String, name: String?) = Unit
+    override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
+    override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
+    override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
     override fun cancelLink(linkId: String) {
         cancelledLinks += linkId
     }
