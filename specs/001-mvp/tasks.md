@@ -71,7 +71,7 @@
   - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)
   - [x] 예약 작업 — 재알림 24시간·만료 7일·삭제 90일·연락 끊김 48시간·기기 180일 (Cloud Scheduler → `/internal/tick`, ADR-0001)
   - [ ] 배포 — Neon·GCP 결제 계정은 사람이 (server/README.md 배포 절)
-- [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`. 기기 등록(`POST /devices`)은 연결을 시작할 때(연결 전 서버 전송 없음), "모든 데이터 지우기"는 `DELETE /devices/{id}` + Firebase 사용자 삭제 (개인정보처리방침 3·6절). 서버 통신은 `core:network` — 앱에 붙일 때 할 일: 릴리스 API 주소 주입(자리표시 `.invalid`면 릴리스 빌드 실패), `Application.onCreate`에서 App Check Play Integrity 공급자 설치(디버그는 Debug 공급자), 디버그만 `10.0.2.2` 평문 허용(network security config), 익명 오탐 신고 경로는 ID 토큰 없이(App Check만)
+- [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`. 기기 등록(`POST /devices`)은 연결을 시작할 때(연결 전 서버 전송 없음), "모든 데이터 지우기"는 `DELETE /devices/{id}` + Firebase 사용자 삭제 (개인정보처리방침 3·6절). 서버 통신은 `core:network`. 기반 완료: `core:data` FamilyRepository(첫 코드 요청·코드 입력 때 로그인·등록, 데이터 지우기), `Application.onCreate`에서 App Check 공급자 설치(디버그 Debug·출시 Play Integrity), 디버그만 `10.0.2.2` 평문 허용, FCM 자동 발급 끔·토큰 갱신. **출시 빌드는 가족 연결 꺼짐**(`FAMILY_ENABLED=false`, `app/src/release/AndroidManifest.xml`이 통신 권한 제거, `./gradlew test`가 확인) — 가족 연결 판 방침 시행 때 함께 켜고 릴리스 API 주소 넣기. 남은 일: 화면(O-S4·S3·S5, O1·O-G1·O-G2·O-G3), 푸시 종류별 처리, 익명 오탐 신고 경로는 ID 토큰 없이(App Check만, T080)
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`
 - [ ] T055a [US4] 연락 끊김 경고 (F6, 서버 판정·알림은 T053 예약 작업으로 완료) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall

@@ -53,6 +53,27 @@ android {
     namespace = "io.github.inq_o.phonedoctor"
 }
 
+// 출시 빌드가 지금 시행 중인 개인정보처리방침(인터넷 권한 없음)을 지키는지 확인한다. CI가 돌리는 ./gradlew test에 건다
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        val manifest = variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST)
+        val verify = tasks.register("verify${variant.name.replaceFirstChar { it.uppercase() }}Permissions") {
+            inputs.file(manifest)
+            doLast {
+                val text = manifest.get().asFile.readText()
+                val banned = listOf(
+                    "android.permission.INTERNET",
+                    "com.google.android.c2dm.permission.RECEIVE",
+                    "com.google.android.providers.gsf.permission.READ_GSERVICES",
+                )
+                val found = banned.filter { "android:name=\"$it\"" in text }
+                check(found.isEmpty()) { "출시 빌드에 통신 권한이 있음: $found (app/src/release/AndroidManifest.xml 참고)" }
+            }
+        }
+        tasks.matching { it.name == "test" }.configureEach { dependsOn(verify) }
+    }
+}
+
 dependencies {
     implementation(projects.feature.onboarding.api)
     implementation(projects.feature.onboarding.impl)
@@ -63,6 +84,7 @@ dependencies {
 
     implementation(projects.core.data)
     implementation(projects.core.designsystem)
+    implementation(projects.core.network)
     implementation(projects.core.notifications)
     implementation(projects.sync.work)
 
@@ -76,9 +98,12 @@ dependencies {
     implementation(libs.androidx.navigation3.ui)
     implementation(libs.androidx.work.runtime.ktx)
 
+    // 푸시(FCM) 토큰 갱신 받기. 출시 빌드는 가족 연결이 꺼져 있고 인터넷 권한도 뺀다 (src/release/AndroidManifest.xml)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
+
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-    // 기기 무결성 확인용(App Check). 출시 빌드에는 아직 넣지 않는다: 인터넷 권한·외부 전송이 생겨 개인정보처리방침을 먼저 고쳐야 함
-    debugImplementation(platform(libs.firebase.bom))
+    // 시험용 App Check 확인(AppCheckProbeReceiver)이 Play Integrity 공급자를 직접 고른다
     debugImplementation(libs.firebase.appcheck.playintegrity)
 
     ksp(libs.androidx.hilt.compiler)

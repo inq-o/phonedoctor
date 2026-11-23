@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  출시 빌드는 지금 시행 중인 개인정보처리방침(docs/privacy-policy.md: 인터넷 권한 없음, 기기 밖 전송 없음)을 지킨다.
+  가족 연결용 라이브러리(core:network, Firebase)가 더하는 통신·푸시 권한을 뺀다(ACCESS_NETWORK_STATE는 원래 WorkManager가 넣던 것이라 둔다).
+  빠졌는지는 ./gradlew test가 verifyReleasePermissions로 확인한다. 가족 연결 판 방침을 시행할 때 이 파일을 지우고
+  core:network의 FAMILY_ENABLED를 켠다 (T057)
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
+    <uses-permission
+        android:name="com.google.android.c2dm.permission.RECEIVE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="com.google.android.providers.gsf.permission.READ_GSERVICES"
+        tools:node="remove" />
+</manifest>

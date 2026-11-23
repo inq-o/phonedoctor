@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 디버그 빌드 전용. 에뮬레이터 → 맥 로컬 서버(server/README.md)만 평문 허용, 나머지는 기본(HTTPS만) -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">10.0.2.2</domain>
+    </domain-config>
+</network-security-config>

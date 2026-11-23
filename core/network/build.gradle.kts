@@ -12,11 +12,15 @@ android {
     defaultConfig {
         // 에뮬레이터 → 맥에서 띄운 로컬 서버 (server/README.md). 끝의 /는 Retrofit 기준 주소에 필요
         buildConfigField("String", "API_BASE_URL", "\"http://10.0.2.2:8080/v1/\"")
+        buildConfigField("boolean", "FAMILY_ENABLED", "true")
     }
     buildTypes {
         release {
             // TODO(배포): Cloud Run 주소가 나오면 바꾼다 (T053 배포)
             buildConfigField("String", "API_BASE_URL", "\"https://api.phonedoctor.invalid/v1/\"")
+            // 출시 빌드는 가족 연결을 끈다: 지금 시행 중인 개인정보처리방침(docs/privacy-policy.md)은 기기 밖 전송이 없다고 적었다.
+            // 켜려면 가족 연결 판 방침을 시행하고, 위 주소를 실제 주소로 바꾸고, app/src/release/AndroidManifest.xml의 권한 제거를 뺀다 (T057)
+            buildConfigField("boolean", "FAMILY_ENABLED", "false")
         }
     }
     testOptions {
@@ -38,6 +42,8 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.auth)
     implementation(libs.firebase.appcheck)
+    implementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
 
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
