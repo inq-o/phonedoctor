@@ -15,11 +15,16 @@ internal val networkJson = Json {
     coerceInputValues = true
 }
 
-/** 시니어 폰은 망이 약할 수 있어 기다리되 무한정은 아니게. 실패하면 부르는 쪽(WorkManager)이 다시 시도한다 */
-internal fun networkClient(tokens: AuthTokens): OkHttpClient = OkHttpClient.Builder()
+/**
+ * 시니어 폰은 망이 약할 수 있어 기다리되 무한정은 아니게. 실패하면 부르는 쪽(WorkManager)이 다시 시도한다.
+ * 호출 전체도 60초로 묶는다 (오탐 신고는 보내는 동안 끄기·지우기가 기다리므로 그 시간을 묶어 둠)
+ */
+internal fun networkClient(tokens: AuthTokens, serverClock: ServerClock = ServerClock()): OkHttpClient = OkHttpClient.Builder()
     .connectTimeout(10, TimeUnit.SECONDS)
     .readTimeout(20, TimeUnit.SECONDS)
+    .callTimeout(60, TimeUnit.SECONDS)
     .addInterceptor(AuthInterceptor(tokens))
+    .addInterceptor(ServerDateInterceptor(serverClock))
     .build()
 
 internal fun networkDataSource(baseUrl: String, client: OkHttpClient, json: Json): PhoneDoctorNetworkDataSource =

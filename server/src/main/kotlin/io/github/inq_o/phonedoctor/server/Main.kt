@@ -30,6 +30,8 @@ data class Config(
     /** 예약 작업 경로(`/internal/tick`)를 부르는 Cloud Scheduler의 OIDC 대상·서비스 계정. 둘 다 있어야 켜짐 */
     val schedulerAudience: String?,
     val schedulerServiceAccount: String?,
+    /** X-Forwarded-For에서 오른쪽 몇 번째가 실제 접속 주소인지 (Cloud Run 직접 1, 외부 부하 분산기 뒤 2) */
+    val proxyHops: Int = 1,
 ) {
     companion object {
         fun fromEnv(env: Map<String, String> = System.getenv()): Config {
@@ -44,6 +46,7 @@ data class Config(
                 appCheckAppIds = req("APP_CHECK_APP_IDS").split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
                 schedulerAudience = env["SCHEDULER_AUDIENCE"]?.takeIf { it.isNotBlank() },
                 schedulerServiceAccount = env["SCHEDULER_SERVICE_ACCOUNT"]?.takeIf { it.isNotBlank() },
+                proxyHops = env["PROXY_HOPS"]?.takeIf { it.isNotBlank() }?.toInt()?.also { require(it >= 1) { "PROXY_HOPS는 1 이상" } } ?: 1,
             ).also {
                 // 한쪽만 있으면 예약 작업이 조용히 꺼진 채 돌아 재알림·만료·삭제가 멈춘다. 시작에서 바로 실패
                 check((it.schedulerAudience == null) == (it.schedulerServiceAccount == null)) {
@@ -61,6 +64,8 @@ class Deps(
     val clock: Clock = Clock.systemUTC(),
     /** 없으면 예약 작업 경로를 꺼 둔다 */
     val scheduler: SchedulerAuth? = null,
+    /** [Config.proxyHops] */
+    val proxyHops: Int = 1,
 ) {
     /** 만료된 Idempotency-Key를 마지막으로 지운 시각 (Idempotency.kt) */
     val keysSweptAt = AtomicReference(Instant.EPOCH)
@@ -77,7 +82,7 @@ fun main() {
     } else {
         null
     }
-    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config, firebase), FcmPusher(firebase), scheduler = scheduler)
+    val deps = Deps(connect(dataSource(config)), FirebaseVerifier(config, firebase), FcmPusher(firebase), scheduler = scheduler, proxyHops = config.proxyHops)
     embeddedServer(Netty, port = config.port, host = "0.0.0.0") { module(deps) }.start(wait = true)
 }
 

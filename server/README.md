@@ -17,7 +17,8 @@
 | pairing | `POST /pairing-codes`, `POST /pairing-codes/{code}/accept`, `GET /links`, `POST /links/{id}/confirm`, `DELETE /links/{id}` | 구현 |
 | alerts | `POST·GET /alerts`, `GET /alerts/{id}`, `POST /alerts/{id}/decision`, `POST /alerts/{id}/outcome` | 구현 |
 | 예약 작업 | `POST /internal/tick` — 재알림 24시간·만료 7일·요청 삭제 90일·연락 끊김 48시간·기기 삭제 180일·지난 연결 코드 (`Jobs.kt`) | 구현 |
-| feedback·models | `/feedback/false-positives`, `/models/latest` | 나중 |
+| feedback | `POST /feedback/false-positives` — App Check만, 집계만 저장, 1년 뒤 정리 (`Feedback.kt`) | 구현 |
+| models | `/models/latest` | 나중 (설치 시점 분류기 T050과 함께) |
 
 ## 시험
 
@@ -42,6 +43,7 @@
 | `APP_CHECK_APP_IDS` | 받을 Firebase 앱 ID, 쉼표 구분 (`google-services.json`의 `mobilesdk_app_id`) |
 | `SCHEDULER_AUDIENCE` | 예약 작업 토큰의 대상. `https://<Cloud Run 주소>/internal/tick` (첫 배포 뒤 주소가 나오면 넣음) |
 | `SCHEDULER_SERVICE_ACCOUNT` | 예약 작업을 부르는 서비스 계정 이메일. 둘 중 하나라도 없으면 `/internal/tick`은 404 (꺼짐) |
+| `PROXY_HOPS` | 오탐 신고 횟수 제한에 쓸 접속 주소가 `X-Forwarded-For` 오른쪽에서 몇 번째인지. Cloud Run 주소로 바로 받으면 1(기본), 외부 부하 분산기 뒤면 2. 배포 뒤 `X-Forwarded-For: 1.2.3.4`를 붙여 한 번 보내 보고, 이 값이 걸러지는지(시간당 30건이 그 주소가 아닌 실제 주소로 세지는지) 확인 |
 
 - Firebase Admin SDK(ID 토큰 검증·FCM 전송)는 기본 인증 정보(ADC)를 쓴다. Cloud Run에서는 서비스 계정이 자동으로 쓰이고, 로컬 실행은 `gcloud auth application-default login` 뒤에 된다
 
