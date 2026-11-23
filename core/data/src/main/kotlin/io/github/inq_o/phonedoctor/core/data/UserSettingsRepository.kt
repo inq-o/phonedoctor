@@ -16,6 +16,9 @@ interface UserSettingsRepository {
     suspend fun completeOnboarding(disclosureVersion: Int)
 
     suspend fun chooseRole(role: DeviceRole)
+
+    /** 보호자가 모든 데이터를 지움: 다음 실행은 역할 선택부터 */
+    suspend fun clearChosenRole()
 }
 
 class DefaultUserSettingsRepository @Inject constructor(
@@ -31,6 +34,8 @@ class DefaultUserSettingsRepository @Inject constructor(
     }
 
     override suspend fun chooseRole(role: DeviceRole) = preferences.setChosenRole(role.name)
+
+    override suspend fun clearChosenRole() = preferences.clearChosenRole()
 }
 
 /**

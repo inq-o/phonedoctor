@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,11 +36,26 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
         }
     }
 
+    override suspend fun reauthenticateWithGoogle(idToken: String) {
+        val user = auth.currentUser ?: return
+        try {
+            user.reauthenticate(GoogleAuthProvider.getCredential(idToken, null)).await()
+        } catch (e: FirebaseNetworkException) {
+            throw IOException(e)
+        }
+    }
+
     override fun signOut() = auth.signOut()
 
     override suspend fun deleteUser() {
         // Google 사용자는 로그인한 지 오래되면 FirebaseAuthRecentLoginRequiredException. 화면이 다시 로그인시킨 뒤 다시 부른다
-        auth.currentUser?.delete()?.await()
+        try {
+            auth.currentUser?.delete()?.await()
+        } catch (e: FirebaseAuthRecentLoginRequiredException) {
+            throw RecentLoginRequiredException()
+        } catch (e: FirebaseNetworkException) {
+            throw IOException(e)
+        }
         auth.signOut()
     }
 }

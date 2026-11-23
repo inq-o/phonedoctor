@@ -141,6 +141,26 @@
     <string name="feature_guardian_impl_history_load_failed">요청 기록을 불러오지 못했어요</string>
     <string name="feature_guardian_impl_history_empty">아직 요청이 없어요.</string>
 
+    <!-- G4 -->
+    <string name="feature_guardian_impl_settings">설정</string>
+    <string name="feature_guardian_impl_settings_title">설정</string>
+    <string name="feature_guardian_impl_settings_caution">주의 단계도 받기</string>
+    <string name="feature_guardian_impl_settings_caution_body">설치할 때 "주의"로 본 앱도 알려 드려요. 끄면 "위험"으로 본 앱과 광고를 띄운 앱만 알려 드려요.</string>
+    <string name="feature_guardian_impl_settings_name">부모님 폰에 보이는 내 이름</string>
+    <string name="feature_guardian_impl_settings_name_body">부모님 폰에는 "%1$s"(으)로 보여요.</string>
+    <string name="feature_guardian_impl_settings_name_default">Google 계정 이름</string>
+    <string name="feature_guardian_impl_settings_name_change">이름 바꾸기</string>
+    <string name="feature_guardian_impl_settings_name_label">이름 (예: 민지, 큰딸)</string>
+    <string name="feature_guardian_impl_settings_name_save">바꾸기</string>
+    <string name="feature_guardian_impl_settings_saved">바꿨어요.</string>
+    <string name="feature_guardian_impl_settings_delete_title">모든 데이터 지우기</string>
+    <string name="feature_guardian_impl_settings_delete_body">서버에 있는 이 폰의 정보와 연결을 모두 지우고 Google 로그인 연결도 끊어요. Google 계정 자체는 지워지지 않아요.</string>
+    <string name="feature_guardian_impl_settings_delete">모두 지우기</string>
+    <string name="feature_guardian_impl_settings_delete_dialog_title">모든 데이터를 지울까요?</string>
+    <string name="feature_guardian_impl_settings_delete_dialog_body">연결한 부모님 폰과 모두 끊기고 요청 기록도 볼 수 없어요. 다시 쓰려면 처음부터 시작해야 해요.</string>
+    <string name="feature_guardian_impl_settings_reauth">Google로 다시 로그인</string>
+    <string name="feature_guardian_impl_settings_reauth_body">로그인한 지 오래돼서 지우기 전에 한 번 더 로그인해야 해요. 서버의 정보는 이미 지웠어요.</string>
+
     <string name="feature_guardian_impl_notifications_off_title">알림이 꺼져 있어요</string>
     <string name="feature_guardian_impl_notifications_off_body">부모님 폰 소식을 받으려면 폰주치의 알림을 켜 주세요.</string>
     <string name="feature_guardian_impl_notifications_open">알림 설정 열기</string>

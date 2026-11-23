@@ -80,4 +80,5 @@ class FakeUserSettingsRepository @Inject constructor() : UserSettingsRepository 
     override suspend fun chooseRole(role: DeviceRole) {
         chosenRole.value = role
     }
+    override suspend fun clearChosenRole() = Unit
 }

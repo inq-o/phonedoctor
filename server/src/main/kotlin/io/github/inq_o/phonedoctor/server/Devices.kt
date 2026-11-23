@@ -115,6 +115,11 @@ fun Route.deviceRoutes(deps: Deps) {
                 if (body.role == DeviceRole.GUARDIAN && caller.signInProvider == "anonymous") {
                     throw ApiProblem(HttpStatusCode.Forbidden, "guardian-requires-account", "보호자는 Google 로그인이 필요함")
                 }
+                // 시니어는 익명 사용자만: 보호자의 Google 계정에 시니어 기기가 묶이면, 그 사람이 보호자로 다시 쓰려 할 때 역할이 막히고
+                // 개인정보처리방침(시니어는 계정 정보 없음)과도 어긋난다
+                if (body.role == DeviceRole.PROTECTED && caller.signInProvider != "anonymous") {
+                    throw ApiProblem(HttpStatusCode.Forbidden, "senior-requires-anonymous", "시니어 기기는 익명 로그인만")
+                }
                 val defaultName = when (body.role) {
                     DeviceRole.PROTECTED -> SENIOR_DEFAULT_NAME
                     DeviceRole.GUARDIAN -> caller.name?.trim()?.take(NAME_MAX)?.ifEmpty { null } ?: GUARDIAN_DEFAULT_NAME

@@ -16,6 +16,10 @@ import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import kotlinx.coroutines.CompletableDeferred
 import io.github.inq_o.phonedoctor.core.notifications.RequestChanges
+import io.github.inq_o.phonedoctor.core.data.RecentLoginRequiredException
+import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -578,5 +582,70 @@ class GuardianViewModelTest {
         val ready = vm.uiState.value as GuardianHomeUiState.Ready
         assertTrue(ready.requests.isEmpty())
         assertFalse(ready.hasHistory)
+    }
+
+    // G4
+
+    private class FakeSettings : UserSettingsRepository {
+        var cleared = 0
+        override val onboardingDone: Flow<Boolean> = flowOf(false)
+        override val chosenRole: Flow<DeviceRole?> = flowOf(DeviceRole.GUARDIAN)
+        override suspend fun completeOnboarding(disclosureVersion: Int) = Unit
+        override suspend fun chooseRole(role: DeviceRole) = Unit
+        override suspend fun clearChosenRole() {
+            cleared++
+        }
+    }
+
+    @Test
+    fun settingsSaveCautionAndName() = runTest(main.dispatcher) {
+        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        vm.setNotifyCaution(true)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.notifyCaution)
+        assertTrue(vm.uiState.value.saved)
+        vm.rename("  민지  ")
+        advanceUntilIdle()
+        assertEquals("민지", vm.uiState.value.displayName)
+        vm.rename("가".repeat(21))
+        advanceUntilIdle()
+        assertEquals("민지", vm.uiState.value.displayName)
+        family.fail["caution"] = IOException("offline")
+        vm.setNotifyCaution(false)
+        advanceUntilIdle()
+        assertEquals(GuardianError.NETWORK, vm.uiState.value.error)
+        assertTrue(vm.uiState.value.notifyCaution)
+    }
+
+    @Test
+    fun deletingAllDataResetsRoleAndAsksForReauthWhenNeeded() = runTest(main.dispatcher) {
+        val settings = FakeSettings()
+        val vm = GuardianSettingsViewModel(family, settings)
+        family.fail["delete"] = RecentLoginRequiredException()
+        vm.deleteAll()
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.needsReauth)
+        assertEquals(0, settings.cleared)
+
+        assertTrue(vm.startReauth())
+        assertFalse(vm.startReauth())
+        vm.onReauthToken("token")
+        advanceUntilIdle()
+        assertEquals(listOf("token"), family.reauthTokens)
+        assertEquals(1, family.deletes)
+        assertEquals(1, settings.cleared)
+        assertTrue(vm.uiState.value.deleted)
+        assertFalse(vm.uiState.value.needsReauth)
+        vm.consumeDeleted()
+        assertFalse(vm.uiState.value.deleted)
+    }
+
+    @Test
+    fun closingTheReauthPickerIsQuiet() {
+        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        vm.startReauth()
+        vm.onReauthFailed(androidx.credentials.exceptions.GetCredentialCancellationException())
+        assertFalse(vm.uiState.value.working)
+        assertNull(vm.uiState.value.error)
     }
 }

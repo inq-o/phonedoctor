@@ -49,6 +49,7 @@ import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
@@ -59,7 +60,7 @@ import java.time.Instant
 fun SeniorHomeScreen(
     onAlertClick: (Long) -> Unit,
     onHistoryClick: () -> Unit,
-    onFamilyClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     onLinkRequestClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SeniorHomeViewModel = hiltViewModel(),
@@ -78,7 +79,7 @@ fun SeniorHomeScreen(
         onScanNow = viewModel::scanNow,
         onOpenUsageSettings = { context.startFirst(viewModel.usageAccessSettingsIntents) },
         family = family,
-        onFamilyClick = onFamilyClick,
+        onSettingsClick = onSettingsClick,
         onLinkRequestClick = onLinkRequestClick,
         modifier = modifier,
     )
@@ -104,7 +105,7 @@ internal fun SeniorHomeScreen(
     onOpenUsageSettings: () -> Unit,
     modifier: Modifier = Modifier,
     family: HomeFamily = HomeFamily(available = false),
-    onFamilyClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
     onLinkRequestClick: (String) -> Unit = {},
 ) {
     val history = stringResource(R.string.feature_senior_home_impl_history)
@@ -120,18 +121,16 @@ internal fun SeniorHomeScreen(
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 )
-                // 가족 관리는 이 버튼으로 (S5). 아이콘과 글자를 함께 (ux-flows S1 상단바)
-                if (family.available) {
-                    OutlinedButton(
-                        onClick = onFamilyClick,
-                        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
-                        modifier = Modifier.heightIn(min = 56.dp),
-                    ) {
-                        Icon(Icons.Filled.Person, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(stringResource(R.string.feature_senior_home_impl_family), style = MaterialTheme.typography.labelLarge)
-                    }
+                // 설정(S7)으로. 가족 관리(S5)는 설정 안에 (ux-flows S1 상단바 "⚙ 설정", 아이콘과 글자를 함께)
+                OutlinedButton(
+                    onClick = onSettingsClick,
+                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+                    modifier = Modifier.heightIn(min = 56.dp),
+                ) {
+                    Icon(Icons.Filled.Settings, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.feature_senior_home_impl_settings), style = MaterialTheme.typography.labelLarge)
                 }
             }
         },

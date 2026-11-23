@@ -102,6 +102,7 @@ class OnboardingViewModelTest {
         override suspend fun chooseRole(role: DeviceRole) {
             roles += role
         }
+        override suspend fun clearChosenRole() = Unit
     }
 
     private class FakeScheduler : ScanScheduler {
@@ -145,5 +146,10 @@ class OnboardingViewModelTest {
         override suspend fun updatePushToken(token: String) = error("부르지 않음")
         override suspend fun deleteAllData() = error("부르지 않음")
         override suspend fun reportAppVersion() = Unit
+        override val displayName: Flow<String?> = flowOf(null)
+        override suspend fun setDisplayName(name: String) = Unit
+        override val notifyCaution: Flow<Boolean> = flowOf(false)
+        override suspend fun setNotifyCaution(enabled: Boolean) = Unit
+        override suspend fun reauthenticateGuardian(googleIdToken: String) = Unit
     }
 }

@@ -51,6 +51,7 @@ fun GuardianHomeScreen(
     onAddFamily: () -> Unit,
     onOpenRequest: (String) -> Unit,
     onHistory: () -> Unit,
+    onSettings: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: GuardianHomeViewModel = hiltViewModel(),
 ) {
@@ -68,6 +69,7 @@ fun GuardianHomeScreen(
         onAddFamily = onAddFamily,
         onOpenRequest = onOpenRequest,
         onHistory = onHistory,
+        onSettings = onSettings,
         onRevoke = viewModel::revoke,
         onRetry = viewModel::refresh,
         onOpenNotificationSettings = { context.openNotificationSettings() },
@@ -87,6 +89,7 @@ internal fun GuardianHomeScreen(
     onAddFamily: () -> Unit,
     onOpenRequest: (String) -> Unit,
     onHistory: () -> Unit,
+    onSettings: () -> Unit,
     onRevoke: (FamilyLink) -> Unit,
     onRetry: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
@@ -98,6 +101,7 @@ internal fun GuardianHomeScreen(
         title = stringResource(R.string.feature_guardian_impl_home_title),
         modifier = modifier,
         actions = {
+            GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_settings), onSettings)
             if (state is GuardianHomeUiState.Failed) GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_retry), onRetry)
             GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_add_family), onAddFamily, enabled = ready?.revoking == null)
         },
@@ -291,11 +295,11 @@ private val PreviewLinks = listOf(
 @Preview(showBackground = true, widthDp = 360, heightDp = 720)
 @Composable
 private fun HomePreview() {
-    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(PreviewLinks), false, {}, {}, {}, {}, {}, {}) }
+    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(PreviewLinks), false, {}, {}, {}, {}, {}, {}, {}) }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
 private fun EmptyPreview() {
-    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(emptyList()), true, {}, {}, {}, {}, {}, {}) }
+    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(emptyList()), true, {}, {}, {}, {}, {}, {}, {}) }
 }

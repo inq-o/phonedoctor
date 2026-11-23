@@ -198,6 +198,68 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `이름은 등록 전이면 저장했다가 등록 때 보내고, 등록 뒤에는 바로 보낸다`() = runTest {
+        val repo = repo()
+        repo.setDisplayName("  엄마  ")
+        assertTrue(network.calls.isEmpty())
+        assertEquals("엄마", repo.displayName.first())
+        repo.createPairingCode()
+        assertEquals("엄마", network.registrations.single().displayName)
+        repo.setDisplayName("우리 엄마")
+        assertEquals("우리 엄마", network.updates.last().second.displayName)
+        try {
+            repo.setDisplayName("가".repeat(21))
+            fail()
+        } catch (_: IllegalArgumentException) {
+        }
+    }
+
+    @Test
+    fun `서버가 이름을 거절하면 저장하지 않는다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.fail["updateDevice"] = IOException("offline")
+        try {
+            repo.setDisplayName("엄마")
+            fail()
+        } catch (_: IOException) {
+        }
+        assertNull(repo.displayName.first())
+    }
+
+    @Test
+    fun `등록 전에 켠 주의 단계도 받기는 보호자 등록 뒤 보낸다`() = runTest {
+        val repo = repo()
+        repo.setNotifyCaution(true)
+        account.signedIn = true
+        repo.acceptPairingCode("482913")
+        assertEquals(true, network.updates.single().second.notifyCaution)
+        repo.setNotifyCaution(false)
+        assertEquals(false, network.updates.last().second.notifyCaution)
+        assertFalse(repo.notifyCaution.first())
+    }
+
+    @Test
+    fun `Google 사용자 삭제에 다시 로그인이 필요하면 알리고, 다시 로그인한 뒤 지우면 서버는 다시 부르지 않는다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        repo.acceptPairingCode("482913")
+        account.deleteError = RecentLoginRequiredException()
+        try {
+            repo.deleteAllData()
+            fail()
+        } catch (_: RecentLoginRequiredException) {
+        }
+        assertEquals(listOf("dev-1"), network.deleted)
+        account.deleteError = null
+        repo.reauthenticateGuardian("token")
+        repo.deleteAllData()
+        assertEquals(1, account.reauthed)
+        assertEquals(listOf("dev-1"), network.deleted)
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
     fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
         val repo = repo()
         repo.reportAppVersion()
@@ -435,6 +497,11 @@ private class FakeAccount : FamilyAccount {
     override suspend fun signInWithGoogle(idToken: String) {
         signedIn = true
         anonymous = false
+    }
+
+    var reauthed = 0
+    override suspend fun reauthenticateWithGoogle(idToken: String) {
+        reauthed++
     }
 
     override fun signOut() {

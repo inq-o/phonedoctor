@@ -71,6 +71,24 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { if (version == null) it.remove(REPORTED_APP_VERSION) else it[REPORTED_APP_VERSION] = version }
     }
 
+    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어 "부모님", 보호자 Google 이름) */
+    val displayName: Flow<String?> = store.data.map { it[DISPLAY_NAME] }
+
+    suspend fun setDisplayName(name: String?) {
+        store.edit { if (name == null) it.remove(DISPLAY_NAME) else it[DISPLAY_NAME] = name }
+    }
+
+    /** (보호자) "주의 단계도 받기" (FR-028) */
+    val notifyCaution: Flow<Boolean> = store.data.map { it[NOTIFY_CAUTION] ?: false }
+
+    suspend fun setNotifyCaution(enabled: Boolean) {
+        store.edit { it[NOTIFY_CAUTION] = enabled }
+    }
+
+    suspend fun clearChosenRole() {
+        store.edit { it.remove(CHOSEN_ROLE) }
+    }
+
     suspend fun setOnboardingDone(done: Boolean) {
         store.edit { it[ONBOARDING_DONE] = done }
     }
@@ -89,6 +107,8 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val LAST_STATUS_REPORT = longPreferencesKey("lastStatusReportAt")
         val ALERT_PULL_CURSOR = stringPreferencesKey("alertPullCursor")
         val REPORTED_APP_VERSION = intPreferencesKey("reportedAppVersion")
+        val DISPLAY_NAME = stringPreferencesKey("displayName")
+        val NOTIFY_CAUTION = booleanPreferencesKey("notifyCaution")
     }
 }
 

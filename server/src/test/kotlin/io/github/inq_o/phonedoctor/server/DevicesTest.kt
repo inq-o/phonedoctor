@@ -90,6 +90,13 @@ class RegisterDeviceTest {
     }
 
     @Test
+    fun `시니어 기기는 익명 사용자만 등록한다`() = serverTest {
+        val google = client.api(Post, "/devices", "id:someone:google:누구", registration())
+        assertEquals(HttpStatusCode.Forbidden, google.status)
+        assertEquals("https://phonedoctor.example/problems/senior-requires-anonymous", google.contract("Problem")["type"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `같은 사용자가 다시 등록하면 같은 기기를 갱신, 역할을 바꾸면 409`() = serverTest {
         val id = register()
         val again = client.api(Post, "/devices", SENIOR, registration(name = "엄마"))

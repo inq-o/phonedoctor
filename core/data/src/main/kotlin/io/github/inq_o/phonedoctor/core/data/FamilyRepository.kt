@@ -62,6 +62,20 @@ interface FamilyRepository {
     /** 연결 끊기 (F4). 시니어·보호자 모두 */
     suspend fun revokeLink(linkId: String)
 
+    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어 "부모님", 보호자 Google 이름) */
+    val displayName: Flow<String?>
+
+    /** 이름을 바꾼다 (1~20자). 등록한 폰이면 서버에도 바로 보낸다. 등록 전이면 등록할 때 함께 보낸다 */
+    suspend fun setDisplayName(name: String)
+
+    /** (보호자) "주의 단계도 받기": 설치 시점 "주의" 판정도 알림 (FR-028) */
+    val notifyCaution: Flow<Boolean>
+
+    suspend fun setNotifyCaution(enabled: Boolean)
+
+    /** (보호자) 모든 데이터 지우기가 [RecentLoginRequiredException]으로 멈췄을 때 Google로 다시 로그인한다 */
+    suspend fun reauthenticateGuardian(googleIdToken: String)
+
     /** 앱이 업데이트됐으면 서버의 기기 정보(appVersionCode)를 고친다. 등록 전이면 아무것도 안 한다 */
     suspend fun reportAppVersion()
 
@@ -81,6 +95,12 @@ class GuardianSignInRequiredException : IllegalStateException("보호자는 Goog
  */
 class DeviceNotRegisteredException : IllegalStateException("서버에 등록된 기기 없음")
 
+/** Google 사용자를 지우려면 최근에 다시 로그인해야 한다 (Firebase). 화면이 Google 로그인을 한 번 더 받은 뒤 다시 지운다 */
+class RecentLoginRequiredException : IllegalStateException("다시 로그인 필요")
+
+/** 표시 이름은 1~20자 (서버 Devices.kt NAME_MAX) */
+const val DISPLAY_NAME_MAX = 20
+
 /** 이미 다른 역할로 등록한 기기. 역할을 바꾸려면 모든 데이터 지우기 뒤 다시 */
 class RoleMismatchException(val registered: DeviceRole) : IllegalStateException("이미 ${registered.name} 역할로 등록됨")
 
@@ -92,6 +112,9 @@ interface FamilyAccount {
 
     /** Google ID 토큰으로 로그인 (보호자). 익명 사용자였으면 그 사용자는 버리고 Google 사용자로 바뀐다 */
     suspend fun signInWithGoogle(idToken: String)
+
+    /** 지금 사용자를 같은 Google 계정으로 다시 확인한다 (사용자 삭제 전) */
+    suspend fun reauthenticateWithGoogle(idToken: String)
     fun signOut()
 
     /** 지금 사용자를 지우고 로그아웃. 로그인 전이면 아무것도 안 한다 */
@@ -188,6 +211,29 @@ internal class DefaultFamilyRepository @Inject constructor(
         requireRegistered()
         forgettingGoneDevice { network.revokeLink(linkId) }
         linkEvents.onLinkRevoked()
+    }
+
+    override val displayName: Flow<String?> = preferences.displayName
+
+    override suspend fun setDisplayName(name: String) {
+        val trimmed = name.trim()
+        require(trimmed.length in 1..DISPLAY_NAME_MAX) { "이름은 1~${DISPLAY_NAME_MAX}자" }
+        serialized {
+            // 서버에 먼저: 실패하면 화면이 그대로 두고 다시 하게 (등록 전이면 저장만)
+            registered()?.let { forgettingGoneDevice { network.updateDevice(it.deviceId, NetworkDeviceUpdate(displayName = trimmed)) } }
+            preferences.setDisplayName(trimmed)
+        }
+    }
+
+    override val notifyCaution: Flow<Boolean> = preferences.notifyCaution
+
+    override suspend fun setNotifyCaution(enabled: Boolean) = serialized {
+        registered()?.let { forgettingGoneDevice { network.updateDevice(it.deviceId, NetworkDeviceUpdate(notifyCaution = enabled)) } }
+        preferences.setNotifyCaution(enabled)
+    }
+
+    override suspend fun reauthenticateGuardian(googleIdToken: String) = serialized {
+        account.reauthenticateWithGoogle(googleIdToken)
     }
 
     override suspend fun reportAppVersion() {
@@ -304,6 +350,8 @@ internal class DefaultFamilyRepository @Inject constructor(
                     NetworkDeviceRegistration(
                         role = role.toNetwork(),
                         fcmToken = pushTokens.token(),
+                        // 정해 둔 이름이 있으면 처음부터 그 이름으로 (없으면 서버 기본)
+                        displayName = preferences.displayName.first(),
                         appVersionCode = deviceInfo.appVersionCode,
                         sdkInt = deviceInfo.sdkInt,
                         manufacturer = deviceInfo.manufacturer,
@@ -318,6 +366,10 @@ internal class DefaultFamilyRepository @Inject constructor(
         val registered = RegisteredDevice(device.deviceId, role.name)
         preferences.setRegisteredDevice(registered)
         preferences.setReportedAppVersion(deviceInfo.appVersionCode)
+        // 등록 전에 켜 둔 "주의 단계도 받기" (등록 본문에는 없는 값). 실패해도 등록은 된 것이라 다음에 설정에서 다시
+        if (role == DeviceRole.GUARDIAN && preferences.notifyCaution.first()) {
+            runCatching { network.updateDevice(device.deviceId, NetworkDeviceUpdate(notifyCaution = true)) }
+        }
         preferences.setPendingRegistrationRole(null)
         pushTokens.setAutoRefresh(true)
         return registered
