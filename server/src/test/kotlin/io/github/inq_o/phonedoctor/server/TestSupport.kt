@@ -53,6 +53,13 @@ object FakeVerifier : TokenVerifier {
     }
 
     override fun verifyAppCheck(token: String) = token == "ok"
+
+    /** 지운 Firebase 사용자 (시험마다 비운다) */
+    val deletedUsers = mutableListOf<String>()
+
+    override fun deleteUser(uid: String) {
+        deletedUsers += uid
+    }
 }
 
 /** 보낸 푸시를 모아 두는 가짜. [failing]이면 전송 실패를 흉내 낸다 */
@@ -80,6 +87,7 @@ fun serverTest(clock: MovableClock = MovableClock(), block: suspend ApplicationT
     TestDb.reset()
     FakePusher.sent.clear()
     FakePusher.failing = false
+    FakeVerifier.deletedUsers.clear()
     testApplication {
         application { module(Deps(TestDb.db, FakeVerifier, FakePusher, clock, scheduler = { it == "tick-ok" })) }
         block(clock)

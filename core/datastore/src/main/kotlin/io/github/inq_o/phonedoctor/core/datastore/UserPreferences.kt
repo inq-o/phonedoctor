@@ -85,6 +85,13 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { it[NOTIFY_CAUTION] = enabled }
     }
 
+    /** 모든 데이터 지우기를 시작했고 아직 끝나지 않음. 앱이 꺼졌다 켜지면 이어서 지운다 */
+    val deletionPending: Flow<Boolean> = store.data.map { it[DELETION_PENDING] ?: false }
+
+    suspend fun setDeletionPending(pending: Boolean) {
+        store.edit { it[DELETION_PENDING] = pending }
+    }
+
     suspend fun clearChosenRole() {
         store.edit { it.remove(CHOSEN_ROLE) }
     }
@@ -109,6 +116,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val REPORTED_APP_VERSION = intPreferencesKey("reportedAppVersion")
         val DISPLAY_NAME = stringPreferencesKey("displayName")
         val NOTIFY_CAUTION = booleanPreferencesKey("notifyCaution")
+        val DELETION_PENDING = booleanPreferencesKey("deletionPending")
     }
 }
 

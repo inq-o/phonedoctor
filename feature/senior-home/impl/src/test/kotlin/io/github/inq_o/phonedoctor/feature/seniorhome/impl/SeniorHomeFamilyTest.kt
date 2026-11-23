@@ -109,6 +109,7 @@ class SeniorHomeFamilyTest {
         override suspend fun updatePushToken(token: String) = Unit
         override suspend fun deleteAllData() = Unit
         override suspend fun reportAppVersion() = Unit
+        override suspend fun resumePendingDeletion() = false
         override val displayName: Flow<String?> = flowOf(null)
         override suspend fun setDisplayName(name: String) = Unit
         override val notifyCaution: Flow<Boolean> = flowOf(false)

@@ -319,6 +319,26 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `지우다 끊겼으면 다음 실행에서 이어서 지운다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        account.deleteError = IOException("offline")
+        try {
+            repo.deleteAllData()
+            fail()
+        } catch (_: IOException) {
+        }
+        assertTrue(prefs.deletionPending.first())
+        account.deleteError = null
+        assertTrue(repo.resumePendingDeletion())
+        assertFalse(prefs.deletionPending.first())
+        assertFalse(account.isSignedIn)
+        // 지울 것이 없으면 아무것도 안 한다
+        assertFalse(repo.resumePendingDeletion())
+        assertEquals(listOf("dev-1"), network.deleted)
+    }
+
+    @Test
     fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
         val repo = repo()
         repo.reportAppVersion()

@@ -237,6 +237,19 @@ class DeleteDeviceTest {
         // 지운 뒤 같은 사용자가 새로 등록하면 새 기기
         assertNotEquals(senior, register())
     }
+
+    @Test
+    fun `시니어의 익명 Firebase 사용자도 지우고, 보호자 Google 사용자는 기기가 지운다`() = serverTest {
+        val senior = register()
+        val guardian = register(GUARDIAN, "guardian")
+        // 남의 기기를 지우려 하면 아무 사용자도 지우지 않는다
+        client.api(Delete, "/devices/$guardian", SENIOR)
+        assertEquals(emptyList<String>(), FakeVerifier.deletedUsers)
+        client.api(Delete, "/devices/$senior", SENIOR)
+        assertEquals(listOf("senior1"), FakeVerifier.deletedUsers)
+        client.api(Delete, "/devices/$guardian", GUARDIAN)
+        assertEquals(listOf("senior1"), FakeVerifier.deletedUsers)
+    }
 }
 
 class DeviceStatusTest {

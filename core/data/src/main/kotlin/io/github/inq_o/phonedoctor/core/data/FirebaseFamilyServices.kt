@@ -57,6 +57,8 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
             auth.currentUser?.delete()?.await()
         } catch (e: FirebaseAuthRecentLoginRequiredException) {
             throw RecentLoginRequiredException()
+        } catch (e: FirebaseAuthInvalidUserException) {
+            // 이미 없는 사용자 (시니어 익명 사용자는 기기 삭제 때 서버가 지운다)
         } catch (e: FirebaseNetworkException) {
             throw IOException(e)
         }

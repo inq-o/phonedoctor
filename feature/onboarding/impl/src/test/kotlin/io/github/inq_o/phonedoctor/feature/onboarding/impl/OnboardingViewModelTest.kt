@@ -146,6 +146,7 @@ class OnboardingViewModelTest {
         override suspend fun updatePushToken(token: String) = error("부르지 않음")
         override suspend fun deleteAllData() = error("부르지 않음")
         override suspend fun reportAppVersion() = Unit
+        override suspend fun resumePendingDeletion() = false
         override val displayName: Flow<String?> = flowOf(null)
         override suspend fun setDisplayName(name: String) = Unit
         override val notifyCaution: Flow<Boolean> = flowOf(false)

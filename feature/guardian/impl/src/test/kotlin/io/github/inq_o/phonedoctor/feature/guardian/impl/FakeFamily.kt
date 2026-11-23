@@ -85,6 +85,7 @@ internal class FakeFamily : FamilyRepository {
         deletes++
     }
     override suspend fun reportAppVersion() = Unit
+    override suspend fun resumePendingDeletion() = false
     override val displayName = MutableStateFlow<String?>(null)
     override suspend fun setDisplayName(name: String) {
         step("name")

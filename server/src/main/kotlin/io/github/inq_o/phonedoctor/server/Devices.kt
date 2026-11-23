@@ -1,6 +1,7 @@
 package io.github.inq_o.phonedoctor.server
 
 import io.ktor.http.HttpStatusCode
+import io.ktor.server.application.log
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
@@ -194,6 +195,15 @@ fun Route.deviceRoutes(deps: Deps) {
                     }
                 }
                 withContext(Dispatchers.IO) { deps.sendAll(pushes) }
+                // 시니어의 익명 Firebase 사용자도 지운다 (개인정보처리방침 6절). 익명 사용자는 기기에서 다시 로그인할 수 없어 기기가 못 지울 때가 있다.
+                // 실패해도 기기 삭제는 끝났으므로 204 (기기도 지우기를 시도한다)
+                if (call.caller.signInProvider == "anonymous") {
+                    try {
+                        withContext(Dispatchers.IO) { deps.verifier.deleteUser(call.caller.uid) }
+                    } catch (e: Exception) {
+                        call.application.log.warn("익명 사용자 삭제 실패", e)
+                    }
+                }
                 call.respond(HttpStatusCode.NoContent)
             }
 

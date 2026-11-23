@@ -76,6 +76,12 @@ interface FamilyRepository {
     /** (보호자) 모든 데이터 지우기가 [RecentLoginRequiredException]으로 멈췄을 때 Google로 다시 로그인한다 */
     suspend fun reauthenticateGuardian(googleIdToken: String)
 
+    /**
+     * 모든 데이터 지우기가 도중에 끊겼으면(앱이 꺼짐) 이어서 지운다. 끝냈으면 true, 지울 것이 없었으면 false.
+     * 보호자가 다시 로그인해야 하면 [RecentLoginRequiredException] (설정 G4에서 이어서)
+     */
+    suspend fun resumePendingDeletion(): Boolean
+
     /** 앱이 업데이트됐으면 서버의 기기 정보(appVersionCode)를 고친다. 등록 전이면 아무것도 안 한다 */
     suspend fun reportAppVersion()
 
@@ -267,7 +273,20 @@ internal class DefaultFamilyRepository @Inject constructor(
         }
     }
 
+    override suspend fun resumePendingDeletion(): Boolean {
+        if (!available || !preferences.deletionPending.first()) return false
+        deleteAllData()
+        return true
+    }
+
     override suspend fun deleteAllData() = serialized {
+        // 끝날 때까지 표시를 남긴다: 중간에 앱이 꺼져도 다음 실행에서 이어서 지운다 (서버만 지우고 Firebase 사용자가 남지 않게)
+        preferences.setDeletionPending(true)
+        deleteSteps()
+        preferences.setDeletionPending(false)
+    }
+
+    private suspend fun deleteSteps() {
         var device = registered()
         val pending = preferences.pendingRegistrationRole.first()?.let(DeviceRole::valueOf)
         // 한 번도 연결을 시작하지 않은 폰: 서버·Firebase에 지울 것이 없다. 아무것도 보내지 않고 이 폰의 설정만 비운다
@@ -288,7 +307,7 @@ internal class DefaultFamilyRepository @Inject constructor(
         // 이 폰에 정해 둔 이름·설정도 지운다: 다음에 다른 역할·계정으로 등록할 때 따라가지 않게 (개인정보처리방침: 표시 이름도 지우는 정보)
         preferences.setDisplayName(null)
         preferences.setNotifyCaution(false)
-        if (!touchedServer) return@serialized
+        if (!touchedServer) return
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()
         try {

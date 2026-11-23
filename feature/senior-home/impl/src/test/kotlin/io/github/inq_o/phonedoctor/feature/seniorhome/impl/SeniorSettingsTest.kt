@@ -114,6 +114,7 @@ class SeniorSettingsTest {
         override suspend fun setNotifyCaution(enabled: Boolean) = Unit
         override suspend fun reauthenticateGuardian(googleIdToken: String) = Unit
         override suspend fun reportAppVersion() = Unit
+        override suspend fun resumePendingDeletion() = false
         override suspend fun updatePushToken(token: String) = Unit
     }
 }
