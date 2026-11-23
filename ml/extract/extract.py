@@ -41,6 +41,31 @@ def korean_label(a):
     return ko if ko and not ko.startswith("@") else (a.get_app_name() or "")
 
 
+NS_ANDROID = "{http://schemas.android.com/apk/res/android}"
+
+
+def _uses_sdk(a, attr):
+    """uses-sdk 값. androguard get_attribute_value는 uses-sdk가 여럿이면 집합 순서라 실행마다 다를 수 있어
+    문서 순서로 고정한다 (찾는 범위·값 읽는 법은 find_tags·get_all_attribute_value와 같음). 기기 추출기도 같은 규칙"""
+    root = a.get_android_manifest_xml()
+    if root is None:
+        return None
+    tags = [root] if root.tag == "uses-sdk" else [e for e in root.iter() if e is not root and e.tag in ("uses-sdk", NS_ANDROID + "uses-sdk")]
+    for t in tags:
+        v = t.get(NS_ANDROID + attr) or t.get(attr)
+        if v is not None:
+            return v
+    return None
+
+
+def _effective_target(target, minimum):
+    """androguard get_effective_target_sdk_version과 같은 규칙 (targetSdk가 없으면 minSdk, 숫자가 아니면 1)"""
+    try:
+        return int(target or minimum)
+    except (ValueError, TypeError):
+        return 1
+
+
 def parse(data):
     """data: APK 파일 바이트. 해시·크기와 같은 바이트를 쓰도록 한 번만 읽는다"""
     a = APK(data, raw=True)
@@ -63,8 +88,8 @@ def parse(data):
         "permissions": sorted(a.get_permissions()),
         "intents": sorted(intents),
         "components": {k: sorted(resolve(n) for n in v) for k, v in comps.items()},
-        "min_sdk": int(a.get_min_sdk_version() or 1),
-        "target_sdk": int(a.get_effective_target_sdk_version()),
+        "min_sdk": int(_uses_sdk(a, "minSdkVersion") or 1),
+        "target_sdk": _effective_target(_uses_sdk(a, "targetSdkVersion"), _uses_sdk(a, "minSdkVersion")),
         "has_launcher": bool(a.get_main_activities()),
         "size_bytes": len(data),
     }

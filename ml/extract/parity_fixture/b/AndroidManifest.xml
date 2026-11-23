@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 경계 사례: targetSdk 없음(minSdk로), 꺼진 별칭만 런처(런처 없음), 같은 이름 컴포넌트 둘(둘 다 셈), 별칭 안 intent-filter(세지 않음), 점 없는 이름 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.example.fixture.b">
+    <uses-sdk android:minSdkVersion="23" />
+    <uses-permission android:name="android.permission.BIND_DEVICE_ADMIN" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission-sdk-23 android:name="android.permission.CAMERA" />
+    <application android:label="@string/app_name">
+        <activity android:name="Hidden" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.BROWSABLE" />
+            </intent-filter>
+        </activity>
+        <activity android:name=".Dup" />
+        <activity android:name=".Dup" />
+        <activity-alias android:name=".Launch" android:targetActivity="Hidden" android:enabled="false" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+            </intent-filter>
+        </activity-alias>
+        <receiver android:name="com.ironsource.sdk.Recv" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SCREEN_ON" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
+        <service android:name="com.unity3d.ads.adplayer.Svc" />
+        <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-0" />
+    </application>
+</manifest>

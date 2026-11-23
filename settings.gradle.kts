@@ -46,6 +46,7 @@ rootProject.name = "PhoneDoctor"
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 include(":app")
+include(":core:classifier")
 include(":core:data")
 include(":core:data-test")
 include(":core:database")
