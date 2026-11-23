@@ -6,6 +6,7 @@ import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
+import io.github.inq_o.phonedoctor.core.network.ServerClock
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlert
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlertCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlertList
@@ -63,7 +64,7 @@ class FamilyRepositoryTest {
             tmp.newFile("prefs.preferences_pb").also { it.delete() }
         }
         prefs = UserPreferences(store)
-        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents, FalsePositiveGate(prefs, reporter))
+        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents, FalsePositiveGate(prefs, reporter, ServerClock()))
     }
 
     @Test

@@ -21,6 +21,7 @@ import org.jetbrains.exposed.v1.core.plus
 import org.jetbrains.exposed.v1.javatime.date
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.upsert
+import java.nio.charset.CharacterCodingException
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
@@ -78,15 +79,32 @@ private var prunedAt: Instant = Instant.EPOCH
  */
 internal fun sourceOf(forwardedFor: String?, remoteHost: String, hops: Int = 1): String {
     val parts = forwardedFor?.split(',')?.map { it.trim() }?.filter { it.isNotEmpty() }.orEmpty()
-    val ip = parts.getOrNull(parts.size - hops) ?: remoteHost
-    return bucket(ip)
+    return parts.getOrNull(parts.size - hops)?.let(::normalizeIp) ?: normalizeIp(remoteHost) ?: remoteHost
 }
 
-private fun bucket(ip: String): String {
-    if (':' !in ip) return ip
-    val addr = runCatching { java.net.InetAddress.getByName(ip.removePrefix("[").substringBefore(']').substringBefore('%')) }.getOrNull()
-    if (addr !is java.net.Inet6Address) return ip
+private val IPV4 = Regex("^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$")
+private val IPV6_CHARS = Regex("^[0-9a-fA-F:.]+$")
+
+/**
+ * IP 문자열을 같은 회선이면 같은 값이 되게: 포트·대괄호·zone은 떼고, IPv4는 숫자로 다시 쓰고, IPv4를 담은 IPv6는 IPv4로,
+ * 나머지 IPv6는 /64로 묶는다. IP가 아니면 null (이름 조회는 하지 않음)
+ */
+internal fun normalizeIp(raw: String): String? {
+    var s = raw.trim()
+    if (s.startsWith("[")) s = s.substring(1).substringBefore(']')
+    else if (s.count { it == ':' } == 1) s = s.substringBefore(':') // IPv4:포트
+    s = s.substringBefore('%')
+    IPV4.matchEntire(s)?.let { m ->
+        val n = m.groupValues.drop(1).map { it.toInt() }
+        return if (n.all { it in 0..255 }) n.joinToString(".") else null
+    }
+    if (':' !in s || !IPV6_CHARS.matches(s)) return null
+    // 문자·콜론·점만 있는 IPv6 꼴이라 이름 조회가 일어나지 않는다
+    val addr = runCatching { java.net.InetAddress.getByName(s) }.getOrNull() ?: return null
+    // ::ffff:a.b.c.d (IPv4를 담은 IPv6)는 JDK가 Inet4Address로 돌려준다
+    if (addr is java.net.Inet4Address) return addr.hostAddress
     val b = addr.address
+    if (b.size != 16) return null
     return (0 until 8).joinToString(":") { "%02x".format(b[it]) } + "::/64"
 }
 
@@ -168,7 +186,9 @@ fun Route.feedbackRoutes(deps: Deps) {
         val bytes = call.receiveChannel().readRemaining(BODY_MAX + 1).readByteArray()
         if (bytes.size > BODY_MAX) throw tooLarge
         val body = try {
-            ApiJson.decodeFromString<FalsePositiveReport>(bytes.decodeToString())
+            ApiJson.decodeFromString<FalsePositiveReport>(bytes.decodeToString(throwOnInvalidSequence = true))
+        } catch (e: CharacterCodingException) {
+            throw badRequest("UTF-8이 아닌 바이트")
         } catch (e: SerializationException) {
             throw badRequest(e.message ?: "JSON 형식 오류")
         } catch (e: IllegalArgumentException) {

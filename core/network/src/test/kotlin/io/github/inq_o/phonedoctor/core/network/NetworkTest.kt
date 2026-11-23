@@ -174,6 +174,19 @@ class RetrofitNetworkTest {
     }
 
     @Test
+    fun `서버 응답의 Date로 서버와 기기 시계 차이를 잰다`() = runTest {
+        val clock = ServerClock()
+        val net = networkDataSource(server.url("/v1/").toString(), networkClient(tokens, clock), networkJson)
+        // 기기보다 정확히 3시간 빠른 서버 (Date는 초 단위)
+        val serverTime = (System.currentTimeMillis() / 1000 + 3 * 3600) * 1000
+        val httpDate = java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME.format(java.time.Instant.ofEpochMilli(serverTime).atZone(java.time.ZoneOffset.UTC))
+        server.enqueue(MockResponse.Builder().code(202).addHeader("Date", httpDate).build())
+        net.reportFalsePositive(NetworkFalsePositiveReport(NetworkAlertSource.SYMPTOM, "com.ad", 7, "ab".repeat(32), detectorVersion = "usage-v1"))
+        val offset = clock.offsetMillis()!!
+        assertTrue(offset in (3 * 3_600_000L - 5_000)..(3 * 3_600_000L + 1_000), "offset=$offset")
+    }
+
+    @Test
     fun `응답을 읽고 모르는 필드는 무시`() = runTest {
         Contract.check("Alert", ALERT_JSON)
         respond(200, ALERT_JSON)

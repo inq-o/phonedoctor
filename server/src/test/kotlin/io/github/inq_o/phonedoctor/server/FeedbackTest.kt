@@ -122,6 +122,15 @@ class FeedbackTest {
         assertEquals(HttpStatusCode.Accepted, typed("application/json; charset=utf-8"))
         assertEquals(HttpStatusCode.UnsupportedMediaType, typed("application/json; charset=utf-16"))
         assertEquals(HttpStatusCode.UnsupportedMediaType, typed("application/json; charset=nope-9"))
+        // UTF-8이 아닌 바이트는 무시되는 필드에 있어도 400
+        val badUtf8 = client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            setBody(object : OutgoingContent.ByteArrayContent() {
+                override val contentType = ContentType.Application.Json
+                override fun bytes() = symptom.dropLast(1).encodeToByteArray() + ",\"x\":\"".encodeToByteArray() + byteArrayOf(0xC3.toByte(), 0x28) + "\"}".encodeToByteArray()
+            })
+        }
+        assertEquals(HttpStatusCode.BadRequest, badUtf8.status)
         // 상한 경계: 4096바이트는 받고 4097은 413
         val pad = { n: Int -> symptom.dropLast(1) + " ".repeat(n - symptom.length) + "}" }
         assertEquals(HttpStatusCode.Accepted, typed("application/json", pad(4096)))
@@ -148,6 +157,12 @@ class FeedbackTest {
         // IPv6는 /64로 묶는다
         assertEquals(sourceOf("2001:db8:1:2::1", "x"), sourceOf("2001:db8:1:2:ffff::9", "x"))
         assertEquals("20:01:0d:b8:00:01:00:02::/64", sourceOf("2001:db8:1:2::abcd", "x"))
+        // 포트·대괄호·zone은 떼고, IPv4를 담은 IPv6는 IPv4로, IP가 아니면 접속 주소로 (이름 조회 안 함)
+        assertEquals("203.0.113.8", sourceOf("203.0.113.8:40001", "x"))
+        assertEquals(sourceOf("2001:db8:1:2::1", "x"), sourceOf("[2001:db8:1:2::1]:443", "x"))
+        assertEquals("203.0.113.8", sourceOf("::ffff:203.0.113.8", "x"))
+        assertEquals("10.0.0.1", sourceOf("not-an-ip.example.com", "10.0.0.1"))
+        assertEquals("10.0.0.1", sourceOf("999.1.1.1", "10.0.0.1"))
         assertTrue(sourceOf("2001:db8:1:3::1", "x") != sourceOf("2001:db8:1:2::1", "x"))
     }
 

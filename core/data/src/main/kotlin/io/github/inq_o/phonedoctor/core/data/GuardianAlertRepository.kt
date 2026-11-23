@@ -98,7 +98,7 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
 
     override suspend fun setFalsePositiveFeedback(enabled: Boolean) {
         // 끄면 세대를 올려 이미 맡긴 것과 응답을 기다리는 중인 것도 보내지 않는다
-        if (enabled) preferences.setFalsePositiveFeedback(true) else falsePositives.invalidate { preferences.setFalsePositiveFeedback(false) }
+        if (enabled) preferences.setFalsePositiveFeedback(true) else falsePositives.disable()
     }
 
     private val json = Json { ignoreUnknownKeys = true }
@@ -188,8 +188,8 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     }
 
     private suspend fun reportFalsePositives(alertId: String, alert: NetworkAlert, generation: Long, decidedAt: String?) {
-        // 서버 응답 시각을 모르면(응답에 없음) 지금으로
-        val answered = decidedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: falsePositives.clock()
+        // 서버 응답 시각(서버 시계). 응답에 없으면 지금을 서버 시계로 옮긴 값
+        val answered = decidedAt?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() } ?: falsePositives.serverNow()
         for (report in alert.toFalsePositives()) {
             val id = "$alertId:${if (report.installScan) "install_scan" else "symptom"}"
             falsePositives.schedule(id, report, generation, answered)

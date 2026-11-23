@@ -2,7 +2,9 @@ package io.github.inq_o.phonedoctor.core.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import io.github.inq_o.phonedoctor.core.datastore.UserPreferences
+import io.github.inq_o.phonedoctor.core.network.ServerClock
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -23,6 +25,8 @@ class FalsePositiveGateTest {
     private val hour = 3_600_000L
     private val now = 100 * hour
 
+    private val serverClock = ServerClock()
+
     private fun TestScope.gate(): Pair<FalsePositiveGate, UserPreferences> {
         val prefs = UserPreferences(PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
             tmp.newFile("g.preferences_pb").also { it.delete() }
@@ -35,7 +39,7 @@ class FalsePositiveGateTest {
             override fun cancelAll() {
                 cancelled++
             }
-        })
+        }, serverClock)
         gate.clock = { now }
         return gate to prefs
     }
@@ -63,14 +67,38 @@ class FalsePositiveGateTest {
     fun invalidatingStopsEarlierGenerations() = runTest {
         val (gate, prefs) = gate()
         val before = gate.generation()
-        gate.invalidate { prefs.setFalsePositiveFeedback(false) }
+        gate.disable()
         assertEquals(1, cancelled)
+        assertFalse(prefs.falsePositiveFeedback.first())
+        assertEquals(before + 1, gate.generation()) // 끄기와 세대 올리기를 한 번에
         prefs.setFalsePositiveFeedback(true)
         assertFalse(gate.schedule("a1:symptom", report, before, now))
         var sent = 0
         assertFalse(gate.send(before, now + hour) { sent++ })
         assertTrue(gate.send(gate.generation(), now + hour) { sent++ })
         assertEquals(1, sent)
+    }
+
+    @Test
+    fun deletionInvalidatesWithoutTurningOff() = runTest {
+        val (gate, prefs) = gate()
+        gate.invalidate()
+        assertEquals(1, cancelled)
+        assertEquals(1L, gate.generation())
+        assertTrue(prefs.falsePositiveFeedback.first())
+    }
+
+    @Test
+    fun deadlineFollowsTheServerClock() = runTest {
+        val (gate, _) = gate()
+        // 기기 시계가 서버보다 12시간 느림: 서버 시각 기준 답한 지 23시간이면 기기 시계로도 마감이 1시간 남은 것으로
+        serverClock.record(serverMillis = now + 12 * hour, localMillis = now)
+        assertFalse(gate.schedule("late", report, 0, decidedAt = now + 12 * hour - 23 * hour))
+        assertTrue(gate.schedule("ok", report, 0, decidedAt = now + 12 * hour - 10 * hour))
+        val (_, deadline, delay) = scheduled.single()
+        assertEquals(now + 14 * hour, deadline) // 서버 기준 마감(답 + 24시간)을 기기 시계로
+        assertTrue(delay in hour..(13 * hour))
+        assertEquals(now + 12 * hour, gate.serverNow())
     }
 
     @Test

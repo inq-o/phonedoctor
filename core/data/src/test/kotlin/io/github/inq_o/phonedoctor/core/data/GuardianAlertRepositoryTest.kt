@@ -8,6 +8,7 @@ import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyOutcome
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
+import io.github.inq_o.phonedoctor.core.network.ServerClock
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlert
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlertCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlertKind
@@ -79,7 +80,7 @@ class GuardianAlertRepositoryTest {
         }
         prefs = UserPreferences(store)
         role?.let { prefs.setRegisteredDevice(RegisteredDevice("dev-2", it)) }
-        gate = FalsePositiveGate(prefs, reporter).also { it.clock = { now } }
+        gate = FalsePositiveGate(prefs, reporter, ServerClock()).also { it.clock = { now } }
         return DefaultGuardianAlertRepository(available, server, prefs, gate)
     }
 
@@ -319,7 +320,7 @@ class GuardianAlertRepositoryTest {
         val failing = FalsePositiveGate(p, object : FalsePositiveReporter {
             override fun schedule(id: String, report: FalsePositive, generation: Long, deadline: Long, delayMillis: Long) = error("WorkManager 오류")
             override fun cancelAll() = Unit
-        })
+        }, ServerClock())
         val repo = DefaultGuardianAlertRepository(true, server, p, failing)
         assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.ALLOW, null).status)
     }

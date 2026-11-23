@@ -122,6 +122,24 @@ internal fun Data.toReport(): NetworkFalsePositiveReport? {
     }
 }
 
+internal fun sendName(id: String) = "false-positive-$id"
+
+/** 마감이 지나도 보내지 못한 신고 작업을 거둔다 (거둔 작업 기록은 WorkManager가 하루쯤 안에 정리) */
+@HiltWorker
+class FalsePositiveExpireWorker @AssistedInject constructor(
+    @Assisted context: Context,
+    @Assisted params: WorkerParameters,
+) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result {
+        inputData.getString(KEY_ID)?.let { WorkManager.getInstance(applicationContext).cancelUniqueWork(sendName(it)) }
+        return Result.success()
+    }
+
+    companion object {
+        const val KEY_ID = "id"
+    }
+}
+
 class WorkManagerFalsePositiveReporter @Inject constructor(
     @ApplicationContext private val context: Context,
 ) : FalsePositiveReporter {
@@ -136,7 +154,15 @@ class WorkManagerFalsePositiveReporter @Inject constructor(
             .addTag(FalsePositiveWorker.TAG)
             .build()
         // 한 번만 보내는 표시는 저장소(DataStore)가 한다. 여기서는 같은 작업이 겹쳐 예약되지 않게만
-        WorkManager.getInstance(context).enqueueUniqueWork("false-positive-$id", ExistingWorkPolicy.KEEP, request)
+        val work = WorkManager.getInstance(context)
+        work.enqueueUniqueWork(sendName(id), ExistingWorkPolicy.KEEP, request)
+        // 마감에 거두는 작업 (망 조건 없음): 망이 오래 끊겨 보내지 못한 신고가 기기에 남아 있지 않게
+        val expire = OneTimeWorkRequestBuilder<FalsePositiveExpireWorker>()
+            .setInputData(workDataOf(FalsePositiveExpireWorker.KEY_ID to id))
+            .setInitialDelay((deadline - System.currentTimeMillis()).coerceAtLeast(0), TimeUnit.MILLISECONDS)
+            .addTag(FalsePositiveWorker.TAG)
+            .build()
+        work.enqueueUniqueWork("false-positive-expire-$id", ExistingWorkPolicy.KEEP, expire)
     }
 
     override fun cancelAll() {

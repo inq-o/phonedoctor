@@ -9,6 +9,7 @@ import io.github.inq_o.phonedoctor.core.network.AuthTokens
 import io.github.inq_o.phonedoctor.core.network.BuildConfig
 import io.github.inq_o.phonedoctor.core.network.FirebaseAuthTokens
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
+import io.github.inq_o.phonedoctor.core.network.ServerClock
 import io.github.inq_o.phonedoctor.core.network.networkClient
 import io.github.inq_o.phonedoctor.core.network.networkDataSource
 import io.github.inq_o.phonedoctor.core.network.networkJson
@@ -23,7 +24,7 @@ internal abstract class NetworkModule {
     companion object {
         @Provides
         @Singleton
-        fun provideNetworkDataSource(tokens: AuthTokens): PhoneDoctorNetworkDataSource =
-            networkDataSource(BuildConfig.API_BASE_URL, networkClient(tokens), networkJson)
+        fun provideNetworkDataSource(tokens: AuthTokens, serverClock: ServerClock): PhoneDoctorNetworkDataSource =
+            networkDataSource(BuildConfig.API_BASE_URL, networkClient(tokens, serverClock), networkJson)
     }
 }

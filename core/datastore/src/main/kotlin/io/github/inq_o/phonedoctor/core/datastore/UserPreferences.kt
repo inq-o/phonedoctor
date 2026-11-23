@@ -113,6 +113,14 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { it[FALSE_POSITIVE_GENERATION] = (it[FALSE_POSITIVE_GENERATION] ?: 0L) + 1 }
     }
 
+    /** 끄기와 세대 올리기를 한 번에 (사이에 앱이 꺼져 껐는데 세대는 그대로 남는 일이 없게) */
+    suspend fun disableFalsePositiveFeedback() {
+        store.edit {
+            it[FALSE_POSITIVE_FEEDBACK] = false
+            it[FALSE_POSITIVE_GENERATION] = (it[FALSE_POSITIVE_GENERATION] ?: 0L) + 1
+        }
+    }
+
     /** 모든 데이터 지우기: 신고 설정과 보낸 표시를 처음 상태로 (세대는 그대로 두어 옛 신고가 되살아나지 않게) */
     suspend fun clearFalsePositiveState() {
         store.edit {

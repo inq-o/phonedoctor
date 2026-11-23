@@ -1,6 +1,7 @@
 package io.github.inq_o.phonedoctor.core.data
 
 import io.github.inq_o.phonedoctor.core.datastore.UserPreferences
+import io.github.inq_o.phonedoctor.core.network.ServerClock
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -18,6 +19,7 @@ import kotlin.random.Random
 class FalsePositiveGate @Inject constructor(
     private val preferences: UserPreferences,
     private val reporter: FalsePositiveReporter,
+    private val serverClock: ServerClock,
 ) {
     private val mutex = Mutex()
 
@@ -27,20 +29,32 @@ class FalsePositiveGate @Inject constructor(
 
     suspend fun generation(): Long = preferences.falsePositiveGeneration.first()
 
-    /** 끄기·모든 데이터 지우기: [change]를 하고 세대를 올려, 이미 맡긴 것과 진행 중인 응답의 신고를 모두 무효로 */
-    suspend fun invalidate(change: suspend () -> Unit = {}) = mutex.withLock {
-        change()
+    /** 지금을 서버 시계로 */
+    fun serverNow(): Long = clock() + (serverClock.offsetMillis() ?: 0L)
+
+    /**
+     * 모든 데이터 지우기: 세대를 올려 이미 맡긴 것과 응답을 기다리는 중인 것의 신고를 모두 무효로.
+     * 보내는 중이던 한 건은 끝난 뒤에 무효가 된다 (자물쇠 순서: 그 한 건은 지우기 전에 보낸 것으로 친다)
+     */
+    suspend fun invalidate() = mutex.withLock {
         preferences.bumpFalsePositiveGeneration()
         reporter.cancelAll()
     }
 
+    /** 끄기: 끄기와 세대 올리기를 한 번에 저장하고 맡긴 것을 거둔다 */
+    suspend fun disable() = mutex.withLock {
+        preferences.disableFalsePositiveFeedback()
+        reporter.cancelAll()
+    }
+
     /**
-     * 신고 하나를 맡긴다. [generation]은 응답을 보내기 전에 읽은 세대, [decidedAt]은 서버의 응답 시각(ms).
-     * 그 사이 무효가 됐거나, 이미 맡겼거나, 마감 안에 1시간 넘게 늦춰 보낼 수 없으면 맡기지 않는다
+     * 신고 하나를 맡긴다. [generation]은 응답을 보내기 전에 읽은 세대, [decidedAt]은 서버의 응답 시각(서버 시계, ms).
+     * 마감은 서버 시계로 잰 뒤 기기 시계로 옮긴다(서버 응답의 Date로 잰 차이). 그 사이 무효가 됐거나, 이미 맡겼거나,
+     * 마감 안에 1시간 넘게 늦춰 보낼 수 없으면 맡기지 않는다
      */
     suspend fun schedule(id: String, report: FalsePositive, generation: Long, decidedAt: Long): Boolean = mutex.withLock {
         if (!sendable(generation)) return@withLock false
-        val deadline = decidedAt + WINDOW_MS
+        val deadline = decidedAt + WINDOW_MS - (serverClock.offsetMillis() ?: 0L)
         val latest = deadline - clock() - MARGIN_MS
         if (latest <= MIN_DELAY_MS) return@withLock false
         if (!preferences.markFalsePositiveReported(id)) return@withLock false

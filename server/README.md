@@ -17,7 +17,8 @@
 | pairing | `POST /pairing-codes`, `POST /pairing-codes/{code}/accept`, `GET /links`, `POST /links/{id}/confirm`, `DELETE /links/{id}` | 구현 |
 | alerts | `POST·GET /alerts`, `GET /alerts/{id}`, `POST /alerts/{id}/decision`, `POST /alerts/{id}/outcome` | 구현 |
 | 예약 작업 | `POST /internal/tick` — 재알림 24시간·만료 7일·요청 삭제 90일·연락 끊김 48시간·기기 삭제 180일·지난 연결 코드 (`Jobs.kt`) | 구현 |
-| feedback·models | `/feedback/false-positives`, `/models/latest` | 나중 |
+| feedback | `POST /feedback/false-positives` — App Check만, 집계만 저장, 1년 뒤 정리 (`Feedback.kt`) | 구현 |
+| models | `/models/latest` | 나중 (설치 시점 분류기 T050과 함께) |
 
 ## 시험
 
