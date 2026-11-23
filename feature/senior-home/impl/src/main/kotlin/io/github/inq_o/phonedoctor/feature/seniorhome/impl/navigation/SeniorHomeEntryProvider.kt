@@ -10,10 +10,17 @@ import io.github.inq_o.phonedoctor.feature.seniorhome.impl.SeniorHomeScreen
 fun EntryProviderScope<NavKey>.seniorHomeEntries(
     onAlertClick: (Long) -> Unit,
     onHistoryClick: () -> Unit,
+    onFamilyClick: () -> Unit,
+    onLinkRequestClick: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     entry<SeniorHomeNavKey> {
-        SeniorHomeScreen(onAlertClick = onAlertClick, onHistoryClick = onHistoryClick)
+        SeniorHomeScreen(
+            onAlertClick = onAlertClick,
+            onHistoryClick = onHistoryClick,
+            onFamilyClick = onFamilyClick,
+            onLinkRequestClick = onLinkRequestClick,
+        )
     }
     entry<ScanHistoryNavKey> {
         ScanHistoryScreen(onBack = onBack)

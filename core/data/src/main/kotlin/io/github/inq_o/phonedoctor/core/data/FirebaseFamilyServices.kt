@@ -2,10 +2,12 @@ package io.github.inq_o.phonedoctor.core.data
 
 import android.content.Context
 import android.os.Build
+import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.messaging.FirebaseMessaging
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.tasks.await
+import java.io.IOException
 import java.util.Locale
 import javax.inject.Inject
 
@@ -16,7 +18,12 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
     override val isAnonymous: Boolean get() = auth.currentUser?.isAnonymous == true
 
     override suspend fun signInAnonymously() {
-        auth.signInAnonymously().await()
+        try {
+            auth.signInAnonymously().await()
+        } catch (e: FirebaseNetworkException) {
+            // 화면이 서버 통신 실패와 같은 "인터넷 연결" 안내를 하게 IOException으로 바꾼다
+            throw IOException(e)
+        }
     }
 
     override fun signOut() = auth.signOut()

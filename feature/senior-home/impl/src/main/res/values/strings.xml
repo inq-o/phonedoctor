@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_senior_home_impl_app_name">폰주치의</string>
+    <string name="feature_senior_home_impl_family">가족</string>
+    <string name="feature_senior_home_impl_guardians">지켜보는 가족: %1$s</string>
+    <string name="feature_senior_home_impl_link_request_title">%1$s님이 연결을 요청했어요</string>
+    <string name="feature_senior_home_impl_link_request_body">눌러서 답해 주세요</string>
 
     <string name="feature_senior_home_impl_ok_title">지금은 확인할 앱이 없어요</string>
     <string name="feature_senior_home_impl_last_scan_today">오늘 %1$s에 살펴봤어요</string>

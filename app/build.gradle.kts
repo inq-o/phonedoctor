@@ -84,6 +84,8 @@ dependencies {
     implementation(projects.feature.onboarding.impl)
     implementation(projects.feature.seniorAppdetail.api)
     implementation(projects.feature.seniorAppdetail.impl)
+    implementation(projects.feature.seniorFamily.api)
+    implementation(projects.feature.seniorFamily.impl)
     implementation(projects.feature.seniorHome.api)
     implementation(projects.feature.seniorHome.impl)
 

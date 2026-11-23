@@ -45,7 +45,12 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleAlertIntent(intent)
+        // 화면 회전 등으로 다시 만들어지면 같은 시작 인텐트가 다시 온다: 이미 연 알림이면 건너뛴다.
+        // 프로세스가 죽은 뒤 새 알림을 눌러 복원된 경우는 주소가 달라 연다
+        val launchUri = intent?.dataString
+        if (savedInstanceState == null || (launchUri != null && launchUri != savedInstanceState.getString(KEY_LAUNCH_NOTIFICATION))) {
+            handleNotificationIntent(intent)
+        }
         setContent {
             PhoneDoctorTheme {
                 Surface(
@@ -53,13 +58,13 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
-                    val pendingAlertId by viewModel.pendingAlertId.collectAsStateWithLifecycle()
+                    val pendingOpen by viewModel.pendingOpen.collectAsStateWithLifecycle()
                     // 설정을 읽기 전에는 아무 화면도 그리지 않는다 (첫 설정 화면이 잠깐 보였다 사라지지 않게)
                     onboardingDone?.let { done ->
                         MainNavigation(
                             onboardingDone = done,
-                            pendingAlertId = pendingAlertId,
-                            onAlertOpened = viewModel::consumePendingAlert,
+                            pendingOpen = pendingOpen,
+                            onOpened = viewModel::consumePendingOpen,
                         )
                     }
                 }
@@ -69,7 +74,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleAlertIntent(intent)
+        handleNotificationIntent(intent)
     }
 
     override fun onStart() {
@@ -77,9 +82,24 @@ class MainActivity : ComponentActivity() {
         viewModel.onAppOpened()
     }
 
-    /** 알림을 눌러 들어왔으면 그 앱 상세 화면으로 간다 */
-    private fun handleAlertIntent(intent: Intent?) {
-        val id = intent?.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L) ?: -1L
-        if (id > 0) viewModel.openAlert(id)
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_LAUNCH_NOTIFICATION, intent?.dataString)
+    }
+
+    /** 알림을 눌러 들어왔으면 그 알림의 화면으로 간다 */
+    private fun handleNotificationIntent(intent: Intent?) {
+        intent ?: return
+        val alertId = intent.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L)
+        val linkId = intent.getStringExtra(SystemNotifier.EXTRA_LINK_ID)
+        when {
+            alertId > 0 -> viewModel.open(PendingOpen.Alert(alertId))
+            !linkId.isNullOrBlank() -> viewModel.open(PendingOpen.LinkRequest(linkId))
+            intent.getBooleanExtra(SystemNotifier.EXTRA_OPEN_FAMILY, false) -> viewModel.open(PendingOpen.FamilyLinks)
+        }
+    }
+
+    private companion object {
+        const val KEY_LAUNCH_NOTIFICATION = "launchNotification"
     }
 }
