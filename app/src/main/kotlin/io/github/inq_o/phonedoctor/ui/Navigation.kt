@@ -29,6 +29,7 @@ import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertDetailNa
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertHistoryNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.EnterCodeNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianHomeNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSettingsNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSignInNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.LinkWaitingNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.impl.navigation.guardianEntries
@@ -43,6 +44,7 @@ import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.PairingCo
 import io.github.inq_o.phonedoctor.feature.seniorfamily.impl.navigation.seniorFamilyEntries
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.ScanHistoryNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
+import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorSettingsNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.impl.navigation.seniorHomeEntries
 
 /** 처음 쌓을 화면. 첫 설정·로그인 화면 밑에는 역할 선택을 깔아 뒤로 가기로 다시 고를 수 있게 한다 */
@@ -137,7 +139,8 @@ fun MainNavigation(
             seniorHomeEntries(
                 onAlertClick = { backStack.add(AppDetailNavKey(it)) },
                 onHistoryClick = { backStack.add(ScanHistoryNavKey) },
-                onFamilyClick = { backStack.add(FamilyLinksNavKey) },
+                onSettingsClick = { push(SeniorSettingsNavKey) },
+                onFamilyClick = { push(FamilyLinksNavKey) },
                 onLinkRequestClick = { backStack.add(LinkConfirmNavKey(it)) },
                 onBack = { backStack.removeLastOrNull() },
             )
@@ -177,6 +180,9 @@ fun MainNavigation(
                 onOpenRequest = { push(AlertDetailNavKey(it)) },
                 onHistory = { push(AlertHistoryNavKey) },
                 onBack = { backStack.removeLastOrNull() },
+                onSettings = { push(GuardianSettingsNavKey) },
+                // 모든 데이터를 지운 보호자 폰은 처음부터 (역할 선택)
+                onDataDeleted = { reset(RoleChoiceNavKey) },
             )
         }
     )

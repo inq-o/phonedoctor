@@ -198,6 +198,147 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `이름은 등록 전이면 저장했다가 등록 때 보내고, 등록 뒤에는 바로 보낸다`() = runTest {
+        val repo = repo()
+        repo.setDisplayName("  엄마  ")
+        assertTrue(network.calls.isEmpty())
+        assertEquals("엄마", repo.displayName.first())
+        repo.createPairingCode()
+        assertEquals("엄마", network.registrations.single().displayName)
+        repo.setDisplayName("우리 엄마")
+        assertEquals("우리 엄마", network.updates.last().second.displayName)
+        try {
+            repo.setDisplayName("가".repeat(21))
+            fail()
+        } catch (_: IllegalArgumentException) {
+        }
+    }
+
+    @Test
+    fun `서버가 이름을 거절하면 저장하지 않는다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        network.fail["updateDevice"] = IOException("offline")
+        try {
+            repo.setDisplayName("엄마")
+            fail()
+        } catch (_: IOException) {
+        }
+        assertNull(repo.displayName.first())
+    }
+
+    @Test
+    fun `등록 전에 켠 주의 단계도 받기는 보호자 등록 뒤 보낸다`() = runTest {
+        val repo = repo()
+        repo.setNotifyCaution(true)
+        account.signedIn = true
+        repo.acceptPairingCode("482913")
+        assertEquals(true, network.updates.single().second.notifyCaution)
+        repo.setNotifyCaution(false)
+        assertEquals(false, network.updates.last().second.notifyCaution)
+        assertFalse(repo.notifyCaution.first())
+    }
+
+    @Test
+    fun `Google 사용자 삭제에 다시 로그인이 필요하면 알리고, 다시 로그인한 뒤 지우면 서버는 다시 부르지 않는다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        repo.acceptPairingCode("482913")
+        account.deleteError = RecentLoginRequiredException()
+        try {
+            repo.deleteAllData()
+            fail()
+        } catch (_: RecentLoginRequiredException) {
+        }
+        assertEquals(listOf("dev-1"), network.deleted)
+        account.deleteError = null
+        repo.reauthenticateGuardian("token")
+        repo.deleteAllData()
+        assertEquals(1, account.reauthed)
+        assertEquals(listOf("dev-1"), network.deleted)
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
+    fun `모든 데이터 지우기는 이름과 주의 단계 설정도 비워 다음 등록에 따라가지 않는다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        repo.setDisplayName("큰딸")
+        repo.setNotifyCaution(true)
+        repo.acceptPairingCode("482913")
+        repo.deleteAllData()
+        assertNull(repo.displayName.first())
+        assertFalse(repo.notifyCaution.first())
+        network.updates.clear()
+        repo.createPairingCode()
+        assertNull(network.registrations.last().displayName)
+        assertTrue(network.updates.isEmpty())
+    }
+
+    @Test
+    fun `연결을 시작한 적 없는 폰은 지울 때 아무것도 보내지 않는다`() = runTest {
+        val repo = repo()
+        repo.setDisplayName("엄마")
+        repo.deleteAllData()
+        assertTrue(network.calls.isEmpty())
+        assertEquals(0, push.deleted)
+        assertEquals(0, account.deleted)
+        assertNull(repo.displayName.first())
+    }
+
+    @Test
+    fun `익명 사용자에게 다시 로그인을 요구하면 로그아웃으로 끝낸다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        account.deleteError = RecentLoginRequiredException()
+        repo.deleteAllData()
+        assertFalse(account.isSignedIn)
+        assertEquals(listOf("dev-1"), network.deleted)
+    }
+
+    @Test
+    fun `응답을 못 받은 등록은 지금 로그인 방식과 맞을 때만 다시 보낸다`() = runTest {
+        val repo = repo()
+        prefs.setPendingRegistrationRole(DeviceRole.SENIOR.name)
+        // 그 뒤 보호자로 Google 로그인함
+        account.signedIn = true
+        account.anonymous = false
+        repo.deleteAllData()
+        assertTrue(network.registrations.isEmpty())
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
+    fun `등록 뒤 주의 단계도 받기를 못 보내면 스위치를 끈다`() = runTest {
+        val repo = repo()
+        repo.setNotifyCaution(true)
+        account.signedIn = true
+        network.fail["updateDevice"] = IOException("offline")
+        repo.acceptPairingCode("482913")
+        assertFalse(repo.notifyCaution.first())
+    }
+
+    @Test
+    fun `지우다 끊겼으면 다음 실행에서 이어서 지운다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        account.deleteError = IOException("offline")
+        try {
+            repo.deleteAllData()
+            fail()
+        } catch (_: IOException) {
+        }
+        assertTrue(prefs.deletionPending.first())
+        account.deleteError = null
+        assertTrue(repo.resumePendingDeletion())
+        assertFalse(prefs.deletionPending.first())
+        assertFalse(account.isSignedIn)
+        // 지울 것이 없으면 아무것도 안 한다
+        assertFalse(repo.resumePendingDeletion())
+        assertEquals(listOf("dev-1"), network.deleted)
+    }
+
+    @Test
     fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
         val repo = repo()
         repo.reportAppVersion()
@@ -435,6 +576,11 @@ private class FakeAccount : FamilyAccount {
     override suspend fun signInWithGoogle(idToken: String) {
         signedIn = true
         anonymous = false
+    }
+
+    var reauthed = 0
+    override suspend fun reauthenticateWithGoogle(idToken: String) {
+        reauthed++
     }
 
     override fun signOut() {

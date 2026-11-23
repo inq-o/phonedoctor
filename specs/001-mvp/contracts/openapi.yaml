@@ -65,7 +65,7 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403':
-          description: 익명 사용자가 보호자로 등록 (type = .../problems/guardian-requires-account)
+          description: 익명 사용자가 보호자로 등록 (type = .../problems/guardian-requires-account), Google 사용자가 시니어로 등록 (type = .../problems/senior-requires-anonymous)
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -99,6 +99,9 @@ paths:
       tags: [devices]
       operationId: deleteDevice
       summary: 기기 삭제 (앱 안의 "모든 데이터 지우기"). 연결·요청 전부 삭제, 해제되지 않은 연결의 상대 기기에 LINK_REVOKED 푸시
+      description: |
+        - 부른 사용자가 익명(시니어)이면 그 Firebase 사용자도 지운다. 익명 사용자는 기기에서 다시 로그인할 수 없어, 오래 쓴 기기는 스스로 지우지 못할 수 있음. 실패해도 기기 삭제는 204
+        - 보호자의 Google 사용자는 앱이 지운다 (필요하면 Google로 다시 로그인한 뒤)
       responses:
         '204': { description: 삭제됨 (이미 없어도 204 — 응답 유실 뒤 재전송) }
         '403': { $ref: '#/components/responses/Forbidden' }

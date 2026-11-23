@@ -9,6 +9,7 @@ import com.auth0.jwt.exceptions.JWTVerificationException
 import com.google.auth.oauth2.GoogleCredentials
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
+import com.google.firebase.auth.AuthErrorCode
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
 import io.ktor.http.HttpStatusCode
@@ -43,6 +44,12 @@ interface TokenVerifier {
     fun verifyIdToken(token: String): Caller?
 
     fun verifyAppCheck(token: String): Boolean
+
+    /**
+     * Firebase 사용자 삭제. 시니어의 익명 사용자는 오래 쓰면 기기에서 지울 때 다시 로그인을 요구받는데 익명이라 다시 로그인할 수 없어,
+     * 기기 삭제("모든 데이터 지우기") 때 서버가 지운다. 이미 없으면 그대로 성공
+     */
+    fun deleteUser(uid: String)
 }
 
 private val CallerKey = AttributeKey<Caller>("caller")
@@ -117,6 +124,14 @@ class FirebaseVerifier(private val config: Config, app: FirebaseApp) : TokenVeri
         null
     } catch (_: IllegalArgumentException) {
         null
+    }
+
+    override fun deleteUser(uid: String) {
+        try {
+            auth.deleteUser(uid)
+        } catch (e: FirebaseAuthException) {
+            if (e.authErrorCode != AuthErrorCode.USER_NOT_FOUND) throw e
+        }
     }
 
     override fun verifyAppCheck(token: String): Boolean = try {

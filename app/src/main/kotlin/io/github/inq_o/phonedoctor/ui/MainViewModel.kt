@@ -36,18 +36,18 @@ sealed interface PendingOpen {
 }
 
 /** 앱을 열 때 처음 보일 화면 */
-enum class StartScreen {
+enum class StartScreen(val isGuardian: Boolean = false) {
     /** O1. 가족 연결을 쓸 수 있는 빌드의 첫 실행 */
     ROLE_CHOICE,
     SENIOR_ONBOARDING,
     SENIOR_HOME,
 
     /** 보호자를 골랐고 아직 서버에 등록하기 전. 역할 선택으로 돌아갈 수 있다 */
-    GUARDIAN_SIGN_IN,
+    GUARDIAN_SIGN_IN(isGuardian = true),
 
     /** 보호자로 등록했는데 로그인이 풀림. 역할은 모든 데이터 지우기 전에는 바꿀 수 없어 역할 선택으로 돌아가지 않는다 */
-    GUARDIAN_SIGN_IN_AGAIN,
-    GUARDIAN_HOME,
+    GUARDIAN_SIGN_IN_AGAIN(isGuardian = true),
+    GUARDIAN_HOME(isGuardian = true),
 }
 
 /**
@@ -74,7 +74,7 @@ internal fun startScreen(
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    settings: UserSettingsRepository,
+    private val settings: UserSettingsRepository,
     private val scheduler: ScanScheduler,
     private val family: FamilyRepository,
 ) : ViewModel() {
@@ -112,9 +112,11 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             if (start.filterNotNull().first() == StartScreen.SENIOR_HOME) scheduler.scanNow("app_open")
         }
-        // 앱이 업데이트됐으면 서버의 기기 정보를 고친다 (등록한 폰만, 실패하면 다음에 열 때)
+        // 앱이 업데이트됐으면 서버의 기기 정보를 고친다 (등록한 폰만, 실패하면 다음에 열 때).
+        // 그 전에, 지우다 앱이 꺼졌으면 이어서 지운다. 보호자 폰이었으면 다음 실행은 역할 선택부터
         viewModelScope.launch {
             try {
+                if (family.resumePendingDeletion() && start.filterNotNull().first().isGuardian) settings.clearChosenRole()
                 family.reportAppVersion()
             } catch (e: CancellationException) {
                 throw e

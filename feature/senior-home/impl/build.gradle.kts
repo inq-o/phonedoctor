@@ -9,6 +9,7 @@ android {
 
 dependencies {
     implementation(projects.core.data)
+    implementation(projects.core.network)
     implementation(projects.core.notifications)
     implementation(projects.feature.seniorHome.api)
 
@@ -16,4 +17,6 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    // ApiException 생성자의 body 타입
+    testImplementation(libs.kotlinx.serialization.json)
 }

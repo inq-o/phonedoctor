@@ -17,6 +17,7 @@ import io.github.inq_o.phonedoctor.core.notifications.GuardianAlertMessage
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import java.time.Instant
 
@@ -78,8 +79,28 @@ internal class FakeFamily : FamilyRepository {
     override suspend fun createPairingCode(): PairingCode = error("보호자 화면에서 부르지 않음")
     override suspend fun confirmLink(linkId: String): FamilyLink = error("보호자 화면에서 부르지 않음")
     override suspend fun updatePushToken(token: String) = Unit
-    override suspend fun deleteAllData() = Unit
+    var deletes = 0
+    override suspend fun deleteAllData() {
+        step("delete")
+        deletes++
+    }
     override suspend fun reportAppVersion() = Unit
+    override suspend fun resumePendingDeletion() = false
+    override val displayName = MutableStateFlow<String?>(null)
+    override suspend fun setDisplayName(name: String) {
+        step("name")
+        displayName.value = name
+    }
+    override val notifyCaution = MutableStateFlow(false)
+    override suspend fun setNotifyCaution(enabled: Boolean) {
+        step("caution")
+        notifyCaution.value = enabled
+    }
+    val reauthTokens = mutableListOf<String>()
+    override suspend fun reauthenticateGuardian(googleIdToken: String) {
+        step("reauth")
+        reauthTokens += googleIdToken
+    }
 }
 
 internal class FakeNotifier : Notifier {

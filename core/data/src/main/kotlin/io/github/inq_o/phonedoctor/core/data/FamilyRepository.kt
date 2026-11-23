@@ -62,6 +62,26 @@ interface FamilyRepository {
     /** 연결 끊기 (F4). 시니어·보호자 모두 */
     suspend fun revokeLink(linkId: String)
 
+    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어 "부모님", 보호자 Google 이름) */
+    val displayName: Flow<String?>
+
+    /** 이름을 바꾼다 (1~20자). 등록한 폰이면 서버에도 바로 보낸다. 등록 전이면 등록할 때 함께 보낸다 */
+    suspend fun setDisplayName(name: String)
+
+    /** (보호자) "주의 단계도 받기": 설치 시점 "주의" 판정도 알림 (FR-028) */
+    val notifyCaution: Flow<Boolean>
+
+    suspend fun setNotifyCaution(enabled: Boolean)
+
+    /** (보호자) 모든 데이터 지우기가 [RecentLoginRequiredException]으로 멈췄을 때 Google로 다시 로그인한다 */
+    suspend fun reauthenticateGuardian(googleIdToken: String)
+
+    /**
+     * 모든 데이터 지우기가 도중에 끊겼으면(앱이 꺼짐) 이어서 지운다. 끝냈으면 true, 지울 것이 없었으면 false.
+     * 보호자가 다시 로그인해야 하면 [RecentLoginRequiredException] (설정 G4에서 이어서)
+     */
+    suspend fun resumePendingDeletion(): Boolean
+
     /** 앱이 업데이트됐으면 서버의 기기 정보(appVersionCode)를 고친다. 등록 전이면 아무것도 안 한다 */
     suspend fun reportAppVersion()
 
@@ -81,6 +101,15 @@ class GuardianSignInRequiredException : IllegalStateException("보호자는 Goog
  */
 class DeviceNotRegisteredException : IllegalStateException("서버에 등록된 기기 없음")
 
+/** Google 사용자를 지우려면 최근에 다시 로그인해야 한다 (Firebase). 화면이 Google 로그인을 한 번 더 받은 뒤 다시 지운다 */
+class RecentLoginRequiredException : IllegalStateException("다시 로그인 필요")
+
+/** 다시 로그인할 때 처음과 다른 Google 계정을 고름 */
+class ReauthAccountMismatchException : IllegalStateException("다른 Google 계정")
+
+/** 표시 이름은 1~20자 (서버 Devices.kt NAME_MAX) */
+const val DISPLAY_NAME_MAX = 20
+
 /** 이미 다른 역할로 등록한 기기. 역할을 바꾸려면 모든 데이터 지우기 뒤 다시 */
 class RoleMismatchException(val registered: DeviceRole) : IllegalStateException("이미 ${registered.name} 역할로 등록됨")
 
@@ -92,6 +121,9 @@ interface FamilyAccount {
 
     /** Google ID 토큰으로 로그인 (보호자). 익명 사용자였으면 그 사용자는 버리고 Google 사용자로 바뀐다 */
     suspend fun signInWithGoogle(idToken: String)
+
+    /** 지금 사용자를 같은 Google 계정으로 다시 확인한다 (사용자 삭제 전) */
+    suspend fun reauthenticateWithGoogle(idToken: String)
     fun signOut()
 
     /** 지금 사용자를 지우고 로그아웃. 로그인 전이면 아무것도 안 한다 */
@@ -190,6 +222,29 @@ internal class DefaultFamilyRepository @Inject constructor(
         linkEvents.onLinkRevoked()
     }
 
+    override val displayName: Flow<String?> = preferences.displayName
+
+    override suspend fun setDisplayName(name: String) {
+        val trimmed = name.trim()
+        require(trimmed.length in 1..DISPLAY_NAME_MAX) { "이름은 1~${DISPLAY_NAME_MAX}자" }
+        serialized {
+            // 서버에 먼저: 실패하면 화면이 그대로 두고 다시 하게 (등록 전이면 저장만)
+            registered()?.let { forgettingGoneDevice { network.updateDevice(it.deviceId, NetworkDeviceUpdate(displayName = trimmed)) } }
+            preferences.setDisplayName(trimmed)
+        }
+    }
+
+    override val notifyCaution: Flow<Boolean> = preferences.notifyCaution
+
+    override suspend fun setNotifyCaution(enabled: Boolean) = serialized {
+        registered()?.let { forgettingGoneDevice { network.updateDevice(it.deviceId, NetworkDeviceUpdate(notifyCaution = enabled)) } }
+        preferences.setNotifyCaution(enabled)
+    }
+
+    override suspend fun reauthenticateGuardian(googleIdToken: String) = serialized {
+        account.reauthenticateWithGoogle(googleIdToken)
+    }
+
     override suspend fun reportAppVersion() {
         if (!available) return
         mutex.withLock {
@@ -218,12 +273,29 @@ internal class DefaultFamilyRepository @Inject constructor(
         }
     }
 
+    override suspend fun resumePendingDeletion(): Boolean {
+        if (!available || !preferences.deletionPending.first()) return false
+        deleteAllData()
+        return true
+    }
+
     override suspend fun deleteAllData() = serialized {
+        // 끝날 때까지 표시를 남긴다: 중간에 앱이 꺼져도 다음 실행에서 이어서 지운다 (서버만 지우고 Firebase 사용자가 남지 않게)
+        preferences.setDeletionPending(true)
+        deleteSteps()
+        preferences.setDeletionPending(false)
+    }
+
+    private suspend fun deleteSteps() {
         var device = registered()
-        if (device == null && account.isSignedIn) {
+        val pending = preferences.pendingRegistrationRole.first()?.let(DeviceRole::valueOf)
+        // 한 번도 연결을 시작하지 않은 폰: 서버·Firebase에 지울 것이 없다. 아무것도 보내지 않고 이 폰의 설정만 비운다
+        val touchedServer = device != null || account.isSignedIn || pending != null
+        if (device == null && account.isSignedIn && pending != null && pending.matches(account.isAnonymous)) {
             // 등록 요청을 보냈는데 응답을 못 받았을 수 있다. 같은 사용자로 다시 등록하면(서버가 갱신으로 처리) ID를 알아 지울 수 있다.
-            // Firebase 사용자를 먼저 지우면 서버의 기기에 다시 닿을 수 없다
-            preferences.pendingRegistrationRole.first()?.let { device = register(DeviceRole.valueOf(it)) }
+            // Firebase 사용자를 먼저 지우면 서버의 기기에 다시 닿을 수 없다. 그 뒤 로그인 방식이 바뀌었으면(시니어로 보내다 보호자로 Google 로그인)
+            // 그 사용자로는 다시 등록할 수 없어 건너뛴다 (익명 사용자는 이미 버려져 서버가 180일 뒤 정리한다)
+            device = register(pending)
         }
         device?.let {
             network.deleteDevice(it.deviceId) // 이미 없어도 서버는 204
@@ -232,9 +304,19 @@ internal class DefaultFamilyRepository @Inject constructor(
         } ?: linkEvents.onDataDeleted()
         preferences.setPendingRegistrationRole(null)
         preferences.setReportedAppVersion(null)
+        // 이 폰에 정해 둔 이름·설정도 지운다: 다음에 다른 역할·계정으로 등록할 때 따라가지 않게 (개인정보처리방침: 표시 이름도 지우는 정보)
+        preferences.setDisplayName(null)
+        preferences.setNotifyCaution(false)
+        if (!touchedServer) return
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()
-        account.deleteUser()
+        try {
+            account.deleteUser()
+        } catch (e: RecentLoginRequiredException) {
+            // 익명 사용자는 다시 로그인할 수 없다. 서버 정보는 이미 지웠으니 로그아웃으로 끝낸다 (버려진 익명 사용자는 Firebase가 정리)
+            if (!account.isAnonymous) throw e
+            account.signOut()
+        }
     }
 
     private suspend fun <T> serialized(block: suspend () -> T): T {
@@ -304,6 +386,8 @@ internal class DefaultFamilyRepository @Inject constructor(
                     NetworkDeviceRegistration(
                         role = role.toNetwork(),
                         fcmToken = pushTokens.token(),
+                        // 정해 둔 이름이 있으면 처음부터 그 이름으로 (없으면 서버 기본)
+                        displayName = preferences.displayName.first(),
                         appVersionCode = deviceInfo.appVersionCode,
                         sdkInt = deviceInfo.sdkInt,
                         manufacturer = deviceInfo.manufacturer,
@@ -318,6 +402,16 @@ internal class DefaultFamilyRepository @Inject constructor(
         val registered = RegisteredDevice(device.deviceId, role.name)
         preferences.setRegisteredDevice(registered)
         preferences.setReportedAppVersion(deviceInfo.appVersionCode)
+        // 등록 전에 켜 둔 "주의 단계도 받기" (등록 본문에는 없는 값). 못 보내면 스위치를 꺼 서버 값과 맞춘다(켜진 것처럼 보이지 않게)
+        if (role == DeviceRole.GUARDIAN && preferences.notifyCaution.first()) {
+            try {
+                network.updateDevice(device.deviceId, NetworkDeviceUpdate(notifyCaution = true))
+            } catch (e: IOException) {
+                preferences.setNotifyCaution(false)
+            } catch (e: ApiException) {
+                preferences.setNotifyCaution(false)
+            }
+        }
         preferences.setPendingRegistrationRole(null)
         pushTokens.setAutoRefresh(true)
         return registered
@@ -337,6 +431,9 @@ internal class DefaultFamilyRepository @Inject constructor(
 
     private fun newKey() = UUID.randomUUID().toString()
 }
+
+/** 이 역할로 등록할 수 있는 로그인인지 (시니어는 익명, 보호자는 Google) */
+private fun DeviceRole.matches(anonymous: Boolean) = (this == DeviceRole.SENIOR) == anonymous
 
 private fun DeviceRole.toNetwork() = when (this) {
     DeviceRole.SENIOR -> NetworkDeviceRole.PROTECTED

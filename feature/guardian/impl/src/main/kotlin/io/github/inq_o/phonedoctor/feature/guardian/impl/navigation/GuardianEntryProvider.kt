@@ -6,12 +6,14 @@ import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertDetailNa
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertHistoryNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.EnterCodeNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianHomeNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSettingsNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSignInNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.LinkWaitingNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.impl.AlertDetailScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.AlertHistoryScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.EnterCodeScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianHomeScreen
+import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianSettingsScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianSignInScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.LinkWaitingScreen
 
@@ -26,7 +28,9 @@ import io.github.inq_o.phonedoctor.feature.guardian.impl.LinkWaitingScreen
  * @param onRetry O-G3에서 시니어가 거절함 → 새 코드 입력
  * @param onOpenRequest G1·G3의 요청 → G2
  * @param onHistory G1 [지난 요청 보기] → G3
- * @param onBack G2·G3에서 뒤로
+ * @param onBack G2·G3·G4에서 뒤로
+ * @param onSettings G1 [설정] → G4
+ * @param onDataDeleted G4에서 모든 데이터를 지움 → 역할 선택부터
  */
 fun EntryProviderScope<NavKey>.guardianEntries(
     onSignedIn: () -> Unit,
@@ -40,18 +44,23 @@ fun EntryProviderScope<NavKey>.guardianEntries(
     onOpenRequest: (String) -> Unit,
     onHistory: () -> Unit,
     onBack: () -> Unit,
+    onSettings: () -> Unit,
+    onDataDeleted: () -> Unit,
 ) {
     entry<GuardianSignInNavKey> {
         GuardianSignInScreen(onSignedIn = onSignedIn, onBack = onSignInBack.takeIf { canLeaveSignIn() })
     }
     entry<GuardianHomeNavKey> {
-        GuardianHomeScreen(onAddFamily = onAddFamily, onOpenRequest = onOpenRequest, onHistory = onHistory)
+        GuardianHomeScreen(onAddFamily = onAddFamily, onOpenRequest = onOpenRequest, onHistory = onHistory, onSettings = onSettings)
     }
     entry<EnterCodeNavKey> {
         EnterCodeScreen(onRequested = onRequested, onSignInRequired = onSignInRequired, onHome = onHome)
     }
     entry<AlertDetailNavKey> { key ->
         AlertDetailScreen(alertId = key.alertId, onBack = onBack)
+    }
+    entry<GuardianSettingsNavKey> {
+        GuardianSettingsScreen(onBack = onBack, onDeleted = onDataDeleted)
     }
     entry<AlertHistoryNavKey> {
         AlertHistoryScreen(onOpen = onOpenRequest, onBack = onBack)

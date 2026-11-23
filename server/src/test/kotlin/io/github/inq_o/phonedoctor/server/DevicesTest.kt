@@ -90,6 +90,13 @@ class RegisterDeviceTest {
     }
 
     @Test
+    fun `시니어 기기는 익명 사용자만 등록한다`() = serverTest {
+        val google = client.api(Post, "/devices", "id:someone:google:누구", registration())
+        assertEquals(HttpStatusCode.Forbidden, google.status)
+        assertEquals("https://phonedoctor.example/problems/senior-requires-anonymous", google.contract("Problem")["type"]!!.jsonPrimitive.content)
+    }
+
+    @Test
     fun `같은 사용자가 다시 등록하면 같은 기기를 갱신, 역할을 바꾸면 409`() = serverTest {
         val id = register()
         val again = client.api(Post, "/devices", SENIOR, registration(name = "엄마"))
@@ -229,6 +236,19 @@ class DeleteDeviceTest {
         assertEquals(0L, transaction(TestDb.db) { Devices.selectAll().where { Devices.deviceId eq senior }.count() })
         // 지운 뒤 같은 사용자가 새로 등록하면 새 기기
         assertNotEquals(senior, register())
+    }
+
+    @Test
+    fun `시니어의 익명 Firebase 사용자도 지우고, 보호자 Google 사용자는 기기가 지운다`() = serverTest {
+        val senior = register()
+        val guardian = register(GUARDIAN, "guardian")
+        // 남의 기기를 지우려 하면 아무 사용자도 지우지 않는다
+        client.api(Delete, "/devices/$guardian", SENIOR)
+        assertEquals(emptyList<String>(), FakeVerifier.deletedUsers)
+        client.api(Delete, "/devices/$senior", SENIOR)
+        assertEquals(listOf("senior1"), FakeVerifier.deletedUsers)
+        client.api(Delete, "/devices/$guardian", GUARDIAN)
+        assertEquals(listOf("senior1"), FakeVerifier.deletedUsers)
     }
 }
 

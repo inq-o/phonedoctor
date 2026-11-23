@@ -26,3 +26,7 @@ data class AlertDetailNavKey(val alertId: String) : NavKey
 /** G3 지난 요청 (알림 전용 요청은 '경고 앱'으로 표시) */
 @Serializable
 data object AlertHistoryNavKey : NavKey
+
+/** G4 보호자 설정 (주의 단계도 받기, 이름, 모든 데이터 지우기) */
+@Serializable
+data object GuardianSettingsNavKey : NavKey
