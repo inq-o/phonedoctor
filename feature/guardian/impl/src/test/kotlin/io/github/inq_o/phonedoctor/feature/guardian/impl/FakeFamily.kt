@@ -119,8 +119,10 @@ internal class FakeAlerts : GuardianAlertRepository {
     val alerts = mutableListOf<FamilyAlert>()
     val fail = mutableMapOf<String, Exception>()
     val decided = mutableListOf<Triple<String, FamilyDecision, String?>>()
+    val gate = mutableMapOf<String, CompletableDeferred<Unit>>()
 
-    private fun step(op: String) {
+    private suspend fun step(op: String) {
+        gate.remove(op)?.await()
         fail.remove(op)?.let { throw it }
     }
 

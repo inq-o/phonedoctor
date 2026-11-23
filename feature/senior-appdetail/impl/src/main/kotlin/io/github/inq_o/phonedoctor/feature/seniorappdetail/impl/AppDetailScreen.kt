@@ -108,6 +108,7 @@ internal fun AppDetailScreen(
                     stringResource(R.string.feature_senior_appdetail_impl_allowed_body, guardian(state.guardianName)),
                     center = true,
                 )
+                state.message?.takeIf { it.isNotBlank() }?.let { Body("“$it”", center = true) }
             }
             is AppDetailUiState.Ready ->
                 if (removed) {

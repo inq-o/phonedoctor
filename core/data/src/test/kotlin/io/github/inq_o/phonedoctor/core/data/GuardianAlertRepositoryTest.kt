@@ -151,15 +151,30 @@ class GuardianAlertRepositoryTest {
     }
 
     @Test
-    fun `먼저 들어간 답이 내 것이면 성공으로 본다`() = runTest {
+    fun `먼저 들어간 답이 같은 답의 내 것이면 성공, 다른 답이면 먼저 온 답으로 알린다`() = runTest {
         server.single = alert("a1", status = NetworkAlertStatus.DECIDED)
         val mine = Json.encodeToJsonElement(
             NetworkDecision.serializer(),
             NetworkDecision(NetworkDecisionType.RECOMMEND_UNINSTALL, null, NetworkDeviceSummary("dev-2", "민지"), "2026-11-23T03:00:00Z"),
         )
+        val repo = repo()
         server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to mine)), null)
-        val a = repo().decide("a1", FamilyDecision.ALLOW, null)
-        assertEquals(FamilyAlertStatus.DECIDED, a.status)
+        assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.RECOMMEND_UNINSTALL, null).status)
+        server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to mine)), null)
+        try {
+            repo.decide("a1", FamilyDecision.ALLOW, null)
+            fail()
+        } catch (e: AlreadyAnsweredException) {
+            assertEquals(FamilyDecision.RECOMMEND_UNINSTALL, e.answer?.decision)
+        }
+    }
+
+    @Test
+    fun `쪽이 많아도 끝까지 읽어 최신 요청을 놓치지 않는다`() = runTest {
+        server.pages = (0 until 12).map { listOf(alert("a$it", updated = "2026-11-23T00:%02d:00Z".format(it))) }
+        val list = repo().alerts()
+        assertEquals("a11", list.first().alertId)
+        assertEquals(12, list.size)
     }
 
     @Test

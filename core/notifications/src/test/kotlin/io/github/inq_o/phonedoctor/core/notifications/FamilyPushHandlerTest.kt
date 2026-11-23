@@ -9,7 +9,8 @@ import org.junit.Test
 
 class FamilyPushHandlerTest {
     private val notifier = RecordingNotifier()
-    private val handler = FamilyPushHandler(notifier)
+    private val changes = RequestChanges()
+    private val handler = FamilyPushHandler(notifier, changes)
 
     @Test
     fun linkRequestedShowsRequestNotification() {

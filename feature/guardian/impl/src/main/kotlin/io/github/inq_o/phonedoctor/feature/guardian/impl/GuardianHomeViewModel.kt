@@ -11,6 +11,7 @@ import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.notifications.RequestChanges
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -53,6 +54,7 @@ sealed interface GuardianHomeUiState {
 class GuardianHomeViewModel @Inject constructor(
     private val family: FamilyRepository,
     private val alerts: GuardianAlertRepository,
+    changes: RequestChanges,
 ) : ViewModel() {
     private val state = MutableStateFlow<GuardianHomeUiState>(GuardianHomeUiState.Loading)
     val uiState: StateFlow<GuardianHomeUiState> = state.asStateFlow()
@@ -60,6 +62,11 @@ class GuardianHomeViewModel @Inject constructor(
     internal var now: () -> Instant = Instant::now
 
     private var loading: Job? = null
+
+    init {
+        // 홈을 보는 동안 새 요청·응답·결과가 오면 다시 읽는다
+        viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
 
     fun refresh() {
         if (loading?.isActive == true) return
@@ -122,6 +129,20 @@ class GuardianHomeViewModel @Inject constructor(
             } else {
                 now.copy(revoking = null, message = GuardianMessage.Failed(error))
             }
+            // 끊은 연결로 받은 요청은 서버에서 볼 수 없게 된다: 요청 목록도 다시 읽는다
+            if (error == null) refreshRequests()
+        }
+    }
+
+    private fun refreshRequests() {
+        viewModelScope.launch {
+            val loaded = runCatchingNonCancel { alerts.alerts(FamilyAlertStatus.OPEN) }
+            val now = state.value as? GuardianHomeUiState.Ready ?: return@launch
+            val active = now.links.any { it.link.status == LinkStatus.ACTIVE }
+            state.value = now.copy(
+                requests = if (!active) emptyList() else loaded?.filter { it.answerable } ?: now.requests,
+                hasHistory = active,
+            )
         }
     }
 

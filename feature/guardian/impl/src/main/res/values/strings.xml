@@ -134,7 +134,7 @@
     <string name="feature_guardian_impl_detail_days">광고가 뜬 날 %1$d일 (요청 뒤)</string>
     <string name="feature_guardian_impl_detail_rule">감지 규칙 %1$s</string>
     <string name="feature_guardian_impl_detail_message_sent">보낸 한마디: “%1$s”</string>
-    <string name="feature_guardian_impl_detail_message_label">지우자고 할 때 %1$s께 보낼 한마디 (선택)</string>
+    <string name="feature_guardian_impl_detail_message_label">%1$s께 한마디 (선택)</string>
     <string name="feature_guardian_impl_detail_message_hint">예: 엄마 이거 광고 앱이에요</string>
     <string name="feature_guardian_impl_detail_explain">[지우자고 하기]를 누르면 %1$s 폰에 지우는 방법이 함께 떠요. 지우는 건 부모님이 직접 확인해야 해요.</string>
     <string name="feature_guardian_impl_history_title">지난 요청</string>

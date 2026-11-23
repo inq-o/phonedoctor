@@ -76,14 +76,15 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
             FamilyAlertStatus.EXPIRED -> NetworkAlertStatus.EXPIRED
             FamilyAlertStatus.UNKNOWN, null -> null
         }
+        // 서버는 바뀐 순서 오름차순으로 준다: 끝까지 읽어야 최신 요청이 빠지지 않는다. 같은 쪽 표시가 되풀이되면 멈춘다
         val items = mutableListOf<NetworkAlert>()
+        val seen = mutableSetOf<String>()
         var page: String? = null
-        var pages = 0
         do {
             val list = guarded { network.listAlerts(status = filter, pageToken = page, pageSize = PAGE_SIZE) }
             items += list.items
-            page = list.nextPageToken
-        } while (page != null && ++pages < MAX_PAGES)
+            page = list.nextPageToken?.takeIf { seen.add(it) }
+        } while (page != null)
         // 같은 요청이 페이지 경계에서 두 번 올 수 있다 (같은 시각 포함) → 마지막 값으로
         return items.associateBy { it.alertId }.values.map { it.toModel() }.sortedByDescending { it.updatedAt }
     }
@@ -111,8 +112,9 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
             when {
                 e.status == 409 && e.slug == "already-decided" -> {
                     val existing = existingDecision(e)
-                    // 망 오류로 결과를 못 받은 내 응답이 이미 들어가 있음 (그 뒤 다른 버튼을 누름): 내가 먼저 답한 것이다
-                    if (existing != null && existing.decidedBy.deviceId == registeredDevice()?.deviceId) {
+                    // 망 오류로 결과를 못 받은 내 응답이 이미 같은 답으로 들어가 있음 (서버도 같은 보호자·같은 답만 성공으로 본다).
+                    // 다른 답이면 먼저 들어간 내 답을 보여 준다
+                    if (existing != null && existing.decidedBy.deviceId == registeredDevice()?.deviceId && existing.decision == body.decision) {
                         return guarded { network.getAlert(alertId) }.toModel()
                     }
                     throw AlreadyAnsweredException(existing?.toAnswer())
@@ -141,7 +143,6 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
 
     private companion object {
         const val PAGE_SIZE = 50
-        const val MAX_PAGES = 10
     }
 }
 
