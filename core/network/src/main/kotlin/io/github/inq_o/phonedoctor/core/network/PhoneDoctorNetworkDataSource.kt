@@ -9,6 +9,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDevice
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRegistration
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceUpdate
+import io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLink
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
@@ -40,4 +41,7 @@ interface PhoneDoctorNetworkDataSource {
     suspend fun getAlert(alertId: String): NetworkAlert
     suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate): NetworkAlert
     suspend fun reportOutcome(key: String, alertId: String, body: NetworkOutcomeCreate): NetworkAlert
+
+    /** 오탐 익명 신고 (US7). 로그인 토큰 없이 App Check만 붙는다. 서버는 기기를 남기지 않고 횟수만 센다 */
+    suspend fun reportFalsePositive(body: NetworkFalsePositiveReport)
 }

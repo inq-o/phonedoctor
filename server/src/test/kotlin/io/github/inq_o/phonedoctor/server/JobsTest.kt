@@ -277,6 +277,17 @@ class RetentionCleanupTest {
     }
 
     @Test
+    fun `오탐 신고 집계는 마지막 신고 1년 뒤 지움`() = serverTest { clock ->
+        val body = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"${"ab".repeat(32)}","detectorVersion":"v1"}"""
+        assertEquals(HttpStatusCode.Accepted, client.api(Post, "/feedback/false-positives", token = null, key = null, body = body).status)
+        clock.instant = clock.instant.plus(Duration.ofDays(FALSE_POSITIVE_KEEP_DAYS))
+        assertEquals(0, ticked().n("deletedFeedback"))
+        clock.instant = clock.instant.plus(Duration.ofDays(1))
+        assertEquals(1, ticked().n("deletedFeedback"))
+        assertEquals(0L, transaction(TestDb.db) { FalsePositives.selectAll().count() })
+    }
+
+    @Test
     fun `기기를 지우면 코드 입력 시도 기록도 지움`() = serverTest {
         join(SENIOR, "protected")
         val g = join(GUARDIAN, "guardian")

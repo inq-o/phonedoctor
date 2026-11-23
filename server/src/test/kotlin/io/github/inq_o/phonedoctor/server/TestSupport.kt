@@ -38,8 +38,8 @@ object TestDb {
 
     /** 시험마다 빈 표에서 시작 */
     fun reset() = transaction(db) {
-        exec("TRUNCATE device, idempotency_key, pairing_attempt CASCADE")
-    }
+        exec("TRUNCATE device, idempotency_key, pairing_attempt, false_positive CASCADE")
+    }.also { clearFeedbackLimits() }
 }
 
 /**

@@ -203,6 +203,9 @@ private const val PAGE_MAX = 50
 private val SHA256 = Regex("^[0-9a-f]{64}$")
 
 /** openapi 스키마 제약 중 직렬화로 걸러지지 않는 것 (조건부 필수, 길이·범위) */
+/** 패키지 이름 (Android 규칙: 영문·숫자·밑줄 조각을 점으로 이음) */
+private val PACKAGE_NAME = Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z0-9_]+)+$")
+
 private fun AlertCreate.validate() {
     check400(source != AlertSource.INSTALL_SCAN || verdict != null) { "install_scan은 verdict 필수" }
     check400(source != AlertSource.SYMPTOM || symptom != null) { "symptom은 symptom 근거 필수" }
@@ -210,6 +213,7 @@ private fun AlertCreate.validate() {
     check400(verdict?.level != RiskLevel.SAFE || source != AlertSource.INSTALL_SCAN) { "안전 판정은 보내지 않음" }
     check400(app.packageName.isNotBlank()) { "packageName이 비어 있음" }
     check400(app.appLabel.isNotBlank() && app.appLabel.length <= LABEL_MAX) { "appLabel은 1~${LABEL_MAX}자" }
+    check400(app.packageName.length <= 255 && PACKAGE_NAME.matches(app.packageName)) { "packageName 형식이 아님" }
     check400(SHA256.matches(app.signingCertSha256)) { "signingCertSha256은 소문자 16진수 64자" }
     check400((app.iconPngBase64?.length ?: 0) <= ICON_MAX) { "iconPngBase64는 ${ICON_MAX}자 이하" }
     verdict?.let { v ->

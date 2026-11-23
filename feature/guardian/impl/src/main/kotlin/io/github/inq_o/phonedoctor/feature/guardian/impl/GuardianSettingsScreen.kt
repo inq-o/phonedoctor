@@ -69,6 +69,7 @@ fun GuardianSettingsScreen(
     GuardianSettingsScreen(
         state = state,
         onNotifyCaution = viewModel::setNotifyCaution,
+        onFalsePositiveFeedback = viewModel::setFalsePositiveFeedback,
         onRename = viewModel::rename,
         onDeleteAll = viewModel::deleteAll,
         onReauth = {
@@ -98,6 +99,7 @@ internal fun GuardianSettingsScreen(
     state: GuardianSettingsUiState,
     onNotifyCaution: (Boolean) -> Unit,
     onRename: (String) -> Unit,
+    onFalsePositiveFeedback: (Boolean) -> Unit = {},
     onDeleteAll: () -> Unit,
     onReauth: () -> Unit,
     onBack: () -> Unit,
@@ -119,23 +121,21 @@ internal fun GuardianSettingsScreen(
         if (state.saved) Body(stringResource(R.string.feature_guardian_impl_settings_saved))
         if (state.working) CircularProgressIndicator()
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            // 주의 단계도 받기 (FR-028): 줄 전체를 눌러도 바뀐다
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(
-                    value = state.notifyCaution,
-                    enabled = !state.working,
-                    role = Role.Switch,
-                    onValueChange = onNotifyCaution,
-                ),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.feature_guardian_impl_settings_caution), style = MaterialTheme.typography.titleMedium)
-                    Text(stringResource(R.string.feature_guardian_impl_settings_caution_body), style = MaterialTheme.typography.bodyMedium)
-                }
-                Spacer(Modifier.width(16.dp))
-                Switch(checked = state.notifyCaution, onCheckedChange = null, enabled = !state.working)
-            }
+            SwitchRow(
+                title = stringResource(R.string.feature_guardian_impl_settings_caution),
+                body = stringResource(R.string.feature_guardian_impl_settings_caution_body),
+                checked = state.notifyCaution,
+                enabled = !state.working,
+                onChange = onNotifyCaution,
+            )
+            HorizontalDivider()
+            SwitchRow(
+                title = stringResource(R.string.feature_guardian_impl_settings_feedback),
+                body = stringResource(R.string.feature_guardian_impl_settings_feedback_body),
+                checked = state.falsePositiveFeedback,
+                enabled = true,
+                onChange = onFalsePositiveFeedback,
+            )
             HorizontalDivider()
             Text(stringResource(R.string.feature_guardian_impl_settings_name), style = MaterialTheme.typography.titleMedium, modifier = Modifier.semantics { heading() })
             Body(
@@ -197,8 +197,27 @@ internal fun GuardianSettingsScreen(
     }
 }
 
+/** 줄 전체를 눌러도 바뀌는 스위치 (보호자 화면 48dp) */
+@Composable
+private fun SwitchRow(title: String, body: String, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onChange),
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(body, style = MaterialTheme.typography.bodyMedium)
+        }
+        Spacer(Modifier.width(16.dp))
+        Switch(checked = checked, onCheckedChange = null, enabled = enabled)
+    }
+}
+
 @Preview(showBackground = true, widthDp = 360, heightDp = 720)
 @Composable
 private fun SettingsPreview() {
-    PhoneDoctorTheme { GuardianSettingsScreen(GuardianSettingsUiState(notifyCaution = true, needsReauth = true), {}, {}, {}, {}, {}) }
+    PhoneDoctorTheme { GuardianSettingsScreen(
+            state = GuardianSettingsUiState(notifyCaution = true, needsReauth = true),
+            onNotifyCaution = {}, onRename = {}, onDeleteAll = {}, onReauth = {}, onBack = {},
+        ) }
 }

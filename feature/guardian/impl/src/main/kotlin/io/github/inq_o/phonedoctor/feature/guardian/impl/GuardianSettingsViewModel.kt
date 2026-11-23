@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.DISPLAY_NAME_MAX
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
 import io.github.inq_o.phonedoctor.core.data.ReauthAccountMismatchException
 import io.github.inq_o.phonedoctor.core.data.RecentLoginRequiredException
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
@@ -18,6 +19,8 @@ import javax.inject.Inject
 
 data class GuardianSettingsUiState(
     val notifyCaution: Boolean = false,
+    /** [괜찮은 앱이에요]로 답한 앱을 익명으로 알리기 (US7) */
+    val falsePositiveFeedback: Boolean = true,
     /** 부모님 폰에 보이는 내 이름. 정하지 않았으면 null (Google 계정 이름) */
     val displayName: String? = null,
     val working: Boolean = false,
@@ -36,6 +39,7 @@ data class GuardianSettingsUiState(
 class GuardianSettingsViewModel @Inject constructor(
     private val family: FamilyRepository,
     private val settings: UserSettingsRepository,
+    private val alerts: GuardianAlertRepository,
 ) : ViewModel() {
     private val state = MutableStateFlow(GuardianSettingsUiState())
     val uiState: StateFlow<GuardianSettingsUiState> = state.asStateFlow()
@@ -43,9 +47,15 @@ class GuardianSettingsViewModel @Inject constructor(
     init {
         viewModelScope.launch { family.notifyCaution.collect { v -> state.update { it.copy(notifyCaution = v) } } }
         viewModelScope.launch { family.displayName.collect { v -> state.update { it.copy(displayName = v) } } }
+        viewModelScope.launch { alerts.falsePositiveFeedback.collect { v -> state.update { it.copy(falsePositiveFeedback = v) } } }
     }
 
     fun setNotifyCaution(enabled: Boolean) = run(saved = true) { family.setNotifyCaution(enabled) }
+
+    /** 이 폰 설정만 바꾼다 (서버에 보내지 않음) */
+    fun setFalsePositiveFeedback(enabled: Boolean) {
+        viewModelScope.launch { alerts.setFalsePositiveFeedback(enabled) }
+    }
 
     fun rename(name: String) {
         val trimmed = name.trim()

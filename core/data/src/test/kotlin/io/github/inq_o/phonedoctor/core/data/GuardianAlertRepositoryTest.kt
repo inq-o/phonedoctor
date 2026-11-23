@@ -54,14 +54,16 @@ class GuardianAlertRepositoryTest {
 
     private val server = AlertServer()
     private var stores = 0
+    private val reported = mutableListOf<Pair<String, FalsePositive>>()
+    private lateinit var prefs: UserPreferences
 
     private suspend fun TestScope.repo(role: String? = "GUARDIAN", available: Boolean = true): DefaultGuardianAlertRepository {
         val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
             tmp.newFile("prefs${++stores}.preferences_pb").also { it.delete() }
         }
-        val prefs = UserPreferences(store)
+        prefs = UserPreferences(store)
         role?.let { prefs.setRegisteredDevice(RegisteredDevice("dev-2", it)) }
-        return DefaultGuardianAlertRepository(available, server, prefs)
+        return DefaultGuardianAlertRepository(available, server, prefs) { id, r -> reported += id to r }
     }
 
     @Test
@@ -197,6 +199,54 @@ class GuardianAlertRepositoryTest {
     }
 
     @Test
+    fun `괜찮은 앱이라고 답하면 오탐을 익명으로 한 번 알리고, 끄면 알리지 않는다`() = runTest {
+        server.single = alert("a1")
+        val repo = repo()
+        repo.decide("a1", FamilyDecision.RECOMMEND_UNINSTALL, null)
+        assertTrue(reported.isEmpty())
+        repo.decide("a1", FamilyDecision.ALLOW, null)
+        val (id, report) = reported.single()
+        assertEquals("a1:symptom", id)
+        assertEquals("com.ad", report.packageName)
+        assertEquals(7L, report.versionCode)
+        assertEquals("usage-test", report.detectorVersion)
+        assertEquals(false, report.installScan)
+
+        // 같은 요청에 다시 답해도 한 번만
+        repo.decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(1, reported.size)
+
+        server.single = alert("a2")
+        repo.setFalsePositiveFeedback(false)
+        repo.decide("a2", FamilyDecision.ALLOW, null)
+        assertEquals(1, reported.size)
+    }
+
+    @Test
+    fun `근거가 합쳐진 요청은 근거마다 알린다`() = runTest {
+        server.single = alert("a1").copy(
+            verdict = NetworkVerdict(NetworkRiskLevel.CAUTION, 0.7, "2026.11.1", listOf(NetworkReason("SIDELOADED", 0.4))),
+        )
+        repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(listOf("a1:install_scan", "a1:symptom"), reported.map { it.first })
+        val scan = reported.first().second
+        assertEquals(listOf("SIDELOADED"), scan.reasonCodes)
+        assertEquals("2026.11.1", scan.modelVersion)
+        assertEquals(0.7, scan.score)
+    }
+
+    @Test
+    fun `신고를 맡기다 실패해도 응답은 성공`() = runTest {
+        server.single = alert("a1")
+        val repo = DefaultGuardianAlertRepository(true, server, UserPreferences(
+            PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
+                tmp.newFile("prefs-fail.preferences_pb").also { it.delete() }
+            },
+        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }) { _, _ -> error("WorkManager 오류") }
+        assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.ALLOW, null).status)
+    }
+
+    @Test
     fun `서버가 지운 기기는 등록 없음으로 알린다`() = runTest {
         server.fail["listAlerts"] = ApiException(403, "device-not-registered", null, null, null, null)
         try {
@@ -266,4 +316,5 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
     override suspend fun revokeLink(linkId: String) = TODO()
     override suspend fun createAlert(key: String, body: NetworkAlertCreate): NetworkAlert = TODO()
     override suspend fun reportOutcome(key: String, alertId: String, body: NetworkOutcomeCreate): NetworkAlert = TODO()
+    override suspend fun reportFalsePositive(body: io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport) = Unit
 }

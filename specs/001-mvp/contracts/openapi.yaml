@@ -454,7 +454,10 @@ paths:
       operationId: reportFalsePositive
       summary: 오탐 익명 신고 (US7). 기기 ID를 저장하지 않음 — 서버는 집계만
       description: |
-        - `Idempotency-Key` 공통 규칙의 예외: 키를 저장하면 기기를 묶을 수 있어 받지 않음. 기기는 보호자 [괜찮은 앱이에요] 1건당 한 번만 보내고(로컬 표시), 재전송으로 생긴 중복은 집계 오차로 받아들임
+        - `Idempotency-Key` 공통 규칙의 예외: 키를 저장하면 기기를 묶을 수 있어 받지 않음. 기기는 보호자 [괜찮은 앱이에요] 1건·근거 1개당 한 번만 보내고(로컬 표시), 재전송으로 생긴 중복은 집계 오차로 받아들임
+        - Firebase ID 토큰을 보내도 보지 않음. 기기는 한 번 쓰는 App Check 토큰(limited-use)을 붙이고, 응답과 시각으로 이어지지 않게 1~24시간 늦춰 보냄
+        - 본문 4KB 초과는 413, 같은 주소에서 시간당 30건 초과는 429 (주소는 서버 메모리에만, 저장 안 함). 집계 수치는 참고용이며 자동 허용 근거로 쓰지 않음
+        - 집계는 마지막 신고 뒤 1년이 지나면 지움
       security:
         - appCheck: []
       requestBody:
@@ -464,6 +467,9 @@ paths:
             schema: { $ref: '#/components/schemas/FalsePositiveReport' }
       responses:
         '202': { description: 접수됨 }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { description: 본문이 너무 큼 }
+        '429': { description: 신고가 너무 잦음 (Retry-After) }
 
   /models/latest:
     get:
@@ -859,15 +865,17 @@ components:
           then: { required: [detectorVersion] }
       properties:
         source: { $ref: '#/components/schemas/AlertSource' }
-        packageName: { type: string }
-        versionCode: { type: integer, format: int64 }
-        signingCertSha256: { type: string }
-        modelVersion: { type: string }
-        score: { type: number }
+        packageName: { type: string, maxLength: 255, pattern: '^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$' }
+        versionCode: { type: integer, format: int64, minimum: 0 }
+        signingCertSha256: { type: string, pattern: '^[0-9a-f]{64}$' }
+        modelVersion: { type: string, pattern: '^[A-Za-z0-9._-]{1,64}$' }
+        score: { type: number, minimum: 0, maximum: 1 }
         reasonCodes:
           type: array
+          maxItems: 3
           items: { $ref: '#/components/schemas/ReasonCode' }
-        detectorVersion: { type: string }
+        detectorVersion: { type: string, pattern: '^[A-Za-z0-9._-]{1,64}$' }
+      description: install_scan에는 detectorVersion을, symptom에는 modelVersion·score·reasonCodes를 보내지 않음 (400)
 
     ModelRelease:
       type: object

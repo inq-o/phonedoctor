@@ -695,4 +695,5 @@ private class FakeNetwork : PhoneDoctorNetworkDataSource {
     override suspend fun getAlert(alertId: String): NetworkAlert = TODO()
     override suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate): NetworkAlert = TODO()
     override suspend fun reportOutcome(key: String, alertId: String, body: NetworkOutcomeCreate): NetworkAlert = TODO()
+    override suspend fun reportFalsePositive(body: io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport) = Unit
 }

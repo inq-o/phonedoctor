@@ -6,6 +6,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRegistration
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceUpdate
+import io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
 import kotlinx.serialization.SerializationException
@@ -57,6 +58,7 @@ internal class RetrofitPhoneDoctorNetwork(baseUrl: String, callFactory: Call.Fac
     override suspend fun getAlert(alertId: String) = call { getAlert(alertId) }
     override suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate) = call { decideAlert(key, alertId, body) }
     override suspend fun reportOutcome(key: String, alertId: String, body: NetworkOutcomeCreate) = call { reportOutcome(key, alertId, body) }
+    override suspend fun reportFalsePositive(body: NetworkFalsePositiveReport) = call { reportFalsePositive(body) }
 }
 
 /** 성공 응답의 본문을 읽지 못함 (IOException이라 부르는 쪽은 망 문제처럼 다시 시도한다) */

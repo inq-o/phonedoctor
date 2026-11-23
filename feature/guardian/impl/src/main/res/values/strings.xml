@@ -146,6 +146,8 @@
     <string name="feature_guardian_impl_settings_title">설정</string>
     <string name="feature_guardian_impl_settings_caution">주의 단계도 받기</string>
     <string name="feature_guardian_impl_settings_caution_body">설치할 때 "주의"로 본 앱도 알려 드려요. 끄면 "위험"으로 본 앱과 광고를 띄운 앱만 알려 드려요.</string>
+    <string name="feature_guardian_impl_settings_feedback">틀린 판정 알리기</string>
+    <string name="feature_guardian_impl_settings_feedback_body">[괜찮은 앱이에요]라고 답하면 몇 시간 뒤 그 앱의 패키지 이름·버전·서명 지문과 판정 규칙 판(설치 시점 판정이면 점수·근거도)을 보내 판정을 고치는 데 써요. 내 이름·계정·기기 정보는 붙이지 않아요.</string>
     <string name="feature_guardian_impl_settings_name">부모님 폰에 보이는 내 이름</string>
     <string name="feature_guardian_impl_settings_name_body">부모님 폰에는 "%1$s"(으)로 보여요.</string>
     <string name="feature_guardian_impl_settings_name_default">Google 계정 이름</string>
