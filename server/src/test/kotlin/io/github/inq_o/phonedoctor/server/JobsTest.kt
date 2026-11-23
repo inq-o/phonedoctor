@@ -280,9 +280,12 @@ class RetentionCleanupTest {
     fun `기기를 지우면 코드 입력 시도 기록도 지움`() = serverTest {
         join(SENIOR, "protected")
         val g = join(GUARDIAN, "guardian")
+        join("id:guardian2:google:박보호", "guardian")
         client.api(Post, "/pairing-codes/000000/accept", GUARDIAN)
-        assertEquals(1L, transaction(TestDb.db) { PairingAttempts.selectAll().count() })
+        client.api(Post, "/pairing-codes/000000/accept", "id:guardian2:google:박보호")
+        assertEquals(2L, transaction(TestDb.db) { PairingAttempts.selectAll().count() })
         client.api(io.ktor.http.HttpMethod.Delete, "/devices/$g", GUARDIAN)
-        assertEquals(0L, transaction(TestDb.db) { PairingAttempts.selectAll().count() })
+        // 지운 기기 것만 지우고 다른 보호자의 시도는 남김
+        assertEquals(listOf("guardian2"), transaction(TestDb.db) { PairingAttempts.selectAll().map { it[PairingAttempts.firebaseUid] } })
     }
 }
