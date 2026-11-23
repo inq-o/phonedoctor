@@ -52,7 +52,7 @@ sealed interface AppDetailUiState {
     }
 
     /** 보호자가 [괜찮은 앱이에요]로 허용함 (F1 끝 주석) */
-    data class Allowed(val guardianName: String?) : AppDetailUiState
+    data class Allowed(val guardianName: String?, val message: String? = null) : AppDetailUiState
 }
 
 @HiltViewModel(assistedFactory = AppDetailViewModel.Factory::class)
@@ -76,7 +76,7 @@ class AppDetailViewModel @AssistedInject constructor(
             alert == null -> AppDetailUiState.Gone
             // 이 화면에서 지운 직후에는 "지웠어요"를 보여 준다
             phase == UninstallPhase.REMOVED -> AppDetailUiState.Ready(alert, phase)
-            alert.outcome == AlertOutcome.ALLOWED -> AppDetailUiState.Allowed(alert.family?.guardianName)
+            alert.outcome == AlertOutcome.ALLOWED -> AppDetailUiState.Allowed(alert.family?.guardianName, alert.family?.messageToSenior)
             alert.status != AlertStatus.OPEN -> AppDetailUiState.Gone
             else -> AppDetailUiState.Ready(alert, phase)
         }

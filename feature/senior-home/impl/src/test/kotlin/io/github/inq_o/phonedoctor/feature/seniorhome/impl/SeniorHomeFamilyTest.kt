@@ -13,6 +13,7 @@ import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.model.PairingCode
 import io.github.inq_o.phonedoctor.core.model.ScanRun
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
+import io.github.inq_o.phonedoctor.core.notifications.GuardianAlertMessage
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
 import io.github.inq_o.phonedoctor.core.usage.UsageAccess
 import kotlinx.coroutines.Dispatchers
@@ -140,5 +141,9 @@ class SeniorHomeFamilyTest {
         override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
         override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
         override fun cancelLink(linkId: String) = Unit
+        override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
+        override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
+        override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
+        override fun cancelGuardianAlert(alertId: String) = Unit
     }
 }

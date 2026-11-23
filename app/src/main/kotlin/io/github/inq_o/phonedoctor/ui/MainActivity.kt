@@ -94,8 +94,10 @@ class MainActivity : ComponentActivity() {
         intent ?: return
         val alertId = intent.getLongExtra(SystemNotifier.EXTRA_ALERT_ID, -1L)
         val linkId = intent.getStringExtra(SystemNotifier.EXTRA_LINK_ID)
+        val requestId = intent.getStringExtra(SystemNotifier.EXTRA_REQUEST_ID)
         when {
             alertId > 0 -> viewModel.open(PendingOpen.Alert(alertId))
+            !requestId.isNullOrBlank() -> viewModel.open(PendingOpen.GuardianRequest(requestId))
             !linkId.isNullOrBlank() -> viewModel.open(PendingOpen.LinkRequest(linkId))
             intent.getBooleanExtra(SystemNotifier.EXTRA_OPEN_FAMILY, false) -> viewModel.open(PendingOpen.FamilyLinks)
         }

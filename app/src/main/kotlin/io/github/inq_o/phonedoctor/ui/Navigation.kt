@@ -25,6 +25,8 @@ import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertDetailNavKey
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertHistoryNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.EnterCodeNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianHomeNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSignInNavKey
@@ -59,16 +61,19 @@ internal fun startStack(start: StartScreen, familyAvailable: Boolean): List<NavK
  */
 internal fun pendingStack(stack: List<NavKey>, target: PendingOpen): List<NavKey>? = when (if (GuardianSignInNavKey in stack) null else stack.firstOrNull()) {
     // 알림으로 연 화면은 홈 바로 위에: [홈으로]·뒤로가 예상대로 홈으로 가고, 같은 화면이 여러 장 쌓이지 않게
-    SeniorHomeNavKey -> listOf(
-        SeniorHomeNavKey,
-        when (target) {
-            is PendingOpen.Alert -> AppDetailNavKey(target.alertId)
-            is PendingOpen.LinkRequest -> LinkConfirmNavKey(target.linkId)
-            PendingOpen.FamilyLinks -> FamilyLinksNavKey
-        },
-    )
-    // 보호자의 연결 알림(연결됨·끊김·연락 끊김)은 연결 목록이 있는 홈으로. 시니어 알림은 보호자 폰에 오지 않는다
-    GuardianHomeNavKey -> if (target == PendingOpen.FamilyLinks) listOf(GuardianHomeNavKey) else emptyList()
+    SeniorHomeNavKey -> when (target) {
+        is PendingOpen.Alert -> listOf(SeniorHomeNavKey, AppDetailNavKey(target.alertId))
+        is PendingOpen.LinkRequest -> listOf(SeniorHomeNavKey, LinkConfirmNavKey(target.linkId))
+        PendingOpen.FamilyLinks -> listOf(SeniorHomeNavKey, FamilyLinksNavKey)
+        // 보호자 요청 알림은 시니어 폰에 오지 않는다
+        is PendingOpen.GuardianRequest -> emptyList()
+    }
+    // 보호자의 연결 알림(연결됨·끊김·연락 끊김)은 연결 목록이 있는 홈으로, 요청 알림은 홈 위에 G2. 시니어 알림은 보호자 폰에 오지 않는다
+    GuardianHomeNavKey -> when (target) {
+        PendingOpen.FamilyLinks -> listOf(GuardianHomeNavKey)
+        is PendingOpen.GuardianRequest -> listOf(GuardianHomeNavKey, AlertDetailNavKey(target.alertId))
+        else -> emptyList()
+    }
     else -> null
 }
 
@@ -169,6 +174,9 @@ fun MainNavigation(
                     backStack.removeAll { it is LinkWaitingNavKey }
                     backStack.add(EnterCodeNavKey)
                 },
+                onOpenRequest = { push(AlertDetailNavKey(it)) },
+                onHistory = { push(AlertHistoryNavKey) },
+                onBack = { backStack.removeLastOrNull() },
             )
         }
     )

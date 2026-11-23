@@ -5,11 +5,16 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
+import io.github.inq_o.phonedoctor.core.model.FamilyAlert
+import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.notifications.RequestChanges
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,12 +42,20 @@ sealed interface GuardianHomeUiState {
         val links: List<GuardianLink>,
         val revoking: String? = null,
         val message: GuardianMessage? = null,
+        /** 답을 기다리는 요청 (열려 있고 아무도 답하지 않음), 최근 것부터 */
+        val requests: List<FamilyAlert> = emptyList(),
+        /** 지난 요청(답했거나 끝난 것)이 있어 [지난 요청 보기]를 보인다 */
+        val hasHistory: Boolean = false,
     ) : GuardianHomeUiState
 }
 
 /** G1 보호자 홈. 화면이 보일 때마다 연결 목록을 다시 불러온다 (놓친 LINK_* 푸시 대비, push-messages.md §1) */
 @HiltViewModel
-class GuardianHomeViewModel @Inject constructor(private val family: FamilyRepository) : ViewModel() {
+class GuardianHomeViewModel @Inject constructor(
+    private val family: FamilyRepository,
+    private val alerts: GuardianAlertRepository,
+    changes: RequestChanges,
+) : ViewModel() {
     private val state = MutableStateFlow<GuardianHomeUiState>(GuardianHomeUiState.Loading)
     val uiState: StateFlow<GuardianHomeUiState> = state.asStateFlow()
 
@@ -50,21 +63,38 @@ class GuardianHomeViewModel @Inject constructor(private val family: FamilyReposi
 
     private var loading: Job? = null
 
+    init {
+        // 홈을 보는 동안 새 요청·응답·결과가 오면 다시 읽는다
+        viewModelScope.launch { changes.changes.collect { refresh() } }
+    }
+
     fun refresh() {
         if (loading?.isActive == true) return
         if (state.value is GuardianHomeUiState.Failed) state.value = GuardianHomeUiState.Loading
         loading = viewModelScope.launch {
+            // 연결과 요청을 함께 불러온다. 요청만 실패하면 연결은 보여 주고 요청은 보이던 대로 둔다
+            // 열린 요청만 받는다 (목록이 길어도 답할 것이 잘리지 않게)
+            val requests = async { runCatchingNonCancel { alerts.alerts(FamilyAlertStatus.OPEN) } }
             val links = try {
                 family.links()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                requests.cancel()
                 // 보이던 목록이 있으면 그대로 둔다 (다음에 다시)
                 if (state.value !is GuardianHomeUiState.Ready) state.value = GuardianHomeUiState.Failed(e.toGuardianError())
                 return@launch
             }
+            val loaded = requests.await()
             val current = state.value as? GuardianHomeUiState.Ready
-            state.value = GuardianHomeUiState.Ready(visible(links), current?.revoking)
+            val shown = visible(links)
+            state.value = GuardianHomeUiState.Ready(
+                shown,
+                current?.revoking,
+                requests = loaded?.filter { it.answerable } ?: current?.requests.orEmpty(),
+                // 연결이 있으면 지난 요청(답한 것·알림 전용·끝난 것)을 볼 수 있다
+                hasHistory = shown.any { it.link.status == LinkStatus.ACTIVE },
+            )
         }
     }
 
@@ -99,6 +129,20 @@ class GuardianHomeViewModel @Inject constructor(private val family: FamilyReposi
             } else {
                 now.copy(revoking = null, message = GuardianMessage.Failed(error))
             }
+            // 끊은 연결로 받은 요청은 서버에서 볼 수 없게 된다: 요청 목록도 다시 읽는다
+            if (error == null) refreshRequests()
+        }
+    }
+
+    private fun refreshRequests() {
+        viewModelScope.launch {
+            val loaded = runCatchingNonCancel { alerts.alerts(FamilyAlertStatus.OPEN) }
+            val now = state.value as? GuardianHomeUiState.Ready ?: return@launch
+            val active = now.links.any { it.link.status == LinkStatus.ACTIVE }
+            state.value = now.copy(
+                requests = if (!active) emptyList() else loaded?.filter { it.answerable } ?: now.requests,
+                hasHistory = active,
+            )
         }
     }
 
@@ -111,16 +155,24 @@ class GuardianHomeViewModel @Inject constructor(private val family: FamilyReposi
     }
 }
 
+/** 실패는 null로 (취소는 그대로 던진다) */
+internal suspend fun <T> runCatchingNonCancel(block: suspend () -> T): T? = try {
+    block()
+} catch (e: CancellationException) {
+    throw e
+} catch (e: Exception) {
+    null
+}
+
 /** 서버의 CONTACT_LOST 판정(Jobs.kt)과 같은 기준: max(마지막 검사 보고, 연결 확정)에서 48시간 */
 internal val CONTACT_LOST_AFTER: Duration = Duration.ofHours(48)
 
 /**
- * 검사 보고를 한 번도 받지 않은 연결은 경고하지 않는다: 시니어 폰의 6시간 보고(T055a)가 아직 없어,
- * 서버처럼 연결 확정 시각으로 재면 모든 연결이 이틀 뒤 "연락 없음"이 된다
+ * 시니어 폰이 6시간마다 보고하므로(T055a) 보고가 한 번도 없으면 연결한 뒤 폰주치의가 돌지 않은 것이다.
+ * CONTACT_LOST 알림을 누르고 들어온 홈과 같은 판단이 되게 서버 규칙 그대로 잰다
  */
 internal fun FamilyLink.isContactLost(now: Instant): Boolean {
     if (status != LinkStatus.ACTIVE) return false
-    val checked = lastCheckedAt ?: return false
-    val since = listOfNotNull(checked, activatedAt).max()
+    val since = listOfNotNull(lastCheckedAt, activatedAt).maxOrNull() ?: return false
     return Duration.between(since, now) >= CONTACT_LOST_AFTER
 }

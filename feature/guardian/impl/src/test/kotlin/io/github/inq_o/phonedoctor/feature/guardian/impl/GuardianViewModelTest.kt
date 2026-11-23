@@ -4,12 +4,18 @@ import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.lifecycle.SavedStateHandle
 import androidx.credentials.exceptions.NoCredentialException
 import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
+import io.github.inq_o.phonedoctor.core.model.FamilyAnswer
+import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
+import io.github.inq_o.phonedoctor.core.data.AlreadyAnsweredException
+import io.github.inq_o.phonedoctor.core.data.AlertClosedException
 import io.github.inq_o.phonedoctor.core.data.GuardianSignInRequiredException
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import kotlinx.coroutines.CompletableDeferred
+import io.github.inq_o.phonedoctor.core.notifications.RequestChanges
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
@@ -30,6 +36,8 @@ class GuardianViewModelTest {
 
     private val family = FakeFamily()
     private val notifier = FakeNotifier()
+    private val requests = FakeAlerts()
+    private val changes = RequestChanges()
 
     // O-G1
 
@@ -271,7 +279,7 @@ class GuardianViewModelTest {
 
     private val now = Instant.parse("2026-11-23T03:00:00Z")
 
-    private fun home() = GuardianHomeViewModel(family).also { it.now = { now } }
+    private fun home() = GuardianHomeViewModel(family, requests, changes).also { it.now = { now } }
 
     @Test
     fun homeListsActiveFirstAndFlagsLostContact() = runTest(main.dispatcher) {
@@ -290,10 +298,10 @@ class GuardianViewModelTest {
     }
 
     @Test
-    fun contactLostNeedsAReportAndCountsFromTheLaterOfReportAndLink() {
+    fun contactLostCountsFromTheLaterOfReportAndLinkLikeTheServer() {
         val old = now.minus(Duration.ofHours(49))
-        // 보고가 없는 연결은 경고하지 않는다 (시니어 보고 T055a 전)
-        assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = old).isContactLost(now))
+        // 연결한 뒤 보고가 한 번도 없으면 연결 시각부터 센다 (CONTACT_LOST 알림과 같은 판단)
+        assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = old).isContactLost(now))
         assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = old, lastCheckedAt = old).isContactLost(now))
         // 보고가 오래돼도 방금 연결했으면 연결 시각부터 센다
         assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = now.minus(Duration.ofHours(1)), lastCheckedAt = old).isContactLost(now))
@@ -349,5 +357,226 @@ class GuardianViewModelTest {
         vm.revoke(ready.links[0].link)
         advanceUntilIdle()
         assertTrue((vm.uiState.value as GuardianHomeUiState.Ready).links.isEmpty())
+    }
+
+    // 요청 (G1·G2·G3)
+
+    @Test
+    fun homeShowsUnansweredRequestsAndHistoryButton() = runTest(main.dispatcher) {
+        family.links += link("l1", LinkStatus.ACTIVE)
+        requests.alerts += listOf(
+            request("open"),
+            request("notice", notice = true),
+            request("answered", status = FamilyAlertStatus.DECIDED, answer = FamilyAnswer(FamilyDecision.ALLOW, "민지", null, Instant.EPOCH)),
+        )
+        val vm = home()
+        vm.refresh()
+        advanceUntilIdle()
+        val ready = vm.uiState.value as GuardianHomeUiState.Ready
+        assertEquals(listOf("open", "notice"), ready.requests.map { it.alertId })
+        // 열린 요청만 받아 온다 (목록이 길어도 답할 것이 잘리지 않게)
+        assertEquals(listOf(FamilyAlertStatus.OPEN), requests.statusAsked)
+        assertTrue(ready.hasHistory)
+    }
+
+    @Test
+    fun requestFailureStillShowsLinksAndKeepsShownRequests() = runTest(main.dispatcher) {
+        family.links += link("l1", LinkStatus.ACTIVE)
+        requests.alerts += request("open")
+        val vm = home()
+        vm.refresh()
+        advanceUntilIdle()
+        requests.fail["alerts"] = IOException("offline")
+        vm.refresh()
+        advanceUntilIdle()
+        val ready = vm.uiState.value as GuardianHomeUiState.Ready
+        assertEquals(listOf("l1"), ready.links.map { it.link.linkId })
+        assertEquals(listOf("open"), ready.requests.map { it.alertId })
+    }
+
+    private fun detail(id: String = "a1") = AlertDetailViewModel(id, requests, notifier, changes).also { it.onShown() }
+
+    @Test
+    fun detailClearsNotificationAndSendsAnswerWithMessage() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        assertEquals(listOf("request:a1"), notifier.cancelled)
+        vm.onMessageChange("엄마 이거 광고 앱이에요" + "!".repeat(60))
+        assertEquals(40, (vm.uiState.value as AlertDetailUiState.Ready).message.length)
+        vm.onMessageChange("엄마 이거 광고 앱이에요")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        vm.decide(FamilyDecision.ALLOW)
+        advanceUntilIdle()
+        assertEquals(listOf(Triple("a1", FamilyDecision.RECOMMEND_UNINSTALL, "엄마 이거 광고 앱이에요")), requests.decided)
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertTrue(ready.answered)
+        assertFalse(ready.alert.answerable)
+    }
+
+    @Test
+    fun allowSendsTheMessageTooAndNoticeCannotBeAllowed() = runTest(main.dispatcher) {
+        requests.alerts += listOf(request("a1"), request("n1", notice = true))
+        val vm = detail()
+        advanceUntilIdle()
+        vm.onMessageChange("엄마 이건 괜찮아요")
+        vm.decide(FamilyDecision.ALLOW)
+        advanceUntilIdle()
+        assertEquals(Triple("a1", FamilyDecision.ALLOW, "엄마 이건 괜찮아요"), requests.decided.single())
+
+        val notice = detail("n1")
+        advanceUntilIdle()
+        notice.decide(FamilyDecision.ALLOW)
+        advanceUntilIdle()
+        assertEquals(1, requests.decided.size)
+    }
+
+    @Test
+    fun someoneElseAnsweredFirst() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        val first = FamilyAnswer(FamilyDecision.RECOMMEND_UNINSTALL, "철수", null, Instant.EPOCH)
+        requests.fail["decide"] = AlreadyAnsweredException(first)
+        vm.decide(FamilyDecision.ALLOW)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertEquals(first, ready.answeredFirst)
+        assertNull(ready.sending)
+    }
+
+    @Test
+    fun detailErrorsAreExplained() = runTest(main.dispatcher) {
+        val missing = detail("gone")
+        advanceUntilIdle()
+        assertEquals(AlertDetailUiState.NotFound, missing.uiState.value)
+
+        requests.alerts += request("a1")
+        requests.fail["alert"] = IOException("offline")
+        val vm = detail()
+        advanceUntilIdle()
+        assertEquals(AlertDetailUiState.Failed(GuardianError.NETWORK), vm.uiState.value)
+        vm.load()
+        advanceUntilIdle()
+        requests.fail["decide"] = IOException("offline")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        assertEquals(GuardianError.NETWORK, (vm.uiState.value as AlertDetailUiState.Ready).error)
+
+        requests.fail["decide"] = AlertClosedException()
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        assertNull((vm.uiState.value as AlertDetailUiState.Ready).sending)
+    }
+
+    @Test
+    fun historyListsEverythingAndKeepsListOnFailure() = runTest(main.dispatcher) {
+        requests.alerts += listOf(request("a1"), request("a2", status = FamilyAlertStatus.EXPIRED))
+        val vm = AlertHistoryViewModel(requests)
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(2, (vm.uiState.value as AlertHistoryUiState.Ready).alerts.size)
+        requests.fail["alerts"] = IOException("offline")
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(2, (vm.uiState.value as AlertHistoryUiState.Ready).alerts.size)
+    }
+
+    @Test
+    fun rejectedAnswerHidesButtonsEvenIfReloadFails() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        requests.fail["decide"] = AlertClosedException()
+        requests.fail["alert"] = IOException("offline")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertTrue(ready.rejected)
+        assertFalse(ready.canAnswer)
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        assertTrue(requests.decided.isEmpty())
+    }
+
+    @Test
+    fun networkErrorRereadsTheRequestToShowAnAnswerThatGotThrough() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        // 서버는 받았는데 응답을 잃음
+        requests.alerts[0] = request("a1", status = FamilyAlertStatus.DECIDED, answer = FamilyAnswer(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, Instant.EPOCH))
+        requests.fail["decide"] = IOException("offline")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertFalse(ready.canAnswer)
+        assertEquals(FamilyDecision.RECOMMEND_UNINSTALL, ready.alert.answer?.decision)
+    }
+
+    @Test
+    fun reopeningTheSameRequestReloadsIt() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        requests.alerts[0] = request("a1", status = FamilyAlertStatus.RESOLVED)
+        vm.onShown()
+        advanceUntilIdle()
+        assertEquals(FamilyAlertStatus.RESOLVED, (vm.uiState.value as AlertDetailUiState.Ready).alert.status)
+        assertEquals(listOf("request:a1", "request:a1"), notifier.cancelled)
+    }
+
+    @Test
+    fun aSlowReloadDoesNotBringBackTheButtonsAfterAnswering() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        // 다시 읽기가 늦게 끝나는 동안 답을 보냄
+        val gate = CompletableDeferred<Unit>().also { requests.gate["alert"] = it }
+        vm.onShown()
+        runCurrent()
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        requests.alerts[0] = request("a1") // 늦게 온 예전 상태
+        gate.complete(Unit)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertTrue(ready.answered)
+        assertFalse(ready.canAnswer)
+        // 늦게 온 예전 상태(열림)로 덮지 않는다
+        assertEquals(FamilyAlertStatus.DECIDED, ready.alert.status)
+    }
+
+    @Test
+    fun pushSignalsReloadTheOpenScreens() = runTest(main.dispatcher) {
+        family.links += link("l1", LinkStatus.ACTIVE)
+        requests.alerts += request("a1")
+        val home = home()
+        home.refresh()
+        val vm = detail()
+        advanceUntilIdle()
+        requests.alerts[0] = request("a1", status = FamilyAlertStatus.DECIDED, answer = FamilyAnswer(FamilyDecision.ALLOW, "철수", null, Instant.EPOCH))
+        changes.changed("other")
+        advanceUntilIdle()
+        assertTrue((vm.uiState.value as AlertDetailUiState.Ready).alert.answerable)
+        changes.changed("a1")
+        advanceUntilIdle()
+        assertFalse((vm.uiState.value as AlertDetailUiState.Ready).alert.answerable)
+        assertTrue((home.uiState.value as GuardianHomeUiState.Ready).requests.isEmpty())
+    }
+
+    @Test
+    fun revokingTheLastLinkClearsRequests() = runTest(main.dispatcher) {
+        family.links += link("l1", LinkStatus.ACTIVE)
+        requests.alerts += request("a1")
+        val vm = home()
+        vm.refresh()
+        advanceUntilIdle()
+        assertEquals(1, (vm.uiState.value as GuardianHomeUiState.Ready).requests.size)
+        vm.revoke(family.links[0])
+        advanceUntilIdle()
+        val ready = vm.uiState.value as GuardianHomeUiState.Ready
+        assertTrue(ready.requests.isEmpty())
+        assertFalse(ready.hasHistory)
     }
 }

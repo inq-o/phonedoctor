@@ -9,7 +9,8 @@ import org.junit.Test
 
 class FamilyPushHandlerTest {
     private val notifier = RecordingNotifier()
-    private val handler = FamilyPushHandler(notifier)
+    private val changes = RequestChanges()
+    private val handler = FamilyPushHandler(notifier, changes)
 
     @Test
     fun linkRequestedShowsRequestNotification() {
@@ -20,9 +21,31 @@ class FamilyPushHandlerTest {
     @Test
     fun guardianLinkMessagesUseSeniorName() {
         assertTrue(handler.handle(mapOf("v" to "1", "type" to "LINK_ACTIVATED", "linkId" to "l1", "protectedName" to "엄마")))
-        // 시니어 폰의 검사 보고(T055a)가 붙기 전에는 연락 끊김을 띄우지 않는다
-        assertFalse(handler.handle(mapOf("v" to "1", "type" to "CONTACT_LOST", "linkId" to "l2", "protectedName" to "아빠")))
-        assertEquals(listOf("activated:l1:엄마"), notifier.calls)
+        // 시니어 폰이 6시간마다 검사 보고를 보내므로(T055a) 연락 끊김도 알린다
+        assertTrue(handler.handle(mapOf("v" to "1", "type" to "CONTACT_LOST", "linkId" to "l2", "protectedName" to "아빠")))
+        assertEquals(listOf("activated:l1:엄마", "lost:l2:아빠"), notifier.calls)
+    }
+
+    @Test
+    fun guardianAlertMessagesBecomeRequestNotifications() {
+        val base = mapOf("v" to "1", "alertId" to "a1", "protectedName" to "엄마", "appLabel" to "초고속 클리너")
+        assertTrue(handler.handle(base + mapOf("type" to "ALERT_CREATED", "source" to "symptom", "symptomCount" to "12", "symptomDate" to "2026-10-23")))
+        assertTrue(handler.handle(base + mapOf("type" to "ALERT_REMINDER", "source" to "install_scan")))
+        assertTrue(handler.handle(base + mapOf("type" to "ALERT_NOTICE", "source" to "symptom", "symptomCount" to "x")))
+        assertEquals(
+            listOf(
+                GuardianAlertMessage("a1", GuardianAlertKind.CREATED, "엄마", "초고속 클리너", false, 12, java.time.LocalDate.of(2026, 10, 23)),
+                GuardianAlertMessage("a1", GuardianAlertKind.REMINDER, "엄마", "초고속 클리너", true, null, null),
+                GuardianAlertMessage("a1", GuardianAlertKind.NOTICE, "엄마", "초고속 클리너", false, null, null),
+            ),
+            notifier.messages,
+        )
+        // 결과는 결과 알림, 갱신은 알림 없이 처리한 것으로
+        assertTrue(handler.handle(base + mapOf("type" to "ALERT_RESOLVED", "outcome" to "uninstalled")))
+        assertTrue(handler.handle(mapOf("v" to "1", "type" to "ALERT_UPDATED", "alertId" to "a1")))
+        assertEquals(listOf("resolved:a1:uninstalled:엄마:초고속 클리너"), notifier.calls)
+        // 요청 ID가 없으면 무시
+        assertFalse(handler.handle(mapOf("v" to "1", "type" to "ALERT_CREATED")))
     }
 
     @Test
@@ -39,7 +62,7 @@ class FamilyPushHandlerTest {
         assertFalse(handler.handle(mapOf("type" to "LINK_REQUESTED", "linkId" to "l1")))
         assertFalse(handler.handle(mapOf("v" to "1", "type" to "LINK_REQUESTED")))
         assertFalse(handler.handle(mapOf("v" to "1", "type" to "LINK_REQUESTED", "linkId" to " ")))
-        assertFalse(handler.handle(mapOf("v" to "1", "type" to "ALERT_UPDATED", "alertId" to "a1", "linkId" to "l1")))
+        assertFalse(handler.handle(mapOf("v" to "1", "type" to "MODEL_UPDATED", "linkId" to "l1")))
         assertTrue(notifier.calls.isEmpty())
     }
 
@@ -59,5 +82,16 @@ class FamilyPushHandlerTest {
             calls += "revoked:$linkId:$guardianName:$seniorName"
         }
         override fun cancelLink(linkId: String) = Unit
+        val messages = mutableListOf<GuardianAlertMessage>()
+        override fun notifyContactLost(linkId: String, seniorName: String?) {
+            calls += "lost:$linkId:$seniorName"
+        }
+        override fun notifyGuardianAlert(message: GuardianAlertMessage) {
+            messages += message
+        }
+        override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) {
+            calls += "resolved:$alertId:$outcome:$seniorName:$appLabel"
+        }
+        override fun cancelGuardianAlert(alertId: String) = Unit
     }
 }

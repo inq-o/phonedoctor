@@ -47,6 +47,18 @@ interface Notifier {
     fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?)
 
     fun cancelLink(linkId: String)
+
+    /** (보호자) 시니어 폰의 검사 보고가 이틀째 없음 (푸시 CONTACT_LOST, ux-flows F6). 탭하면 보호자 홈(G1)이 열린다 */
+    fun notifyContactLost(linkId: String, seniorName: String?)
+
+    /** (보호자) 요청 알림 (ALERT_CREATED·REMINDER·NOTICE). 탭하면 요청 상세(G2)가 열린다 */
+    fun notifyGuardianAlert(message: GuardianAlertMessage)
+
+    /** (보호자) 시니어 폰에서 처리가 끝남 (ALERT_RESOLVED, [outcome]은 openapi OutcomeType). 탭하면 G2 */
+    fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?)
+
+    /** (보호자) 요청을 화면으로 봤거나 답함 */
+    fun cancelGuardianAlert(alertId: String)
 }
 
 class SystemNotifier @Inject constructor(
@@ -174,6 +186,113 @@ class SystemNotifier @Inject constructor(
         notifyLink(linkId, context.getString(title), text, launch)
     }
 
+    override fun notifyContactLost(linkId: String, seniorName: String?) {
+        val launch = launchIntent() ?: return
+        launch.putExtra(EXTRA_OPEN_FAMILY, true)
+        launch.data = notificationUri("contact-lost", linkId)
+        val name = seniorNameOrFallback(seniorName)
+        notifyLink(
+            linkId,
+            context.getString(R.string.core_notifications_contact_lost_title, name),
+            context.getString(R.string.core_notifications_contact_lost_text, name),
+            launch,
+        )
+    }
+
+    override fun notifyGuardianAlert(message: GuardianAlertMessage) {
+        val senior = seniorNameOrFallback(message.seniorName)
+        val app = message.appLabel?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_app_fallback)
+        val dayCount = message.symptomCount
+        val title: String
+        val text: String
+        when (message.kind) {
+            GuardianAlertKind.REMINDER -> {
+                title = context.getString(R.string.core_notifications_guardian_reminder_title)
+                text = context.getString(R.string.core_notifications_guardian_reminder_text, app, senior)
+            }
+            GuardianAlertKind.CREATED, GuardianAlertKind.NOTICE -> {
+                val allowed = message.kind == GuardianAlertKind.NOTICE
+                title = context.getString(if (allowed) R.string.core_notifications_guardian_notice_title else R.string.core_notifications_alert_title)
+                text = when {
+                    // 설치 시점 판정만 있으면 횟수가 없다
+                    dayCount == null ->
+                        context.getString(R.string.core_notifications_guardian_installed_text, senior, app)
+                    else -> {
+                        val subject = Josa.iGa(app)
+                        val date = message.symptomDate
+                        val base = if (date == null || date == LocalDate.now()) {
+                            context.getString(R.string.core_notifications_guardian_symptom_today, senior, subject, dayCount)
+                        } else {
+                            context.getString(R.string.core_notifications_guardian_symptom_date, senior, subject, date.monthValue, date.dayOfMonth, dayCount)
+                        }
+                        if (allowed) context.getString(R.string.core_notifications_guardian_notice_prefix, base) else base
+                    }
+                }
+            }
+        }
+        val channel = if (message.kind == GuardianAlertKind.NOTICE) CHANNEL_NOTICE else CHANNEL_ALERTS
+        notifyRequest(message.alertId, "request-${message.kind.name.lowercase()}", channel, title, text, high = message.kind != GuardianAlertKind.NOTICE)
+    }
+
+    override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) {
+        val senior = seniorNameOrFallback(seniorName)
+        val app = appLabel?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_app_fallback)
+        val text = when (outcome) {
+            "uninstalled" -> context.getString(R.string.core_notifications_resolved_uninstalled, senior, Josa.eulReul(app))
+            "declined" -> context.getString(R.string.core_notifications_resolved_declined, senior, Josa.eulReul(app))
+            "already_removed" -> context.getString(R.string.core_notifications_resolved_already_removed, Josa.eunNeun(app))
+            "allowed" -> context.getString(R.string.core_notifications_resolved_allowed, Josa.eunNeun(app))
+            "suspended" -> context.getString(R.string.core_notifications_resolved_suspended, senior, Josa.eulReul(app))
+            else -> context.getString(R.string.core_notifications_resolved_other, Josa.eunNeun(app))
+        }
+        notifyRequest(alertId, "request-resolved", CHANNEL_RESULT, context.getString(R.string.core_notifications_resolved_title), text, high = false)
+    }
+
+    override fun cancelGuardianAlert(alertId: String) {
+        NotificationManagerCompat.from(context).cancel(requestTag(alertId), REQUEST_NOTIFICATION_ID)
+    }
+
+    /** 요청 알림은 요청마다 하나 (새 소식이 앞 알림을 바꾼다). 시니어 쪽 요청 알림(숫자 ID)과 겹치지 않게 tag로 구분 */
+    private fun notifyRequest(alertId: String, kind: String, channel: String, title: String, text: String, high: Boolean) {
+        if (!canNotify()) return
+        ensureGuardianChannels()
+        val launch = launchIntent() ?: return
+        launch.putExtra(EXTRA_REQUEST_ID, alertId)
+        launch.data = notificationUri(kind, alertId)
+        val pending = PendingIntent.getActivity(
+            context, requestTag(alertId).hashCode(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, channel)
+            .setSmallIcon(R.drawable.core_notifications_ic_alert)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(if (high) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(requestTag(alertId), REQUEST_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            // 권한이 막 꺼진 경우. 보호자 홈의 요청 목록에는 그대로 보인다
+        }
+    }
+
+    private fun requestTag(alertId: String) = "request:$alertId"
+
+    private fun ensureGuardianChannels() {
+        ensureChannel()
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_NOTICE, context.getString(R.string.core_notifications_channel_notice), NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = context.getString(R.string.core_notifications_channel_notice_description) },
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(CHANNEL_RESULT, context.getString(R.string.core_notifications_channel_result), NotificationManager.IMPORTANCE_LOW)
+                .apply { description = context.getString(R.string.core_notifications_channel_result_description) },
+        )
+    }
+
     override fun cancelLink(linkId: String) {
         NotificationManagerCompat.from(context).cancel(linkId, LINK_NOTIFICATION_ID)
     }
@@ -240,10 +359,18 @@ class SystemNotifier @Inject constructor(
         private const val URI_SCHEME = "phonedoctor-notification"
         const val EXTRA_LINK_ID = "io.github.inq_o.phonedoctor.extra.LINK_ID"
         const val EXTRA_OPEN_FAMILY = "io.github.inq_o.phonedoctor.extra.OPEN_FAMILY"
+
+        /** (보호자) 서버 요청 ID. 탭하면 G2 */
+        const val EXTRA_REQUEST_ID = "io.github.inq_o.phonedoctor.extra.REQUEST_ID"
         private const val CHANNEL_ALERTS = "alerts"
 
         // push-messages.md §4
         private const val CHANNEL_LINK = "link"
+        private const val CHANNEL_NOTICE = "notice"
+        private const val CHANNEL_RESULT = "result"
+
+        /** 보호자 요청 알림은 tag(request:ID)로 구분한다 */
+        private const val REQUEST_NOTIFICATION_ID = 2
 
         /** 연결 알림은 tag(linkId)로 구분한다. tag 없는 요청 알림과는 ID가 같아도 겹치지 않는다 */
         private const val LINK_NOTIFICATION_ID = 1
