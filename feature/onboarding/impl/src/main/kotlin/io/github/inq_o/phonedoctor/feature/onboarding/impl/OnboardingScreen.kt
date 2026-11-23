@@ -16,6 +16,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.SiteAlertsFeature
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,8 +45,10 @@ fun OnboardingScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    var siteAccessGranted by remember { mutableStateOf(SiteAlertsFeature.isGranted(context)) }
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
+        siteAccessGranted = SiteAlertsFeature.isGranted(context)
         onPauseOrDispose {}
     }
     LaunchedEffect(state.finished) {
@@ -61,6 +67,8 @@ fun OnboardingScreen(
             }
         },
         onOpenUsageSettings = { context.startFirst(viewModel.usageAccessSettingsIntents) },
+        siteAccessGranted = siteAccessGranted,
+        onOpenSiteAccess = { context.startFirst(SiteAlertsFeature.settingsIntents(context)) },
         onNext = viewModel::next,
         onConnectFamily = { viewModel.finish(connectFamily = true) },
         modifier = modifier,
@@ -88,6 +96,8 @@ internal fun OnboardingScreen(
     onNext: () -> Unit,
     onConnectFamily: () -> Unit,
     modifier: Modifier = Modifier,
+    siteAccessGranted: Boolean = false,
+    onOpenSiteAccess: () -> Unit = {},
 ) {
     // 첫 설정 중에는 뒤로 가기로 앱이 닫히지 않게 한다 (앞 단계로도 돌아가지 않음: 고지는 이미 읽음)
     BackHandler(enabled = state.index > 0) {}
@@ -114,6 +124,15 @@ internal fun OnboardingScreen(
                         PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
                         PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_usage_open), onOpenUsageSettings)
                     }
+                OnboardingStep.NOTIFICATION_ACCESS -> {
+                    val last = state.index == state.steps.lastIndex
+                    if (siteAccessGranted) {
+                        PdPrimaryButton(stringResource(if (last) R.string.feature_onboarding_impl_start else R.string.feature_onboarding_impl_next), onNext)
+                    } else {
+                        PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
+                        PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_site_access_open), onOpenSiteAccess)
+                    }
+                }
                 OnboardingStep.FAMILY -> {
                     PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
                     PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_family_connect), onConnectFamily)
@@ -157,6 +176,18 @@ internal fun OnboardingScreen(
                     Title(stringResource(R.string.feature_onboarding_impl_usage_title))
                     Body(stringResource(R.string.feature_onboarding_impl_usage_body))
                     Body(stringResource(R.string.feature_onboarding_impl_usage_how))
+                }
+            OnboardingStep.NOTIFICATION_ACCESS ->
+                if (siteAccessGranted) {
+                    StatusCircle(StatusKind.OK)
+                    Spacer(Modifier.height(24.dp))
+                    Title(stringResource(R.string.feature_onboarding_impl_usage_granted_title))
+                    Body(stringResource(R.string.feature_onboarding_impl_site_access_granted_body))
+                } else {
+                    Title(stringResource(R.string.feature_onboarding_impl_site_access_title))
+                    Body(stringResource(R.string.feature_onboarding_impl_site_access_body))
+                    Body(stringResource(R.string.feature_onboarding_impl_site_access_scope))
+                    Body(stringResource(R.string.feature_onboarding_impl_site_access_optional))
                 }
             OnboardingStep.FAMILY -> {
                 Title(stringResource(R.string.feature_onboarding_impl_family_title))

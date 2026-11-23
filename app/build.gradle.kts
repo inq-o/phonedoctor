@@ -68,6 +68,8 @@ androidComponents {
                 )
                 val found = banned.filter { "android:name=\"$it\"" in text }
                 check(found.isEmpty()) { "출시 빌드에 통신 권한이 있음: $found (app/src/release/AndroidManifest.xml 참고)" }
+                // 사이트 광고 알림(US10)은 방침에 알림 접근을 적기 전까지 출시 빌드에서 뺀다 (feature/senior-sites/api)
+                check("android.permission.BIND_NOTIFICATION_LISTENER_SERVICE" !in text) { "출시 빌드에 알림 리스너가 있음 (app/src/release/AndroidManifest.xml 참고)" }
                 // FCM 토큰은 연결을 시작할 때 처음 발급한다 (켜져 있으면 앱 시작 때 발급·전송)
                 val autoInitOff = Regex("""android:name="firebase_messaging_auto_init_enabled"\s+android:value="false"""")
                 check(autoInitOff.containsMatchIn(text)) { "FCM 자동 발급이 꺼져 있지 않음 (app/src/main/AndroidManifest.xml)" }
@@ -90,6 +92,8 @@ dependencies {
     implementation(projects.feature.seniorFamily.impl)
     implementation(projects.feature.seniorHome.api)
     implementation(projects.feature.seniorHome.impl)
+    implementation(projects.feature.seniorSites.api)
+    implementation(projects.feature.seniorSites.impl)
 
     implementation(projects.core.data)
     implementation(projects.core.designsystem)

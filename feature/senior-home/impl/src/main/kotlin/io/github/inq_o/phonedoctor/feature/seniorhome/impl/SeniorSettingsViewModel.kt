@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.DISPLAY_NAME_MAX
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.SiteAlertsFeature
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +22,8 @@ enum class SettingsResult { NAME_SAVED, DELETED, NETWORK, BUSY, FAILED }
 data class SeniorSettingsUiState(
     /** 가족 연결을 쓸 수 있는 빌드 (이름·가족·지우기를 보인다) */
     val familyAvailable: Boolean,
+    /** 사이트 광고 알림(US10)을 쓰는 빌드 */
+    val siteAlertsAvailable: Boolean = SiteAlertsFeature.ENABLED,
     /** 가족에게 보이는 이름. 정하지 않았으면 null ("부모님") */
     val displayName: String? = null,
     val working: Boolean = false,

@@ -30,6 +30,10 @@
     <string name="core_notifications_channel_notice_description">괜찮다고 하신 앱이 다시 광고를 많이 띄우면 알려 드려요</string>
     <string name="core_notifications_channel_result">처리 결과</string>
     <string name="core_notifications_channel_result_description">부모님 폰에서 앱을 지웠는지 알려 드려요</string>
+    <string name="core_notifications_site_ads_title">%1$s 사이트가 광고 알림을 보내고 있어요</string>
+    <string name="core_notifications_site_ads_text">눌러서 이 사이트 알림만 끌 수 있어요</string>
+    <string name="core_notifications_site_still_on_title">%1$s 사이트 알림이 아직 켜져 있어요</string>
+    <string name="core_notifications_site_still_on_text">눌러서 스위치를 다시 꺼 주세요</string>
     <string name="core_notifications_channel_link">가족 연결</string>
     <string name="core_notifications_channel_link_description">가족 연결 요청이 오거나, 연결되거나 끊겼을 때 알려 드려요</string>
     <string name="core_notifications_link_requested_title">가족 연결 요청이 왔어요</string>

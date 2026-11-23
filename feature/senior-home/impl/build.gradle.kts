@@ -12,6 +12,7 @@ dependencies {
     implementation(projects.core.network)
     implementation(projects.core.notifications)
     implementation(projects.feature.seniorHome.api)
+    implementation(projects.feature.seniorSites.api)
 
     implementation(libs.androidx.activity.compose)
 

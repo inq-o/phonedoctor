@@ -16,11 +16,20 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Qualifier
+
+/** 사이트 광고 알림(US10)을 쓰는 빌드인지 (feature:senior-sites SiteAlertsFeature.ENABLED) */
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class SiteAlertsEnabled
 
 enum class OnboardingStep {
     DISCLOSURE,
     NOTIFICATION,
     USAGE_ACCESS,
+
+    /** (선택) 알림 접근: Chrome 사이트 광고 알림 찾기 (US10). 이 기능이 켜진 빌드에서만 */
+    NOTIFICATION_ACCESS,
 
     /** O-S4 가족 연결 안내. 가족 연결을 쓸 수 있는 빌드에서만. 건너뛸 수 있다 */
     FAMILY,
@@ -44,6 +53,7 @@ class OnboardingViewModel @Inject constructor(
     private val settings: UserSettingsRepository,
     private val scheduler: ScanScheduler,
     family: FamilyRepository,
+    @SiteAlertsEnabled siteAlerts: Boolean,
 ) : ViewModel() {
     private val state = MutableStateFlow(
         OnboardingUiState(
@@ -52,6 +62,7 @@ class OnboardingViewModel @Inject constructor(
                 // 알림 권한 요청 창은 Android 13부터 있다. 그 전 기기는 단계를 건너뛴다
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !notifier.canNotify()) add(OnboardingStep.NOTIFICATION)
                 add(OnboardingStep.USAGE_ACCESS)
+                if (siteAlerts) add(OnboardingStep.NOTIFICATION_ACCESS)
                 if (family.available) add(OnboardingStep.FAMILY)
             },
             usageAccessGranted = usageAccess.isGranted(),

@@ -17,6 +17,7 @@ fun EntryProviderScope<NavKey>.seniorHomeEntries(
     onAlertClick: (Long) -> Unit,
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onSitesClick: () -> Unit,
     onFamilyClick: () -> Unit,
     onLinkRequestClick: (String) -> Unit,
     onBack: () -> Unit,
@@ -33,6 +34,6 @@ fun EntryProviderScope<NavKey>.seniorHomeEntries(
         ScanHistoryScreen(onBack = onBack)
     }
     entry<SeniorSettingsNavKey> {
-        SeniorSettingsScreen(onFamilyClick = onFamilyClick, onBack = onBack)
+        SeniorSettingsScreen(onFamilyClick = onFamilyClick, onSitesClick = onSitesClick, onBack = onBack)
     }
 }

@@ -9,6 +9,7 @@ import io.github.inq_o.phonedoctor.feature.seniorappdetail.api.navigation.AppDet
 import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.FamilyLinksNavKey
 import io.github.inq_o.phonedoctor.feature.seniorfamily.api.navigation.LinkConfirmNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.navigation.SiteAlertNavKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -29,6 +30,12 @@ class NavigationStackTest {
         assertEquals(listOf(SeniorHomeNavKey, AppDetailNavKey(7)), pendingStack(listOf(SeniorHomeNavKey), PendingOpen.Alert(7)))
         assertEquals(listOf(SeniorHomeNavKey, LinkConfirmNavKey("l1")), pendingStack(listOf(SeniorHomeNavKey), PendingOpen.LinkRequest("l1")))
         assertEquals(listOf(SeniorHomeNavKey, FamilyLinksNavKey), pendingStack(listOf(SeniorHomeNavKey), PendingOpen.FamilyLinks))
+        // 사이트 광고 알림은 그 사이트 설정을 바로 여는 화면으로
+        assertEquals(
+            listOf(SeniorHomeNavKey, SiteAlertNavKey("https://ads.example.com", openSettings = true)),
+            pendingStack(listOf(SeniorHomeNavKey), PendingOpen.Site("https://ads.example.com")),
+        )
+        assertEquals(emptyList<Any>(), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.Site("https://ads.example.com")))
     }
 
     @Test

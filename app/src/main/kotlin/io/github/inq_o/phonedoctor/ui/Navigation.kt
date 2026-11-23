@@ -46,6 +46,9 @@ import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.ScanHistory
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorHomeNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.api.navigation.SeniorSettingsNavKey
 import io.github.inq_o.phonedoctor.feature.seniorhome.impl.navigation.seniorHomeEntries
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.navigation.SiteAlertNavKey
+import io.github.inq_o.phonedoctor.feature.seniorsites.api.navigation.SitesNavKey
+import io.github.inq_o.phonedoctor.feature.seniorsites.impl.navigation.seniorSitesEntries
 
 /** 처음 쌓을 화면. 첫 설정·로그인 화면 밑에는 역할 선택을 깔아 뒤로 가기로 다시 고를 수 있게 한다 */
 internal fun startStack(start: StartScreen, familyAvailable: Boolean): List<NavKey> = when (start) {
@@ -69,6 +72,7 @@ internal fun pendingStack(stack: List<NavKey>, target: PendingOpen): List<NavKey
         PendingOpen.FamilyLinks -> listOf(SeniorHomeNavKey, FamilyLinksNavKey)
         // 보호자 요청 알림은 시니어 폰에 오지 않는다
         is PendingOpen.GuardianRequest -> emptyList()
+        is PendingOpen.Site -> listOf(SeniorHomeNavKey, SiteAlertNavKey(target.site, openSettings = true))
     }
     // 보호자의 연결 알림(연결됨·끊김·연락 끊김)은 연결 목록이 있는 홈으로, 요청 알림은 홈 위에 G2. 시니어 알림은 보호자 폰에 오지 않는다
     GuardianHomeNavKey -> when (target) {
@@ -140,11 +144,17 @@ fun MainNavigation(
                 onAlertClick = { backStack.add(AppDetailNavKey(it)) },
                 onHistoryClick = { backStack.add(ScanHistoryNavKey) },
                 onSettingsClick = { push(SeniorSettingsNavKey) },
+                onSitesClick = { push(SitesNavKey) },
                 onFamilyClick = { push(FamilyLinksNavKey) },
                 onLinkRequestClick = { backStack.add(LinkConfirmNavKey(it)) },
                 onBack = { backStack.removeLastOrNull() },
             )
             appDetailEntry(onBack = { backStack.removeLastOrNull() })
+            seniorSitesEntries(
+                onOpenSite = { push(SiteAlertNavKey(it)) },
+                onHome = toSeniorHome,
+                onBack = { backStack.removeLastOrNull() },
+            )
             seniorFamilyEntries(
                 onAddFamily = { push(PairingCodeNavKey) },
                 onAnswer = { backStack.add(LinkConfirmNavKey(it)) },

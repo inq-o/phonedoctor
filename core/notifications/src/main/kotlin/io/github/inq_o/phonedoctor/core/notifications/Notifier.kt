@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.Josa
+import io.github.inq_o.phonedoctor.core.model.SiteAlert
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
 import javax.inject.Inject
@@ -59,6 +60,14 @@ interface Notifier {
 
     /** (보호자) 요청을 화면으로 봤거나 답함 */
     fun cancelGuardianAlert(alertId: String)
+
+    /**
+     * (시니어) Chrome 사이트가 광고 알림을 보냄 (US10): "○○ 사이트가 광고 알림을 보내고 있어요. 끌까요?".
+     * [stillOn]이면 끄는 화면을 연 뒤에도 옴. 탭하면 그 사이트 알림 설정을 바로 연다 (FR-052)
+     */
+    fun notifySiteAds(alert: SiteAlert, stillOn: Boolean)
+
+    fun cancelSite(site: String)
 }
 
 class SystemNotifier @Inject constructor(
@@ -293,6 +302,42 @@ class SystemNotifier @Inject constructor(
         )
     }
 
+    override fun notifySiteAds(alert: SiteAlert, stillOn: Boolean) {
+        if (!canNotify()) return
+        ensureChannel()
+        val launch = launchIntent() ?: return
+        launch.putExtra(EXTRA_SITE, alert.site)
+        launch.data = notificationUri(if (stillOn) "site-still-on" else "site-ads", alert.site)
+        val pending = PendingIntent.getActivity(
+            context, siteTag(alert.site).hashCode(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val title = context.getString(
+            if (stillOn) R.string.core_notifications_site_still_on_title else R.string.core_notifications_site_ads_title,
+            alert.displayName,
+        )
+        val text = context.getString(if (stillOn) R.string.core_notifications_site_still_on_text else R.string.core_notifications_site_ads_text)
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.core_notifications_ic_alert)
+            .setContentTitle(title)
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(siteTag(alert.site), SITE_NOTIFICATION_ID, notification)
+        } catch (e: SecurityException) {
+            // 권한이 막 꺼진 경우. 설정의 사이트 목록에는 보인다
+        }
+    }
+
+    override fun cancelSite(site: String) {
+        NotificationManagerCompat.from(context).cancel(siteTag(site), SITE_NOTIFICATION_ID)
+    }
+
+    private fun siteTag(site: String) = "site:$site"
+
     override fun cancelLink(linkId: String) {
         NotificationManagerCompat.from(context).cancel(linkId, LINK_NOTIFICATION_ID)
     }
@@ -360,6 +405,9 @@ class SystemNotifier @Inject constructor(
         const val EXTRA_LINK_ID = "io.github.inq_o.phonedoctor.extra.LINK_ID"
         const val EXTRA_OPEN_FAMILY = "io.github.inq_o.phonedoctor.extra.OPEN_FAMILY"
 
+        /** (시니어) 광고 알림을 보내는 사이트 주소. 탭하면 그 사이트 화면이 알림 설정을 바로 연다 */
+        const val EXTRA_SITE = "io.github.inq_o.phonedoctor.extra.SITE"
+
         /** (보호자) 서버 요청 ID. 탭하면 G2 */
         const val EXTRA_REQUEST_ID = "io.github.inq_o.phonedoctor.extra.REQUEST_ID"
         private const val CHANNEL_ALERTS = "alerts"
@@ -371,6 +419,9 @@ class SystemNotifier @Inject constructor(
 
         /** 보호자 요청 알림은 tag(request:ID)로 구분한다 */
         private const val REQUEST_NOTIFICATION_ID = 2
+
+        /** 사이트 알림은 tag(site:주소)로 구분한다 */
+        private const val SITE_NOTIFICATION_ID = 3
 
         /** 연결 알림은 tag(linkId)로 구분한다. tag 없는 요청 알림과는 ID가 같아도 겹치지 않는다 */
         private const val LINK_NOTIFICATION_ID = 1

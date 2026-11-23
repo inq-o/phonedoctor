@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <!--
+          Chrome 사이트 알림 살펴보기 (US10). 사용자가 설정에서 알림 접근을 허용해야 동작한다.
+          Chrome 아닌 앱의 알림은 받는 즉시 버리고, 기록은 이 폰 안에만 둔다 (FR-050·054)
+        -->
+        <service
+            android:name=".SiteNotificationListener"
+            android:exported="true"
+            android:label="@string/feature_senior_sites_impl_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

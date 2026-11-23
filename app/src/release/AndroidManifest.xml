@@ -20,6 +20,10 @@
 
     <application>
         <!-- QR 읽기(ML Kit 코드 스캐너)가 앱이 뜰 때마다 도는 초기화. 출시 빌드는 보호자 화면에 갈 수 없어 뺀다 -->
+        <!-- 사이트 광고 알림(US10)의 알림 리스너. 개인정보처리방침에 알림 접근을 적기 전까지 출시 빌드에서 뺀다 -->
+        <service
+            android:name="io.github.inq_o.phonedoctor.feature.seniorsites.impl.SiteNotificationListener"
+            tools:node="remove" />
         <provider
             android:name="com.google.mlkit.common.internal.MlKitInitProvider"
             android:authorities="${applicationId}.mlkitinitprovider"
