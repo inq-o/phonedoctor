@@ -100,8 +100,13 @@ class RequestContractTest {
         val body = networkJson.parseToJsonElement(networkJson.encodeToString(NetworkAlertCreate.serializer(), scan)).jsonObject
         assertNull(body["symptom"])
         assertNull(body["app"]!!.jsonObject["versionName"])
-        // kind 기본값(approval)은 보내지 않아도 서버 기본값과 같다
-        assertTrue(body["kind"] == null || body["kind"]!!.jsonPrimitive.content == "approval")
+        // 기본값도 보낸다 (서버 기본값에 기대지 않게)
+        assertEquals("approval", body["kind"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun `바꿀 값이 없는 수정 본문은 만들 수 없음 (계약 minProperties 1)`() {
+        assertFailsWith<IllegalArgumentException> { NetworkDeviceUpdate() }
     }
 
     @Test
@@ -161,6 +166,28 @@ class RetrofitNetworkTest {
     }
 
     @Test
+    fun `서버가 먼저 더한 열거값은 UNKNOWN으로 읽고 목록은 계속 읽음`() = runTest {
+        val future = ALERT_JSON.replace("\"status\":\"decided\"", "\"status\":\"cancelled\"")
+            .replace("BROWSER_OR_FILE", "PRELOADED").replace("\"level\":\"RISK\"", "\"level\":\"EXTREME\"")
+            .replace("recommend_uninstall", "snooze")
+        respond(200, """{"items":[$future,$ALERT_JSON]}""")
+        val items = network.listAlerts().items
+        assertEquals(NetworkAlertStatus.UNKNOWN, items[0].status)
+        assertEquals(NetworkInstallSource.UNKNOWN, items[0].app.installSource)
+        assertEquals(NetworkRiskLevel.UNKNOWN, items[0].verdict!!.level)
+        assertEquals(NetworkDecisionType.UNKNOWN, items[0].decision!!.decision)
+        assertEquals(NetworkAlertStatus.DECIDED, items[1].status)
+    }
+
+    @Test
+    fun `성공 응답 본문을 읽지 못하면 IOException`() = runTest {
+        respond(200, "<html>프록시 안내</html>")
+        assertFailsWith<UnreadableResponseException> { network.getAlert("a1") }
+        respond(200, """{"alertId":"a1"}""")
+        assertFailsWith<UnreadableResponseException> { network.getAlert("a1") }
+    }
+
+    @Test
     fun `질의 값은 계약의 이름으로`() = runTest {
         respond(200, """{"items":[]}""")
         network.listLinks(NetworkLinkStatus.ACTIVE)
@@ -193,6 +220,11 @@ class RetrofitNetworkTest {
         assertEquals(12, limited.retryAfterSeconds)
 
         // 본문이 문제 형식이 아니어도(프록시 오류 등) 상태 코드는 남김
+        respond(500, """{"type":"about:blank","title":"Internal Server Error","status":500}""")
+        val other = assertFailsWith<ApiException> { network.listLinks() }
+        assertNull(other.slug)
+        assertEquals("HTTP 500", other.message)
+
         respond(502, "Bad Gateway")
         val gateway = assertFailsWith<ApiException> { network.listLinks() }
         assertEquals(502, gateway.status)

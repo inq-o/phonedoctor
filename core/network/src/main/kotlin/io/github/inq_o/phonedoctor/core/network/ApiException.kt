@@ -20,7 +20,7 @@ class ApiException(
     /** 429의 Retry-After(초) */
     val retryAfterSeconds: Long?,
     cause: Throwable? = null,
-) : RuntimeException("HTTP $status ${slug ?: ""} ${detail ?: ""}".trim(), cause) {
+) : RuntimeException(listOfNotNull("HTTP $status", slug, detail).joinToString(" "), cause) {
     companion object {
         private const val PROBLEM_BASE = "https://phonedoctor.example/problems/"
 
@@ -31,7 +31,8 @@ class ApiException(
             fun field(name: String) = body?.get(name)?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
             return ApiException(
                 status = e.code(),
-                slug = field("type")?.removePrefix(PROBLEM_BASE),
+                // 우리 서버의 type만 slug로 (프록시 등의 about:blank는 null)
+                slug = field("type")?.takeIf { it.startsWith(PROBLEM_BASE) }?.removePrefix(PROBLEM_BASE),
                 title = field("title"),
                 detail = field("detail"),
                 body = body,
