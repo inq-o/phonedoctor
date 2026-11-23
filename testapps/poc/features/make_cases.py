@@ -104,6 +104,10 @@ add("6c", "이벤트 뒤 업데이트된 앱: 판정 시점 스냅샷을 소급�
     [{"target": [9000, "ad.w", ".Main"], "features": F(F9=lf, F10=lf), "meta_validity": "updated_after_event", "rule_v0": ["R5"], "rule_v0t": AD()}],
     launchers={"ad.w": {"resolved": [".Main"], "system": False, "since": 9500}},
     events=[[1000, "RESUMED", "app.a", ".Main"], [9000, "RESUMED", "ad.w", ".Main"]])
+add("6d", "R1: 시스템 앱의 런처가 아닌 화면이 조작 없이 열림 (시스템 앱은 광고로 세지 않음)",
+    [{"target": [9000, "sys.s", ".Panel"], "features": F(F9=o(False), F10=o(True)), "rule_v0": ["R1"], "rule_v0t": NORMAL(["R1"])}],
+    launchers={"sys.s": {"resolved": [".Main"], "system": True}},
+    events=[[1000, "RESUMED", "app.a", ".Main"], [9000, "RESUMED", "sys.s", ".Panel"]])
 e7 = {"target": [52000, "ad.x", ".AdActivity"], "features": full(o(2000), none, none, none, none, none, none, none, none, o(False), o(False)),
       "rule_v0t": AD()}
 add("7", "재부팅 (DEVICE_STARTUP 있음): 부팅 전 상태 무효, 부팅 뒤 '없음'은 확정", [e7], init=init, segments=[1, 2],

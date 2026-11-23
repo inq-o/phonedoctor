@@ -50,7 +50,7 @@
 - [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`) — 진행: `symptom_event`·`allow_entry`·`detector_state`(= usage_cursor)·`alert_local`·사이트 표는 있음. `installed_app`·`verdict`·`package_change_cursor`는 설치 시점 분류기(T050)와 함께
 - [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount — 설치 시점 분류기(T050) 뒤. 지금 주기 작업은 증상 검사만(SymptomScanWorker)
 - [x] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로). 조회 전에 사용 기록 권한 확인(없으면 `SecurityException`, 상태 보고만), 런처 별칭은 `targetActivity`로 풀기, 마지막 화면 꺼짐·직전 화면을 실행 사이에 저장 — 완료(`core/usage`: `UsageEventsSource`·`detector/Detector`, 별칭은 `targetActivity`로 풀어 공개 화면 판정, 권한 없으면 SecurityException을 상태 보고로)
-- [x] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007) — 완료: 규칙 R1~R5 이식(`DetectorCasesTest`가 `rule_v0.py` 사례로 확인), 실측 뒤 R6·R7 추가(PR #6, docs/measurements/2026-11-17), 앱별 광고 횟수·근거 기록과 확인 요청, 열린 요청 근거 갱신·허용 앱 알림 전용 1번은 PR #20
+- [x] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007) — 완료: 규칙 R1~R5 이식(`DetectorCasesTest`가 `testapps/poc/features/cases.json` 사례로 PC 기준 구현 `featx.py`와 대조, R1 사례 6d 추가), 실측 뒤 R6·R7 추가(PR #6, docs/measurements/2026-11-17), 앱별 광고 횟수·근거 기록과 확인 요청, 열린 요청 근거 갱신·허용 앱 알림 전용 1번은 PR #20
 - [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
@@ -65,7 +65,7 @@
 - [ ] T050 [US1] 모델 개선 + INT8 변환 + LiteRT 이식 `core/classifier/model`
 - [ ] T051 [US1] 기기 지연 측정 Microbenchmark (NFR-01)
 - [ ] T052 [US2] 첫 전체 검사 화면 (O-S3)
-- [x] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts — 완료: devices·pairing·alerts·예약 작업(PR #12~#14), 설정·삭제(PR #22), 오탐 신고(PR #24)
+- [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts — 진행: devices·pairing·alerts·예약 작업(PR #12~#14), 설정·삭제(PR #22), 오탐 신고(PR #24). 남은 것: 배포(아래), `/models/latest`(FR-008)는 모델 배포와 함께 T050에서
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
   - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
   - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)

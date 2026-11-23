@@ -9,45 +9,60 @@
 
 ## 1. 대상
 
-- 테스트셋 `test_v1.csv`의 앱 중 라벨이 `adware`이거나, `weak`가 아닌 `normal`인 앱. `review`·`excluded`·`weak normal`은 분모에서 뺀다(`control_metrics.py`가 자동으로 거름).
-- **관찰한 판과 같은 APK**를 설치한다(`ml/data/apk_split/`의 분할 세트, README §3의 SHA-256 대조에서 `ok`가 `yes`인 앱). 판이 다른 앱은 대조군 결과도 분류기 결과와 비교할 수 없다.
+- 테스트셋 `test_v1.csv`의 앱 중 라벨이 `adware`이거나 `weak`가 아닌 `normal`이고, README §3의 판 대조(`apk_versions.py`)에서 `ok`가 `yes`인 앱. 나머지는 분모에서 뺀다(`control_metrics.py`가 판 대조 결과를 받아 거르고 뺀 수를 알림). 판이 다른 앱은 대조군 결과를 분류기 결과와 비교할 수 없다.
+- 2026-11-24 기준 v1 라벨 중 `ok`가 `yes`인 앱은 없다(README §3). 다시 관찰해 라벨을 확정한 뒤에 잰다.
+- **관찰한 판과 같은 APK**를 설치한다(`ml/data/apk_split/`의 분할 세트).
 - 분류기 결과와 같은 테스트셋 버전을 쓴다. 수치에는 `test_v1`처럼 버전을 함께 적는다.
 
 ## 2. 환경
 
-- 관찰 전용 AVD `Observe_API_35`(README §2)를 쓴다. Google Play 이미지라 Play Protect가 있다.
-- 시티즌코난이 에뮬레이터에서 실행되지 않거나 검사를 거부하면 시험용 S10+(Android 12)를 쓰고, 기기를 결과 파일에 적는다. 같은 도구는 한 환경에서만 잰다.
-- 측정 전에 두 도구를 최신으로 올리고, 앱 정보에서 버전 이름을 `tool_version`에 적는다. Play Protect는 Play 스토어 버전을 적는다.
+- **대조군 전용 AVD `Control_API_35`**를 새로 만든다(관찰용과 같은 사양: Pixel 8, API 35, Google Play 이미지, arm64). 관찰용 `Observe_API_35`는 adb 설치 검사를 꺼 두었으므로(README §2) 쓰지 않는다.
+- 시티즌코난이 에뮬레이터에서 실행되지 않거나 검사를 거부하면 시험용 S10+(Android 12)를 쓴다. 같은 도구는 한 기기에서만 재고, 기기 이름을 `device` 열에 적는다.
+- 측정 전에 두 도구를 최신으로 올린 뒤 **Play 스토어 자동 업데이트를 끈다**(측정 중 판이 바뀌지 않게). 버전은 앱 정보에서 읽어 `tool_version`에 적는다. Play Protect는 Google Play 서비스(`com.google.android.gms`) 판과 Play 스토어 판을 함께 적는다(예: `gms 26.1 / store 45.0`).
 - 네트워크를 켠다. Play Protect 검사는 Google 서버에서 최신 정보를 받는다.
 - 측정 중에는 우리 앱(폰주치의)을 설치하지 않는다.
 
+1회 준비:
+
+```bash
+emulator -avd Control_API_35 -no-audio -no-boot-anim
+adb shell settings put global verifier_verify_adb_installs 1   # adb 설치도 Play Protect가 검사 (관찰용과 반대)
+adb shell cmd alarm set-timezone Asia/Seoul
+# Play 스토어 로그인, 시티즌코난 설치·필수 권한 허용, 한국어 1순위, Play 스토어 자동 업데이트 끄기
+adb emu avd snapshot save clean
+```
+
 ## 3. 순서
 
-앱을 한꺼번에 설치하면 경고가 어느 앱 것인지 헷갈리므로 **묶음 10개씩** 진행한다.
+앱을 한꺼번에 설치하면 경고가 어느 앱 것인지 헷갈리므로 **묶음 10개씩** 진행하고, 묶음 번호를 `batch` 열에 적는다.
 
-1. 스냅숏 `clean`(도구 두 개만 설치, 권한 허용 마침)에서 시작한다.
-2. 묶음의 앱 10개를 설치한다.
+0. 묶음을 짤 때 aapt2로 앱 이름(라벨)을 뽑아, **같은 묶음 안에 이름이 같거나 비슷한 앱이 없게** 나눈다(클리너·배터리·손전등처럼 흔한 이름이 많음).
+1. 스냅숏 `clean`에서 시작한다: `adb emu avd snapshot load clean`
+2. 묶음의 앱 10개를 설치한다. 설치 방법은 측정 전체에서 하나로 정하고 결과 보고에 적는다. 스토어 설치처럼 보이게 하려면 설치자를 Play 스토어로 지정한다.
    ```bash
-   adb install-multiple ml/data/apk_split/<패키지>/*.apk
+   adb install-multiple -i com.android.vending ml/data/apk_split/<패키지>/*.apk
    ```
-   설치할 때 Play Protect가 막거나 경고하면, 그 앱의 `play_protect` 결과를 그 문구로 적는다. "그래도 설치"로 넘기면 묶음 검사도 계속할 수 있다.
-3. **Play Protect**: Play 스토어 → 프로필 → Play Protect → 검사. 경고가 뜬 앱마다 화면 문구를 그대로 적고 스크린숏을 남긴다. 메뉴 이름은 Play 스토어 판마다 다를 수 있으므로, 첫 측정 때 실제 경로를 이 줄에 고쳐 적는다.
+   설치할 때 Play Protect가 막거나 경고하면 그 자체가 탐지다. 그 앱의 `play_protect`는 `flagged`(문구 그대로)로 적는다. 설치가 끝내 막혀 시티즌코난으로 검사할 수 없으면 `citizen_conan`은 `not_scanned`(이유: Play Protect가 설치를 막음)로 적는다. adb 설치에서 경고가 어떻게 보이는지(대화상자인지, 설치 실패 메시지인지)는 첫 측정 때 확인해 이 줄에 적는다.
+3. **Play Protect**: Play 스토어 → 프로필 → Play Protect → 검사. 경고가 뜬 앱마다 화면 문구를 그대로 적고 스크린숏을 남긴다. 메뉴 이름은 Play 스토어 판마다 다를 수 있으므로, 첫 측정 때 실제 경로를 이 줄에 고쳐 적는다. 검사 도중 Play Protect가 앱을 끄거나 지우면 그 앱은 `flagged`다.
 4. **시티즌코난**: 첫 화면의 [악성 앱 검사]. 결과에 나온 앱과 분류(전화사기 악성 앱·원격제어 앱·출처를 알 수 없는 앱 등)를 그대로 적고 스크린숏을 남긴다.
-5. 스냅숏 `clean`으로 되돌리고 다음 묶음으로 넘어간다.
+5. 두 도구 모두 결과를 앱 이름으로 보여 줄 수 있다. 결과 항목을 눌러 앱 정보 화면에서 **패키지명을 확인**하고 적는다. 이름만으로 짝짓지 않는다.
+6. 스냅숏 `clean`으로 되돌리고 다음 묶음으로 넘어간다.
 
 스크린숏과 화면 문구는 `ml/data/control/<날짜>/<도구>/`에 둔다(레포 제외, 관찰 기록과 같은 방식).
 
 ## 4. 기록 양식
 
-`control_v1.csv` — 앱·도구마다 한 줄. 쉼표가 든 문구는 따옴표로 감싼다(`csv.writer`).
+`control_v1.csv` — 앱·도구마다 한 줄. 쉼표가 든 문구는 따옴표로 감싼다(`csv.writer`). 정답 앱은 두 도구 모두 한 줄씩 있어야 집계한다.
 
 | 열 | 값 |
 |---|---|
-| `package` | 패키지명 |
+| `package` | 패키지명 (앱 정보 화면에서 확인한 것) |
 | `tool` | `citizen_conan` / `play_protect` |
-| `tool_version` | 앱 버전 이름 (Play Protect는 Play 스토어 버전) |
-| `result` | `flagged`: 유해·악성·광고 경고 / `source_only`: 설치 경로 경고뿐(예: 출처를 알 수 없는 앱) / `clean`: 경고 없음 / `not_scanned`: 설치 실패·검사 오류 |
-| `warning` | 화면 문구 그대로. `flagged`·`source_only`이면 필수, `clean`이면 비움 |
+| `tool_version` | 앱 버전 (Play Protect는 `gms <판> / store <판>`). 한 도구 안에서는 모두 같아야 함 |
+| `device` | `Control_API_35` 또는 실기기 이름. 한 도구 안에서는 모두 같아야 함 |
+| `batch` | 묶음 번호 (1부터) |
+| `result` | `flagged`: 유해·악성·광고 경고, 설치 차단, 검사 중 끄기·지우기 / `source_only`: 설치 경로 경고뿐(예: 출처를 알 수 없는 앱) / `clean`: 경고 없음 / `not_scanned`: 설치 실패·검사 오류 |
+| `warning` | 화면 문구 그대로(`not_scanned`이면 이유). `clean`이면 비움 |
 | `scanned` | 검사 날짜 `YYYY-MM-DD` |
 
 **`source_only`를 따로 두는 이유.** 테스트셋은 adb로 설치하므로 앱이 실제로 광고 도배인지와 상관없이 "출처를 알 수 없는 앱"으로 나올 수 있다. 이런 결과를 `flagged`로 세면 두 도구의 Recall과 FPR이 함께 부풀려진다. 그래서 설치 경로 경고는 잡지 못한 것으로 센다. `source_only` 개수는 따로 보고한다. 한 앱에 여러 경고가 함께 뜨면 가장 강한 것을 고른다(`flagged` > `source_only`).
@@ -55,10 +70,11 @@
 ## 5. 집계
 
 ```bash
-python ml/label/control_metrics.py ml/label/test_v1_labels.csv ml/label/test_v1.csv ml/label/control_v1.csv
+python ml/label/apk_versions.py ml/label/test_v1_labels.csv > ml/data/control/versions.csv || true   # ok가 yes 아닌 앱이 있으면 exit 1이지만 CSV는 씀
+python ml/label/control_metrics.py ml/label/test_v1_labels.csv ml/label/test_v1.csv ml/data/control/versions.csv ml/label/control_v1.csv
 ```
 
-형식 오류가 있으면 멈춘다. 오류가 없으면 도구별로 Recall(잡은 adware ÷ adware)과 앱 단위 FPR(잡은 normal ÷ normal)을 낸다. `not_scanned`는 분모에서 빼고 개수를 따로 적는다. 기록이 빠진 정답 앱도 알린다. 보고서 비교표는 다음과 같이 만든다.
+라벨·대조군 기록의 형식 오류, 한 도구 안의 판·기기 섞임, 판 대조 결과와 라벨 파일의 앱 불일치, 기록이 빠진 정답 앱이 있으면 수치를 내지 않고 멈춘다. 통과하면 도구별로 Recall(잡은 adware ÷ adware)과 앱 단위 FPR(잡은 normal ÷ normal)을 내고, 검사 못 한 수(분모에서 뺌)와 설치 경로 경고만 뜬 수를 함께 낸다. 분류기 수치도 같은 정답 앱 집합으로 낸다. 보고서 비교표는 다음과 같이 만든다.
 
 | 수단 | 테스트셋 | Recall | 앱 단위 FPR | 검사 못 함 | 설치 경로 경고만 |
 |---|---|---|---|---|---|
