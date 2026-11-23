@@ -1,6 +1,11 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
+import io.github.inq_o.phonedoctor.core.model.FamilyAlert
+import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
+import io.github.inq_o.phonedoctor.core.model.FamilyAnswer
+import io.github.inq_o.phonedoctor.core.model.FamilySymptom
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
@@ -8,6 +13,7 @@ import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.model.PairingCode
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.notifications.GuardianAlertMessage
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.Flow
@@ -87,5 +93,55 @@ internal class FakeNotifier : Notifier {
     override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
     override fun cancelLink(linkId: String) {
         cancelled += linkId
+    }
+    override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
+    override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
+    override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
+    override fun cancelGuardianAlert(alertId: String) {
+        cancelled += "request:$alertId"
+    }
+}
+
+internal fun request(
+    id: String,
+    status: FamilyAlertStatus = FamilyAlertStatus.OPEN,
+    notice: Boolean = false,
+    answer: FamilyAnswer? = null,
+    updated: Long = 0,
+) = FamilyAlert(
+    alertId = id, seniorName = "엄마", status = status, notice = notice, fromInstallScan = false, appLabel = "초고속 클리너",
+    packageName = "com.ad", versionName = "1.0", installSource = "BROWSER_OR_FILE", firstInstallTime = null,
+    symptom = FamilySymptom("2026-11-23", 12, 1, Instant.EPOCH, Instant.EPOCH, "usage-test"),
+    answer = answer, outcome = null, createdAt = Instant.EPOCH, updatedAt = Instant.ofEpochSecond(updated),
+)
+
+internal class FakeAlerts : GuardianAlertRepository {
+    val alerts = mutableListOf<FamilyAlert>()
+    val fail = mutableMapOf<String, Exception>()
+    val decided = mutableListOf<Triple<String, FamilyDecision, String?>>()
+
+    private fun step(op: String) {
+        fail.remove(op)?.let { throw it }
+    }
+
+    override suspend fun alerts(): List<FamilyAlert> {
+        step("alerts")
+        return alerts.toList()
+    }
+
+    override suspend fun alert(alertId: String): FamilyAlert {
+        step("alert")
+        return alerts.firstOrNull { it.alertId == alertId } ?: throw apiError(404)
+    }
+
+    override suspend fun decide(alertId: String, decision: FamilyDecision, messageToSenior: String?): FamilyAlert {
+        step("decide")
+        decided += Triple(alertId, decision, messageToSenior)
+        val answered = alert(alertId).copy(
+            status = FamilyAlertStatus.DECIDED,
+            answer = FamilyAnswer(decision, "민지", messageToSenior, Instant.EPOCH),
+        )
+        alerts.replaceAll { if (it.alertId == alertId) answered else it }
+        return answered
     }
 }

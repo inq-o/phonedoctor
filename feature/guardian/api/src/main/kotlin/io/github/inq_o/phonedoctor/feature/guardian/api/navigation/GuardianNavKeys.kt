@@ -18,3 +18,11 @@ data object EnterCodeNavKey : NavKey
 /** O-G3 "부모님 폰에서 [연결할게요]를 눌러 주세요" 대기. [seniorName]은 코드를 넣었을 때 서버가 알려 준 이름 */
 @Serializable
 data class LinkWaitingNavKey(val linkId: String, val seniorName: String) : NavKey
+
+/** G2 요청 상세·응답 */
+@Serializable
+data class AlertDetailNavKey(val alertId: String) : NavKey
+
+/** G3 지난 요청 (알림 전용 요청은 '경고 앱'으로 표시) */
+@Serializable
+data object AlertHistoryNavKey : NavKey

@@ -30,6 +30,9 @@ sealed interface PendingOpen {
 
     /** 연결 목록 (시니어 S5, 보호자 G1) */
     data object FamilyLinks : PendingOpen
+
+    /** (보호자) 요청 상세 G2 */
+    data class GuardianRequest(val alertId: String) : PendingOpen
 }
 
 /** 앱을 열 때 처음 보일 화면 */

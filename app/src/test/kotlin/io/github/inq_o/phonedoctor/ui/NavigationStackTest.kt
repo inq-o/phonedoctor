@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.ui
 
+import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.AlertDetailNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianHomeNavKey
 import io.github.inq_o.phonedoctor.feature.guardian.api.navigation.GuardianSignInNavKey
 import io.github.inq_o.phonedoctor.feature.onboarding.api.navigation.OnboardingNavKey
@@ -35,6 +36,9 @@ class NavigationStackTest {
         assertEquals(listOf(GuardianHomeNavKey), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.FamilyLinks))
         assertEquals(emptyList<Any>(), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.LinkRequest("l1")))
         assertEquals(emptyList<Any>(), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.Alert(7)))
+        // 요청 알림은 홈 위에 G2, 시니어 폰에는 오지 않는 알림이라 버린다
+        assertEquals(listOf(GuardianHomeNavKey, AlertDetailNavKey("a1")), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.GuardianRequest("a1")))
+        assertEquals(emptyList<Any>(), pendingStack(listOf(SeniorHomeNavKey), PendingOpen.GuardianRequest("a1")))
     }
 
     @Test

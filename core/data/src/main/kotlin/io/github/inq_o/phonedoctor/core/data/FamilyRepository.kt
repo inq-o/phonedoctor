@@ -6,6 +6,7 @@ import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.model.PairingCode
+import io.github.inq_o.phonedoctor.core.model.ProtectionFlags
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRegistration
@@ -358,4 +359,5 @@ internal fun NetworkLink.toModel() = FamilyLink(
     createdAt = createdAt.toInstant(),
     activatedAt = activatedAt?.toInstant(),
     lastCheckedAt = lastCheckedAt?.toInstant(),
+    protection = protection?.let { ProtectionFlags(it.notifications, it.usageAccess, it.notificationListener) },
 )

@@ -10,6 +10,8 @@ import dagger.hilt.components.SingletonComponent
 import io.github.inq_o.phonedoctor.core.data.AndroidDeviceInfo
 import io.github.inq_o.phonedoctor.core.data.AndroidProtectionStatus
 import io.github.inq_o.phonedoctor.core.data.DefaultFamilyAlertSync
+import io.github.inq_o.phonedoctor.core.data.DefaultGuardianAlertRepository
+import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
 import io.github.inq_o.phonedoctor.core.data.FamilyAlertSync
 import io.github.inq_o.phonedoctor.core.data.FamilyLinkEvents
 import io.github.inq_o.phonedoctor.core.data.ProtectionStatus
@@ -48,6 +50,9 @@ internal interface FamilyModule {
 
     @Binds
     fun bindsProtectionStatus(impl: AndroidProtectionStatus): ProtectionStatus
+
+    @Binds
+    fun bindsGuardianAlertRepository(impl: DefaultGuardianAlertRepository): GuardianAlertRepository
 
     companion object {
         @Provides

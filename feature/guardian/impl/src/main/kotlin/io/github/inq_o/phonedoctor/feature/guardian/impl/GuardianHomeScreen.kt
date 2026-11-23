@@ -25,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
@@ -47,6 +49,8 @@ import java.util.Locale
 @Composable
 fun GuardianHomeScreen(
     onAddFamily: () -> Unit,
+    onOpenRequest: (String) -> Unit,
+    onHistory: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: GuardianHomeViewModel = hiltViewModel(),
 ) {
@@ -62,6 +66,8 @@ fun GuardianHomeScreen(
         state = state,
         notificationsOn = notificationsOn,
         onAddFamily = onAddFamily,
+        onOpenRequest = onOpenRequest,
+        onHistory = onHistory,
         onRevoke = viewModel::revoke,
         onRetry = viewModel::refresh,
         onOpenNotificationSettings = { context.openNotificationSettings() },
@@ -73,12 +79,14 @@ private fun Context.openNotificationSettings() {
     startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
 }
 
-/** G1. 요청 목록(G2)은 요청 화면과 함께 붙인다 */
+/** G1. 답을 기다리는 요청(누르면 G2), 연결한 부모님 폰, 지난 요청(G3) */
 @Composable
 internal fun GuardianHomeScreen(
     state: GuardianHomeUiState,
     notificationsOn: Boolean,
     onAddFamily: () -> Unit,
+    onOpenRequest: (String) -> Unit,
+    onHistory: () -> Unit,
     onRevoke: (FamilyLink) -> Unit,
     onRetry: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
@@ -116,6 +124,18 @@ internal fun GuardianHomeScreen(
                     }
                     null -> Unit
                 }
+                if (state.requests.isNotEmpty()) {
+                    Text(
+                        stringResource(R.string.feature_guardian_impl_home_requests, state.requests.size),
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.fillMaxWidth().semantics { heading() },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.requests.forEach { AlertCard(it) { onOpenRequest(it.alertId) } }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
                 if (state.links.isEmpty()) {
                     Headline(stringResource(R.string.feature_guardian_impl_home_empty_title))
                     Body(stringResource(R.string.feature_guardian_impl_home_empty_body))
@@ -125,6 +145,10 @@ internal fun GuardianHomeScreen(
                             LinkCard(item, enabled = state.revoking == null, onRevoke = { confirming = item.link.linkId })
                         }
                     }
+                }
+                if (state.hasHistory) {
+                    Spacer(Modifier.height(16.dp))
+                    GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_home_history), onHistory)
                 }
                 if (state.revoking != null) CircularProgressIndicator()
             }
@@ -175,6 +199,11 @@ private fun LinkCard(item: GuardianLink, enabled: Boolean, onRevoke: () -> Unit)
                         ?: stringResource(R.string.feature_guardian_impl_home_no_check_yet),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                // 시니어 폰의 보호가 반쯤 멈춤: 권한이 꺼짐 (T055a, ux-flows F6 "권한 꺼짐 표시")
+                link.protection?.let { p ->
+                    if (!p.usageAccess) Warning(stringResource(R.string.feature_guardian_impl_home_usage_off, name))
+                    if (!p.notifications) Warning(stringResource(R.string.feature_guardian_impl_home_notifications_off, name))
+                }
                 if (item.contactLost) {
                     Spacer(Modifier.height(8.dp))
                     Text(
@@ -188,6 +217,12 @@ private fun LinkCard(item: GuardianLink, enabled: Boolean, onRevoke: () -> Unit)
             }
         }
     }
+}
+
+@Composable
+private fun Warning(text: String) {
+    Spacer(Modifier.height(8.dp))
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
 }
 
 /** "오늘 오후 3:05" / "11월 20일 오후 3:05" */
@@ -256,11 +291,11 @@ private val PreviewLinks = listOf(
 @Preview(showBackground = true, widthDp = 360, heightDp = 720)
 @Composable
 private fun HomePreview() {
-    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(PreviewLinks), false, {}, {}, {}, {}) }
+    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(PreviewLinks), false, {}, {}, {}, {}, {}, {}) }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 640)
 @Composable
 private fun EmptyPreview() {
-    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(emptyList()), true, {}, {}, {}, {}) }
+    PhoneDoctorTheme { GuardianHomeScreen(GuardianHomeUiState.Ready(emptyList()), true, {}, {}, {}, {}, {}, {}) }
 }
