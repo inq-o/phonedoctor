@@ -15,6 +15,7 @@ import com.google.firebase.auth.FirebaseAuthException
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.createRouteScopedPlugin
+import io.ktor.server.request.path
 import io.ktor.util.AttributeKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -67,8 +68,16 @@ class AuthConfig {
 val FirebaseAuthPlugin = createRouteScopedPlugin("FirebaseAuth", ::AuthConfig) {
     val deps = pluginConfig.deps
     onCall { call ->
-        val idToken = call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
         val appCheck = call.request.headers["X-Firebase-AppCheck"]
+        // 오탐 익명 신고는 App Check만: 로그인 토큰을 보내도 보지 않는다 (누가 보냈는지 남기지 않게, openapi security)
+        if (call.request.path() == FALSE_POSITIVE_PATH) {
+            if (appCheck.isNullOrEmpty()) throw unauthorized("app-check-missing", "App Check 토큰이 없음")
+            if (!withContext(Dispatchers.IO) { deps.verifier.verifyAppCheck(appCheck) }) {
+                throw unauthorized("app-check-invalid", "App Check 토큰이 유효하지 않음")
+            }
+            return@onCall
+        }
+        val idToken = call.request.headers["Authorization"]?.removePrefix("Bearer ")?.trim()
         if (idToken.isNullOrEmpty()) throw unauthorized("id-token-missing", "Firebase ID 토큰이 없음")
         if (appCheck.isNullOrEmpty()) throw unauthorized("app-check-missing", "App Check 토큰이 없음")
         val caller = withContext(Dispatchers.IO) {

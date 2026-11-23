@@ -93,6 +93,7 @@ fun Application.module(deps: Deps) {
             deviceRoutes(deps)
             pairingRoutes(deps)
             alertRoutes(deps)
+            feedbackRoutes(deps)
         }
     }
 }

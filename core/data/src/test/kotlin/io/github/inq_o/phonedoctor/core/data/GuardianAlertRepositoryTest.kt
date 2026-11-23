@@ -54,14 +54,16 @@ class GuardianAlertRepositoryTest {
 
     private val server = AlertServer()
     private var stores = 0
+    private val reported = mutableListOf<Pair<String, FalsePositive>>()
+    private lateinit var prefs: UserPreferences
 
     private suspend fun TestScope.repo(role: String? = "GUARDIAN", available: Boolean = true): DefaultGuardianAlertRepository {
         val store = PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
             tmp.newFile("prefs${++stores}.preferences_pb").also { it.delete() }
         }
-        val prefs = UserPreferences(store)
+        prefs = UserPreferences(store)
         role?.let { prefs.setRegisteredDevice(RegisteredDevice("dev-2", it)) }
-        return DefaultGuardianAlertRepository(available, server, prefs)
+        return DefaultGuardianAlertRepository(available, server, prefs) { id, r -> reported += id to r }
     }
 
     @Test
@@ -197,6 +199,25 @@ class GuardianAlertRepositoryTest {
     }
 
     @Test
+    fun `괜찮은 앱이라고 답하면 오탐을 익명으로 한 번 알리고, 끄면 알리지 않는다`() = runTest {
+        server.single = alert("a1")
+        val repo = repo()
+        repo.decide("a1", FamilyDecision.RECOMMEND_UNINSTALL, null)
+        assertTrue(reported.isEmpty())
+        repo.decide("a1", FamilyDecision.ALLOW, null)
+        val (id, report) = reported.single()
+        assertEquals("a1", id)
+        assertEquals("com.ad", report.packageName)
+        assertEquals(7L, report.versionCode)
+        assertEquals("usage-test", report.detectorVersion)
+        assertEquals(false, report.installScan)
+
+        repo.setFalsePositiveFeedback(false)
+        repo.decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(1, reported.size)
+    }
+
+    @Test
     fun `서버가 지운 기기는 등록 없음으로 알린다`() = runTest {
         server.fail["listAlerts"] = ApiException(403, "device-not-registered", null, null, null, null)
         try {
@@ -266,4 +287,5 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
     override suspend fun revokeLink(linkId: String) = TODO()
     override suspend fun createAlert(key: String, body: NetworkAlertCreate): NetworkAlert = TODO()
     override suspend fun reportOutcome(key: String, alertId: String, body: NetworkOutcomeCreate): NetworkAlert = TODO()
+    override suspend fun reportFalsePositive(body: io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport) = Unit
 }

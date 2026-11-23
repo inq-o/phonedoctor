@@ -19,6 +19,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDecision
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeType
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,6 +45,28 @@ interface GuardianAlertRepository {
      * [messageToSenior]는 40자까지, 시니어 화면에 그대로 보인다
      */
     suspend fun decide(alertId: String, decision: FamilyDecision, messageToSenior: String?): FamilyAlert
+
+    /** [괜찮은 앱이에요]로 답하면 익명으로 오탐을 알릴지 (US7, 설정 G4에서 끌 수 있음) */
+    val falsePositiveFeedback: Flow<Boolean>
+
+    suspend fun setFalsePositiveFeedback(enabled: Boolean)
+}
+
+/** 오탐 익명 신고 한 건 (openapi FalsePositiveReport). 기기·사용자를 알 수 있는 값은 없다 */
+data class FalsePositive(
+    val installScan: Boolean,
+    val packageName: String,
+    val versionCode: Long,
+    val signingCertSha256: String,
+    val modelVersion: String?,
+    val score: Double?,
+    val reasonCodes: List<String>?,
+    val detectorVersion: String?,
+)
+
+/** 오탐 신고를 망이 될 때까지 재시도하며 보낸다 (sync:work). 요청 하나에 한 번만 */
+fun interface FalsePositiveReporter {
+    fun schedule(alertId: String, report: FalsePositive)
 }
 
 /** 먼저 온 응답만 유효하다 (FR-024). [answer]는 먼저 답한 응답 */
@@ -60,7 +83,12 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     @FamilyEnabled private val available: Boolean,
     private val network: PhoneDoctorNetworkDataSource,
     private val preferences: UserPreferences,
+    private val falsePositives: FalsePositiveReporter,
 ) : GuardianAlertRepository {
+    override val falsePositiveFeedback: Flow<Boolean> = preferences.falsePositiveFeedback
+
+    override suspend fun setFalsePositiveFeedback(enabled: Boolean) = preferences.setFalsePositiveFeedback(enabled)
+
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 응답을 못 받은 응답 보내기의 Idempotency-Key. 같은 응답을 다시 보내면 같은 키로 */
@@ -104,7 +132,13 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
             message,
         )
         return try {
-            guarded { network.decideAlert(key, alertId, body) }.toModel().also { keysLock.withLock { pendingKeys.remove(op) } }
+            val alert = guarded { network.decideAlert(key, alertId, body) }
+            keysLock.withLock { pendingKeys.remove(op) }
+            // 괜찮은 앱이라고 답함 = 판정이 틀렸을 수 있음. 켜 두었으면 앱·판·판정기만 익명으로 알린다 (요청마다 한 번)
+            if (decision == FamilyDecision.ALLOW && preferences.falsePositiveFeedback.first()) {
+                alert.toFalsePositive()?.let { falsePositives.schedule(alertId, it) }
+            }
+            alert.toModel()
         } catch (e: IOException) {
             throw e // 서버가 처리했는지 모름 → 다시 누르면 같은 키
         } catch (e: ApiException) {
@@ -143,6 +177,20 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
 
     private companion object {
         const val PAGE_SIZE = 50
+    }
+}
+
+/** 판정 근거가 있을 때만 (계약: install_scan은 모델 판·점수·근거, symptom은 감지 규칙 판 필수) */
+internal fun NetworkAlert.toFalsePositive(): FalsePositive? {
+    val v = verdict
+    return when {
+        source == NetworkAlertSource.INSTALL_SCAN && v != null -> FalsePositive(
+            true, app.packageName, app.versionCode, app.signingCertSha256, v.modelVersion, v.score, v.reasons.map { it.code }, null,
+        )
+        symptom != null -> FalsePositive(
+            false, app.packageName, app.versionCode, app.signingCertSha256, null, null, null, symptom!!.detectorVersion,
+        )
+        else -> null
     }
 }
 

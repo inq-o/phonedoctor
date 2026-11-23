@@ -8,6 +8,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDevice
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRegistration
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceUpdate
+import io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLink
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkList
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
@@ -16,6 +17,7 @@ import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.Headers
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
@@ -70,6 +72,14 @@ internal interface PhoneDoctorApi {
 
     @POST("alerts/{alertId}/outcome")
     suspend fun reportOutcome(@Header(IDEMPOTENCY_KEY) key: String, @Path("alertId") alertId: String, @Body body: NetworkOutcomeCreate): NetworkAlert
+
+    /** 익명: 로그인 토큰 없이 App Check만 (AuthInterceptor가 [ANONYMOUS] 표시를 보고 뺀다) */
+    @POST("feedback/false-positives")
+    @Headers("$ANONYMOUS: 1")
+    suspend fun reportFalsePositive(@Body body: NetworkFalsePositiveReport)
 }
 
 internal const val IDEMPOTENCY_KEY = "Idempotency-Key"
+
+/** 로그인 토큰을 붙이지 않을 요청 표시 (서버로 나가기 전에 지운다) */
+internal const val ANONYMOUS = "X-PhoneDoctor-Anonymous"

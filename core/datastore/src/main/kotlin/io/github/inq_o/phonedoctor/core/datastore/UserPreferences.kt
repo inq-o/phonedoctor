@@ -92,6 +92,13 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { it[DELETION_PENDING] = pending }
     }
 
+    /** (보호자) [괜찮은 앱이에요]로 답한 앱을 익명으로 알려 판정을 고치는 데 쓰게 할지 (US7, 기본 켬, data-model §5) */
+    val falsePositiveFeedback: Flow<Boolean> = store.data.map { it[FALSE_POSITIVE_FEEDBACK] ?: true }
+
+    suspend fun setFalsePositiveFeedback(enabled: Boolean) {
+        store.edit { it[FALSE_POSITIVE_FEEDBACK] = enabled }
+    }
+
     suspend fun clearChosenRole() {
         store.edit { it.remove(CHOSEN_ROLE) }
     }
@@ -117,6 +124,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val DISPLAY_NAME = stringPreferencesKey("displayName")
         val NOTIFY_CAUTION = booleanPreferencesKey("notifyCaution")
         val DELETION_PENDING = booleanPreferencesKey("deletionPending")
+        val FALSE_POSITIVE_FEEDBACK = booleanPreferencesKey("falsePositiveFeedback")
     }
 }
 

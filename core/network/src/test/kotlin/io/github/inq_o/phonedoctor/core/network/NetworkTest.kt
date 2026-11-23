@@ -11,6 +11,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRegistration
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceRole
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceUpdate
+import io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport
 import io.github.inq_o.phonedoctor.core.network.model.NetworkInstallSource
 import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
@@ -93,6 +94,10 @@ class RequestContractTest {
         check("AlertCreate", NetworkAlertCreate.serializer(), symptom)
         check("DecisionCreate", NetworkDecisionCreate.serializer(), NetworkDecisionCreate(NetworkDecisionType.ALLOW, "괜찮아요"))
         check("OutcomeCreate", NetworkOutcomeCreate.serializer(), NetworkOutcomeCreate(NetworkOutcomeType.ALREADY_REMOVED, "2026-11-21T05:00:00Z"))
+        check(
+            "FalsePositiveReport", NetworkFalsePositiveReport.serializer(),
+            NetworkFalsePositiveReport(NetworkAlertSource.SYMPTOM, "com.ad", 7, "ab".repeat(32), detectorVersion = "usage-v1"),
+        )
     }
 
     @Test
@@ -152,6 +157,19 @@ class RetrofitNetworkTest {
         assertEquals("app-check", req.headers["X-Firebase-AppCheck"])
         assertEquals("key-1", req.headers["Idempotency-Key"])
         Contract.check("AlertCreate", req.body!!.utf8())
+    }
+
+    @Test
+    fun `오탐 신고는 로그인 토큰 없이 App Check만`() = runTest {
+        server.enqueue(MockResponse.Builder().code(202).build())
+        network.reportFalsePositive(NetworkFalsePositiveReport(NetworkAlertSource.SYMPTOM, "com.ad", 7, "ab".repeat(32), detectorVersion = "usage-v1"))
+        val req = server.takeRequest()
+        assertEquals("/v1/feedback/false-positives", req.url.encodedPath)
+        assertEquals(null, req.headers["Authorization"])
+        assertEquals(null, req.headers["X-PhoneDoctor-Anonymous"])
+        assertEquals(null, req.headers["Idempotency-Key"])
+        assertEquals("app-check", req.headers["X-Firebase-AppCheck"])
+        Contract.check("FalsePositiveReport", req.body!!.utf8())
     }
 
     @Test

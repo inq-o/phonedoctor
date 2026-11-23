@@ -599,7 +599,7 @@ class GuardianViewModelTest {
 
     @Test
     fun settingsSaveCautionAndName() = runTest(main.dispatcher) {
-        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
         vm.setNotifyCaution(true)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.notifyCaution)
@@ -620,7 +620,7 @@ class GuardianViewModelTest {
     @Test
     fun deletingAllDataResetsRoleAndAsksForReauthWhenNeeded() = runTest(main.dispatcher) {
         val settings = FakeSettings()
-        val vm = GuardianSettingsViewModel(family, settings)
+        val vm = GuardianSettingsViewModel(family, settings, requests)
         family.fail["delete"] = RecentLoginRequiredException()
         vm.deleteAll()
         advanceUntilIdle()
@@ -642,7 +642,7 @@ class GuardianViewModelTest {
 
     @Test
     fun reauthWithAnotherAccountAsksForTheFirstOne() = runTest(main.dispatcher) {
-        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
         vm.startReauth()
         family.fail["reauth"] = io.github.inq_o.phonedoctor.core.data.ReauthAccountMismatchException()
         vm.onReauthToken("other")
@@ -654,8 +654,19 @@ class GuardianViewModelTest {
     }
 
     @Test
+    fun feedbackSwitchIsLocalOnly() = runTest(main.dispatcher) {
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.falsePositiveFeedback)
+        vm.setFalsePositiveFeedback(false)
+        advanceUntilIdle()
+        assertFalse(vm.uiState.value.falsePositiveFeedback)
+        assertTrue(family.calls.isEmpty())
+    }
+
+    @Test
     fun closingTheReauthPickerIsQuiet() {
-        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
         vm.startReauth()
         vm.onReauthFailed(androidx.credentials.exceptions.GetCredentialCancellationException())
         assertFalse(vm.uiState.value.working)

@@ -13,6 +13,10 @@ import java.io.IOException
 internal class AuthInterceptor(private val tokens: AuthTokens) : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val appCheck = token { tokens.appCheckToken() }
+        // 익명 요청(오탐 신고): 로그인 토큰을 붙이지 않는다 (누가 보냈는지 서버가 알 수 없게)
+        if (chain.request().header(ANONYMOUS) != null) {
+            return chain.proceed(chain.request().newBuilder().removeHeader(ANONYMOUS).header("X-Firebase-AppCheck", appCheck).build())
+        }
         fun send(forceRefresh: Boolean): Response {
             val id = token { tokens.idToken(forceRefresh) }
             return chain.proceed(

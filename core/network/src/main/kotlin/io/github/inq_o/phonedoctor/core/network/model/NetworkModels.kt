@@ -234,3 +234,16 @@ data class NetworkAlert(
 
 @Serializable
 data class NetworkAlertList(val items: List<NetworkAlert>, val nextPageToken: String? = null)
+
+/** 오탐 익명 신고 (openapi FalsePositiveReport). 기기·사용자를 알 수 있는 값은 넣지 않는다 */
+@Serializable
+data class NetworkFalsePositiveReport(
+    val source: NetworkAlertSource,
+    val packageName: String,
+    val versionCode: Long,
+    val signingCertSha256: String,
+    val modelVersion: String? = null,
+    val score: Double? = null,
+    val reasonCodes: List<String>? = null,
+    val detectorVersion: String? = null,
+)

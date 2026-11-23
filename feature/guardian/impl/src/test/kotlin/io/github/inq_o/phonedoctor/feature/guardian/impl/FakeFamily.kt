@@ -143,6 +143,10 @@ internal class FakeAlerts : GuardianAlertRepository {
     val fail = mutableMapOf<String, Exception>()
     val decided = mutableListOf<Triple<String, FamilyDecision, String?>>()
     val gate = mutableMapOf<String, CompletableDeferred<Unit>>()
+    override val falsePositiveFeedback = MutableStateFlow(true)
+    override suspend fun setFalsePositiveFeedback(enabled: Boolean) {
+        falsePositiveFeedback.value = enabled
+    }
 
     private suspend fun step(op: String) {
         gate.remove(op)?.await()
