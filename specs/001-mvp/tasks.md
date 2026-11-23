@@ -99,7 +99,7 @@
 
 ## 나중에 (P2·P3)
 
-- [x] T080 [US7] 오탐 익명 신고 — 완료: 서버 `POST /v1/feedback/false-positives`(App Check만, 로그인 토큰을 보내도 보지 않음, 같은 앱·판·판정기별 횟수와 처음·마지막 날짜만 집계, Flyway V6), 앱은 보호자가 [괜찮은 앱이에요]로 답하면 요청마다 한 번 WorkManager로 보냄(로그인 토큰 없이), G4 [틀린 판정 알리기] 스위치(기본 켬). 집계 보관 기간은 방침 초안에 [확인 필요]
+- [x] T080 [US7] 오탐 익명 신고 — 완료: 서버 `POST /v1/feedback/false-positives`(App Check만, 로그인 토큰을 보내도 보지 않음, 같은 앱·판·판정기별 횟수와 처음·마지막 날짜만 집계, Flyway V6), 앱은 보호자가 [괜찮은 앱이에요]로 답하면 요청·근거마다 한 번 WorkManager로 보냄(로그인 토큰 없이 한 번 쓰는 App Check 토큰, 1~24시간 늦춰서), G4 [틀린 판정 알리기] 스위치(기본 켬). 서버는 본문 4KB·주소별 시간당 30건 제한, 집계는 마지막 신고 1년 뒤 정리(예약 작업)
 - [ ] T081 [US8] 강력 모드 (testdpc 참고)
 - [ ] T082 FR-042 AppFunctions — compileSdk 37 필요
 - [ ] T083 [US6] Gemini Nano 문장 다듬기
