@@ -122,7 +122,11 @@ script -qF ml/data/apkeep_split.log apkeep -c ml/data/test_v1_ids.csv -d google-
   -o locale=ko_KR,timezone=Asia/Seoul,split_apk=true -s 3000 -r 1 ml/data/apk_split/
 ```
 
-## 6. 한계
+## 6. 대조군
+
+같은 테스트셋을 시티즌코난·Play Protect로 검사하는 절차와 기록 양식은 [control_group.md](control_group.md)(T027).
+
+## 7. 한계
 
 - 에뮬레이터에서는 광고 네트워크가 광고를 덜 내보낼 수 있다(광고 미노출 → 정상으로 잘못 판정할 위험).
 - 10분 대기로는 몇 시간·며칠 뒤에 시작하는 앱 밖 광고를 놓친다.

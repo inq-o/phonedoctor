@@ -1852,6 +1852,61 @@
    ]
   },
   {
+   "id": "6d",
+   "title": "R1: 시스템 앱의 런처가 아닌 화면이 조작 없이 열림 (시스템 앱은 광고로 세지 않음)",
+   "launchers": {
+    "sys.s": {
+     "resolved": [
+      ".Main"
+     ],
+     "system": true
+    }
+   },
+   "events": [
+    [
+     1000,
+     "RESUMED",
+     "app.a",
+     ".Main"
+    ],
+    [
+     9000,
+     "RESUMED",
+     "sys.s",
+     ".Panel"
+    ]
+   ],
+   "expect": [
+    {
+     "target": [
+      9000,
+      "sys.s",
+      ".Panel"
+     ],
+     "features": {
+      "F9": [
+       false,
+       "OBSERVED"
+      ],
+      "F10": [
+       true,
+       "OBSERVED"
+      ]
+     },
+     "rule_v0": [
+      "R1"
+     ],
+     "rule_v0t": {
+      "outcome": "NORMAL",
+      "failed": [
+       "R1"
+      ],
+      "unknown": []
+     }
+    }
+   ]
+  },
+  {
    "id": "7",
    "title": "재부팅 (DEVICE_STARTUP 있음): 부팅 전 상태 무효, 부팅 뒤 '없음'은 확정",
    "init": {

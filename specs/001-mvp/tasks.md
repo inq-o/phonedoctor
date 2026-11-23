@@ -42,15 +42,15 @@
   - Play 후보 497개 `ml/collect/` (검색어 20개, 로그인 없이 공개 검색), apkeep + 익명 공용 계정으로 다운로드 진행 중 (2026-10-07). 라벨링·원스토어 전용 앱은 남음
 - [ ] T026 **평가용 테스트셋 분리·동결** `ml/label/` — 이후 학습에 절대 사용 안 함 (constitution VII)
   - 라벨은 에뮬레이터 관찰(R1~R6)로만 붙임. v1 = 150개(회색지대 100 + 시니어 50), 이후 버전별로 무작위 추가만 함 (2026-10-12). 광고 도배·정상 수(Recall·FPR 분모)는 관찰 후 확정해 여기에 적음
-- [ ] T027 대조군 측정 절차 문서화: 같은 테스트셋을 시티즌코난·Play Protect로 검사하는 방법·기록 양식
+- [x] T027 대조군 측정 절차 문서화: 같은 테스트셋을 시티즌코난·Play Protect로 검사하는 방법·기록 양식 — 완료: `ml/label/control_group.md`(대상·환경·묶음 10개 순서·기록 양식, 설치 경로 경고만 뜬 결과는 `source_only`로 따로 셈), 집계 `ml/label/control_metrics.py`(도구별 Recall·앱 단위 FPR). 실제 측정은 T070
 
 앱 뼈대 (병행)
-- [ ] T030 [P] minSdk 23 → 26 `build-logic/.../KotlinAndroid.kt`
-- [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo
-- [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`)
-- [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount
-- [ ] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로). 조회 전에 사용 기록 권한 확인(없으면 `SecurityException`, 상태 보고만), 런처 별칭은 `targetActivity`로 풀기, 마지막 화면 꺼짐·직전 화면을 실행 사이에 저장
-- [ ] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007)
+- [x] T030 [P] minSdk 23 → 26 `build-logic/.../KotlinAndroid.kt` — 완료: minSdk 26
+- [ ] T031 [P] `core:model` 생성 — Verdict·RiskLevel·ReasonCode·AppInfo — 진행: 증상 쪽 모델(`SymptomAlert`·`Family`·`ScanRun`)은 있음. Verdict·RiskLevel·ReasonCode·AppInfo는 설치 시점 분류기(T050)와 함께 (지금은 `core:network` 모델에만 있음)
+- [ ] T032 [P] Room 엔티티 교체 — data-model.md §3 (`installed_app`, `verdict`, `symptom_event`, `usage_cursor`, `allow_entry`, `package_change_cursor`) — 진행: `symptom_event`·`allow_entry`·`detector_state`(= usage_cursor)·`alert_local`·사이트 표는 있음. `installed_app`·`verdict`·`package_change_cursor`는 설치 시점 분류기(T050)와 함께
+- [ ] T033 [US1] `sync:work` 변화 감지 작업 — getChangedPackages + bootCount — 설치 시점 분류기(T050) 뒤. 지금 주기 작업은 증상 검사만(SymptomScanWorker)
+- [x] T034 [US11] 증상 감지 `core/usage` — UsageStatsManager.queryEvents(`ACTIVITY_RESUMED`)로 조작 없는 포그라운드 전환을 앱별 귀속 (ADR-0003 주 경로). 조회 전에 사용 기록 권한 확인(없으면 `SecurityException`, 상태 보고만), 런처 별칭은 `targetActivity`로 풀기, 마지막 화면 꺼짐·직전 화면을 실행 사이에 저장 — 완료(`core/usage`: `UsageEventsSource`·`detector/Detector`, 별칭은 `targetActivity`로 풀어 공개 화면 판정, 권한 없으면 SecurityException을 상태 보고로)
+- [x] T035 [US11] 전환 분류 휴리스틱(조작 직후 vs 조작 없음, FR-012, 규칙 v0 R1~R5 이식, 단위 테스트는 `testapps/poc/rule_v0.py`의 `_check` 사례) + 앱별 광고 횟수 기록·근거 생성(FR-010) → US4 가족 알림 트리거. 열린 요청은 근거 갱신(FR-023), 허용 앱은 notice 1번(FR-007) — 완료: 규칙 R1~R5 이식(`DetectorCasesTest`가 `testapps/poc/features/cases.json` 사례로 PC 기준 구현 `featx.py`와 대조, R1 사례 6d 추가), 실측 뒤 R6·R7 추가(PR #6, docs/measurements/2026-11-17), 앱별 광고 횟수·근거 기록과 확인 요청, 열린 요청 근거 갱신·허용 앱 알림 전용 1번은 PR #20
 - [ ] T036 [US11] 설치 시점 분류기에 `SYSTEM_ALERT_WINDOW` 사전 경고 신호 연결(FR-011) — 오버레이형 공백 보조
 
 ## 단계 3 — 8주차 10/19~23 (중간고사)
@@ -65,7 +65,7 @@
 - [ ] T050 [US1] 모델 개선 + INT8 변환 + LiteRT 이식 `core/classifier/model`
 - [ ] T051 [US1] 기기 지연 측정 Microbenchmark (NFR-01)
 - [ ] T052 [US2] 첫 전체 검사 화면 (O-S3)
-- [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts
+- [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts — 진행: devices·pairing·alerts·예약 작업(PR #12~#14), 설정·삭제(PR #22), 오탐 신고(PR #24). 남은 것: 배포(아래), `/models/latest`(FR-008)는 모델 배포와 함께 T050에서
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
   - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
   - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)
@@ -74,7 +74,7 @@
 - [x] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`. 기기 등록(`POST /devices`)은 연결을 시작할 때(연결 전 서버 전송 없음), "모든 데이터 지우기"는 `DELETE /devices/{id}` + Firebase 사용자 삭제 (개인정보처리방침 3·6절). 서버 통신은 `core:network`. 기반 완료: `core:data` FamilyRepository(첫 코드 요청·코드 입력 때 로그인·등록, 데이터 지우기), `Application.onCreate`에서 App Check 공급자 설치(디버그 Debug·출시 Play Integrity), 디버그만 `10.0.2.2` 평문 허용, FCM 자동 발급 끔·토큰 갱신. **출시 빌드는 가족 연결 꺼짐**(`FAMILY_ENABLED=false`, `app/src/release/AndroidManifest.xml`이 통신 권한 제거, `./gradlew test`가 확인) — 가족 연결 판 방침 시행 때 함께 켜고 릴리스 API 주소 넣기. FCM 토큰 갱신은 WorkManager로 재시도, 등록 뒤에만 FCM 자동 발급 켬. 시니어 화면 완료: `feature:senior-family`(O-S4 코드·QR — 화면이 보이는 동안 5초마다 연결 목록을 확인해 푸시 없이도 S3로, S3 연결 확인, S5 연결 관리·끊기 확인창), 첫 설정 마지막 단계 가족 연결 안내(건너뛰기 가능), 홈 [가족] 버튼·지켜보는 가족·놓친 연결 요청 카드, 푸시 `LINK_REQUESTED`·`LINK_REVOKED` 알림(채널 `link`). 보호자 화면 완료: O1 역할 선택(가족 연결이 켜진 빌드의 첫 실행만, 고른 역할은 기기 설정에 저장), `feature:guardian`(O-G1 Credential Manager Google 로그인 — 서버 전송 없음, 마친 뒤 알림 권한 요청 / O-G2 6자리 입력·Google 코드 스캐너 QR(카메라 권한 없음)·서버 오류별 안내 / O-G3 대기 — 5초마다 연결 상태 확인 / G1 연결 목록·마지막 검사 시각·연락 끊김 문구(검사 보고를 받은 연결만, 기준은 서버와 같은 max(보고, 연결 확정)+48시간)·연결 끊기·요청 취소·알림 꺼짐 안내), 푸시 `LINK_ACTIVATED`·시니어가 끊거나 거절한 `LINK_REVOKED` 알림, 보호자로 등록한 폰은 다시 로그인할 때 역할을 바꾸지 않음, 보호자 폰은 주기 검사 건너뜀. Google 로그인은 Firebase 콘솔에 디버그 서명 SHA-1 등록과 `google-services.json`의 웹 클라이언트 ID가 필요(없는 빌드는 "쓸 수 없어요" 안내). 설정 완료: 시니어 S7(가족에게 보이는 이름 1~20자 — 등록 전이면 저장했다가 등록 때 보냄, 연결한 가족 보기, 글자 크기 설정 열기, 모든 데이터 지우기 확인창), 홈 상단 [가족]→[설정], 보호자 G4(주의 단계도 받기 — 등록 전에 켜면 등록 뒤 보냄, 내 이름, 모든 데이터 지우기 — Firebase가 다시 로그인을 요구하면 [Google로 다시 로그인] 뒤 이어서 지움, 지우면 역할 선택부터), 서버도 시니어 등록은 익명 사용자만(403 senior-requires-anonymous). 익명 오탐 신고는 T080에서 완료
 - [x] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`. 시니어 쪽 완료: 열린 확인 요청을 `POST /alerts`(source symptom)로 보내고 근거가 늘면 다시 보냄(서버 open일 때만, 만료됐으면 새 요청), 보호자 응답은 푸시 `DECISION_MADE`(DB만 반영 후 알림)와 `GET /alerts?updatedSince` 당겨 오기 둘 다로 받음, S2에 "민지님이 지우자고 했어요"+한마디 / 답 기다리는 중엔 테두리 [지금 지울래요] / 허용이면 "가족이 괜찮다고 했어요", 허용 목록(`allow_entry`)과 허용 앱의 notice 1번(FR-007), 처리 결과 `POST /alerts/{id}/outcome`(보내기 전에 서버 상태를 읽어 맞는 결과만), 새 보호자 연결 시 열린 요청 다시 보냄, Room 판 2(자동 이전). 보호자 쪽 완료: G1 "답을 기다리는 요청" 카드·[지난 요청 보기], G2 상세(앱·설치 정보·감지 근거·한마디 40자·[괜찮은 앱이에요]/[지우자고 하기], 알림 전용은 [지우자고 하기]만, "△△님이 먼저 답했어요", 결과·만료 표시), G3 기록(알림 전용은 "경고 앱"), 푸시 ALERT_CREATED·REMINDER·NOTICE·RESOLVED 알림(채널 alerts·notice·result, 탭하면 G2), 응답 재전송은 같은 키. 요청 목록은 화면을 열 때 서버에서 읽는다(오프라인 사본 `alert_cache`는 두지 않음). G2의 "📞 엄마께 전화하기"는 전화번호를 받는 곳이 없어(data-model에 없음) 넣지 않음. 시니어가 시스템 창에서 취소한 것(declined)은 지금처럼 다시 지울 수 있게 두고 서버에 보내지 않음
 - [x] T055a [US4] 연락 끊김 경고 (F6, 서버 판정·알림은 T053 예약 작업으로 완료) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회. 시니어 6시간 보고 완료(검사 뒤 가족 동기화 작업이 마지막 검사 시도 시각과 알림·사용 기록·알림 접근 권한 상태를 보냄). G1 연락 끊김 문구(서버와 같은 max(보고, 연결 확정)+48시간, 보고를 받은 연결만)·권한 꺼짐 표시(사용 기록·알림), CONTACT_LOST 알림 완료
-- [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
+- [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall — 진행: S2 [지금 지울래요] → `core/packages` AppUninstaller(PackageInstaller.uninstall), 지운 결과(uninstalled·already_removed)는 서버에 보고. 남은 것: 시스템 창에서 취소하면 `declined` 보고와 하루 뒤 1회 재안내(spec US5 시나리오 4, FR-027, data-model `nextNudgeAt`)
 - [ ] T057 [P] 개인정보처리방침 공개 — 지금 판 `docs/privacy-policy.md`(인터넷 권한 없음, 기기 밖 전송 없음 기준). 가족 연결 판 초안 `docs/privacy-policy-family.md`(서버 코드와 대조, 출시 전 `[확인 필요]` 채우고 앱 동작 다시 대조). 공개 주소(GitHub Pages 등)는 확인 후. 서버를 붙이면 다시 고침
 - [x] T058 [P] 공개 고지 화면 (O-S1, FR-041) — 첫 설정 1단계 "폰주치의가 하는 일" (PR #5)
 - [x] T059 [US10] Chrome 사이트 광고 알림 끄기 — 알림 리스너(Chrome 외 알림 즉시 폐기) + 사이트별 기록 + 판정 + 채널 설정 화면 열기 (FR-050~054). 알림 접근 공개 고지는 T058에 포함. 완료: `feature:senior-sites` 알림 리스너(Chrome 4종만, 다른 앱 알림은 내용을 보지 않고 버림), 채널 ID `web:` 에서 사이트 주소 추출, 사이트별 기록(Room 판 3, 문구는 판정에만 쓰고 저장 안 함, 30일), 판정(하루 5번 또는 광고·겁주기 문구 2번 — 임시 기준, 사례 수집 뒤 정함), "○○ 사이트가 광고 알림을 보내고 있어요" 알림 1번 → 탭하면 그 사이트 채널 설정을 바로 열고 돌아오면 "껐어요", 끈 화면을 연 뒤 1분 지나 또 오면 "아직 켜져 있어요" 1번, [괜찮은 사이트예요] 허용 목록, 첫 설정 (선택) 알림 접근 단계, S7 [사이트 광고 알림 보기]. **출시 빌드는 꺼짐**(`SITE_ALERTS_ENABLED=false`, 출시 매니페스트에서 리스너 제거, `./gradlew test`가 확인) — 지금 방침에 알림 접근이 없어서. 가족 연결 판 방침 초안 2·5절에 적어 둠
@@ -87,7 +87,7 @@
 - [ ] T062 원스토어 심사 가이드라인 점검 — 개인정보 보호·보안(처리방침 공개, 접근권한 최소화)과 앱 기능 조항. `QUERY_ALL_PACKAGES`·사용 기록·앱 삭제 요청의 용도 설명, 개인정보처리방침 URL 입력 필요 여부를 ONEconsole 등록 화면에서 확인
 - [ ] T063 Android 개발자 인증(Google) 확인 — 원스토어 안내: 인증 안 한 앱은 2027년부터 Android 기기 설치 제한. 과제 기간 영향과 절차 확인
 - [x] T063a 서버 인증의 App Check 공급자 재검토 — Play Integrity 그대로, Firebase에서 "Google Play 밖에서만 배포" 설정(PLAY_RECOGNIZED 불필요, 최소 기기 무결성). Play Console 없이 Cloud Console에서 API 사용 설정. ADR-0001 보완(2026-11-18)
-- [ ] T064 [US6] 근거 문구 시니어·보호자 2종 적용
+- [ ] T064 [US6] 근거 문구 시니어·보호자 2종 적용 — 진행: 증상 근거는 시니어 S2·보호자 G2 문구가 따로 있음, 보호자 G2는 판정 근거 코드 문구도 보여 줌. 시니어용 설치 시점 근거 문구는 분류기(T050)와 함께
 
 ## 단계 6 — 12~13주차 · 검증·보고
 
