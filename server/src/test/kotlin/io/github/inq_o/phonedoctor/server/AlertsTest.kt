@@ -266,11 +266,11 @@ class ListAlertsTest {
         }
         clock.instant = clock.instant.plusSeconds(60)
         decide(ids[0])
-        // 둘째 요청을 만든 시각 이후에 바뀐 것: 셋째 요청, 결정된 첫 요청
+        // 둘째 요청을 만든 시각부터(같은 시각 포함) 바뀐 것: 둘째·셋째 요청, 결정된 첫 요청
         val t1 = clock.instant.minusSeconds(120)
         assertEquals(listOf(ids[1], ids[2]), items(GUARDIAN, "status=open").map { it.id })
         // 첫 요청은 결정되며 updatedAt이 바뀌어 맨 뒤로
-        assertEquals(listOf(ids[2], ids[0]), items(GUARDIAN, "updatedSince=$t1").map { it.id })
+        assertEquals(listOf(ids[1], ids[2], ids[0]), items(GUARDIAN, "updatedSince=$t1").map { it.id })
 
         val p1 = client.api(Get, "/alerts?pageSize=2", GUARDIAN).json()
         val token = p1.s("nextPageToken")!!
@@ -509,5 +509,60 @@ class AlertReviewFollowupTest {
         val again = client.api(Post, "/devices", SENIOR, """{"role":"protected","fcmToken":"f","appVersionCode":1,"sdkInt":31}""", key = key)
         assertNull(again.headers["Idempotent-Replayed"])
         assertNotEquals(first.s("deviceId"), again.json().s("deviceId"))
+    }
+}
+
+/** PR #14 추가 리뷰에서 나온 경우 */
+class AlertReviewFollowup2Test {
+    @Test
+    fun `updatedSince는 같은 시각도 포함`() = serverTest { clock ->
+        family()
+        val a = created()
+        val r = client.api(Get, "/alerts?updatedSince=${clock.instant}", GUARDIAN).json()
+        assertEquals(listOf(a.id), r["items"]!!.jsonArray.map { it.jsonObject.id })
+    }
+
+    @Test
+    fun `주의 요청에 위험 판정이 오면 판정을 올리고 모두에게 알림`() = serverTest {
+        val (l1, l2) = family(GUARDIAN, G2)
+        val g2 = client.api(Get, "/links", G2).json()["items"]!!.jsonArray[0].jsonObject.o("guardianDevice").s("deviceId")
+        client.api(Patch, "/devices/$g2", G2, """{"notifyCaution":true}""")
+        val a = created(scan(level = "CAUTION"))
+        assertEquals(listOf(l2), a.ids())
+        FakePusher.sent.clear()
+        val up = create(scan(level = "RISK")).contract("Alert")
+        assertEquals(a.id, up.id)
+        assertEquals("RISK", up.o("verdict").s("level"))
+        assertEquals(listOf(l1, l2).sorted(), up.ids())
+        assertEquals(
+            mapOf("fcm-guardian1" to "ALERT_CREATED", "fcm-guardian2" to "ALERT_UPDATED"),
+            FakePusher.sent.associate { it.token to it.data["type"] },
+        )
+    }
+
+    @Test
+    fun `결과는 보호자 응답과 맞아야 함`() = serverTest {
+        family()
+        val allowed = created(scan(versionCode = 1))
+        decide(allowed.id, decision = "allow")
+        outcome(allowed.id, "uninstalled").problem(HttpStatusCode.Conflict, "outcome-mismatch")
+        assertEquals(HttpStatusCode.OK, outcome(allowed.id, "allowed").status)
+        val removed = created(scan(versionCode = 2))
+        decide(removed.id)
+        outcome(removed.id, "allowed").problem(HttpStatusCode.Conflict, "outcome-mismatch")
+        assertEquals(HttpStatusCode.OK, outcome(removed.id, "declined").status)
+    }
+
+    @Test
+    fun `연결 해제와 기기 삭제가 동시에 와도 500이 아님`() = serverTest {
+        repeat(8) { round ->
+            TestDb.reset()
+            val (link) = family()
+            val senior = client.api(Get, "/links", SENIOR).json()["items"]!!.jsonArray[0].jsonObject.o("protectedDevice").s("deviceId")
+            val statuses = coroutineScope {
+                listOf(async { client.api(Delete, "/links/$link", GUARDIAN).status }, async { client.api(Delete, "/devices/$senior", SENIOR).status }).awaitAll()
+            }
+            assertTrue(statuses.all { it == HttpStatusCode.NoContent || it == HttpStatusCode.NotFound }, "round $round: $statuses")
+        }
     }
 }

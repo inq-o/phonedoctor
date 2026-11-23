@@ -212,3 +212,55 @@ class CleanupTest {
         assertEquals(1, ticked().n("deletedCodes"))
     }
 }
+
+/** PR #14 추가 리뷰에서 나온 경우 */
+class TickReviewFollowupTest {
+    @Test
+    fun `예약 작업이 늦게 불려도 만료된 요청에는 재알림 없음`() = serverTest { clock ->
+        pair()
+        newAlert()
+        clock.instant = clock.instant.plus(Duration.ofDays(8))
+        val r = ticked()
+        assertEquals(1, r.n("expired"))
+        assertEquals(0, r.n("reminded"))
+        assertEquals(0, FakePusher.types().count { it == "ALERT_REMINDER" })
+    }
+
+    @Test
+    fun `알림 뒤 늦게 도착한 옛 보고가 다음 연락 끊김 알림을 막지 않음`() = serverTest { clock ->
+        val senior = pair()
+        val t0 = clock.instant
+        clock.instant = t0.plus(Duration.ofHours(48))
+        assertEquals(1, ticked().n("contactLost"))
+        // 1시간 뒤, 끊기기 전(47시간째)에 검사한 보고가 늦게 올라옴
+        clock.instant = t0.plus(Duration.ofHours(49))
+        client.api(Put, "/devices/$senior/status", body = """{"checkedAt":"${t0.plus(Duration.ofHours(47))}","protection":{"notifications":true,"usageAccess":true,"notificationListener":true}}""")
+        clock.instant = t0.plus(Duration.ofHours(47 + 48))
+        assertEquals(1, ticked().n("contactLost"))
+        assertEquals(2, FakePusher.types().count { it == "CONTACT_LOST" })
+    }
+
+    @Test
+    fun `새로 연결한 보호자는 시니어의 옛 보고 때문에 바로 연락 끊김을 받지 않음`() = serverTest { clock ->
+        val senior = pair()
+        client.api(Put, "/devices/$senior/status", body = """{"checkedAt":"${clock.instant}","protection":{"notifications":true,"usageAccess":true,"notificationListener":true}}""")
+        clock.instant = clock.instant.plus(Duration.ofDays(3))
+        ticked() // 기존 보호자에게는 알림
+        FakePusher.sent.clear()
+        join("id:guardian2:google:박보호", "guardian")
+        val code = client.api(Post, "/pairing-codes", SENIOR).json()["code"]!!.jsonPrimitive.content
+        val l2 = client.api(Post, "/pairing-codes/$code/accept", "id:guardian2:google:박보호").json()["linkId"]!!.jsonPrimitive.content
+        client.api(Post, "/links/$l2/confirm", SENIOR)
+        FakePusher.sent.clear()
+        assertEquals(0, ticked().n("contactLost"))
+        clock.instant = clock.instant.plus(Duration.ofHours(48))
+        assertEquals(1, ticked().n("contactLost"))
+        assertEquals("fcm-guardian2", FakePusher.sent.single { it.data["type"] == "CONTACT_LOST" }.token)
+    }
+
+    @Test
+    fun `형식이 깨진 Scheduler 토큰은 401로 (500 아님)`() {
+        val auth = GoogleOidcAuth("https://x/internal/tick", "s@x")
+        for (t in listOf("garbage", "a.b", "%%%.%%%.%%%")) assertEquals(false, auth.verify(t), t)
+    }
+}

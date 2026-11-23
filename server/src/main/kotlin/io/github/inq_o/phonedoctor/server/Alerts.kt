@@ -21,6 +21,7 @@ import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.core.exists
 import org.jetbrains.exposed.v1.core.greater
+import org.jetbrains.exposed.v1.core.greaterEq
 import org.jetbrains.exposed.v1.core.inList
 import org.jetbrains.exposed.v1.core.inSubQuery
 import org.jetbrains.exposed.v1.core.not
@@ -413,18 +414,20 @@ fun Route.alertRoutes(deps: Deps) {
                     return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> alertPush(view, g) }, alertId)
                 }
 
-                // 열린 요청에 합치기: 없던 근거는 붙이고, 증상 근거는 더 최신일 때만 바꾼다. verdict·source·kind는 처음 값
+                // 열린 요청에 합치기: 없던 근거는 붙이고, 증상 근거는 더 최신일 때만, 판정은 단계가 올라갈 때만 바꾼다. source·kind는 처음 값
                 val alertId = open[Alerts.alertId]
-                val addVerdict = open[Alerts.verdict] == null && body.verdict != null
+                // 판정은 없던 것을 붙이거나 단계가 올라갈 때(주의 → 위험)만 바꾼다. 다시 내려가거나 같은 단계면 처음 값
+                val oldVerdict = open[Alerts.verdict]
+                val newVerdict = body.verdict?.takeIf { oldVerdict == null || it.level > oldVerdict.level }
                 val oldSymptom = open[Alerts.symptom]
                 val newSymptom = body.symptom?.takeIf { oldSymptom == null || it.newerThan(oldSymptom) }
                 val already = AlertLinks.select(AlertLinks.linkId).where { AlertLinks.alertId eq alertId }.map { it[AlertLinks.linkId] }.toSet()
                 // 요청 뒤에 연결됐거나 이번 근거로 받을 대상이 된 보호자 (예: "주의" 요청에 증상 근거가 붙음)
                 val added = eligible.filter { it.first !in already }
-                val evidenceChanged = addVerdict || newSymptom != null
+                val evidenceChanged = newVerdict != null || newSymptom != null
                 if (evidenceChanged || added.isNotEmpty()) {
                     Alerts.update({ Alerts.alertId eq alertId }) {
-                        if (addVerdict) it[verdict] = body.verdict
+                        if (newVerdict != null) it[verdict] = newVerdict
                         if (newSymptom != null) it[symptom] = newSymptom
                         it[updatedAt] = now.utc()
                     }
@@ -470,7 +473,8 @@ fun Route.alertRoutes(deps: Deps) {
                         Alerts.alertId inSubQuery visibleToGuardian(myId)
                     }
                     if (status != null) where = where and (Alerts.status eq status.db)
-                    if (since != null) where = where and (Alerts.updatedAt greater since.utc())
+                    // 같은 시각 포함: 같은 ms에 바뀐 다른 요청을 놓치지 않게. 이미 받은 요청이 다시 올 수 있어 앱은 alertId로 덮어쓴다
+                    if (since != null) where = where and (Alerts.updatedAt greaterEq since.utc())
                     if (after != null) {
                         val (t, id) = after
                         where = where and ((Alerts.updatedAt greater t.utc()) or ((Alerts.updatedAt eq t.utc()) and (Alerts.alertId greater id)))
@@ -573,7 +577,17 @@ fun Route.alertRoutes(deps: Deps) {
                         AlertStatus.OPEN -> if (body.outcome != OutcomeType.ALREADY_REMOVED) {
                             throw ApiProblem(HttpStatusCode.Conflict, "not-decided", "보호자 응답 전", "응답 전에는 already_removed만 보고함")
                         }
-                        AlertStatus.DECIDED -> Unit
+                        AlertStatus.DECIDED -> {
+                            // 보호자 응답과 맞는 결과만: 허용 → allowed(또는 그사이 직접 지움), 삭제 권유 → 지움·취소·이미 지움·정지
+                            val decided = DecisionType.of(row[Alerts.decision]!!)
+                            val fits = when (decided) {
+                                DecisionType.ALLOW -> body.outcome in setOf(OutcomeType.ALLOWED, OutcomeType.ALREADY_REMOVED)
+                                DecisionType.RECOMMEND_UNINSTALL -> body.outcome != OutcomeType.ALLOWED
+                            }
+                            if (!fits) {
+                                throw ApiProblem(HttpStatusCode.Conflict, "outcome-mismatch", "보호자 응답과 맞지 않는 결과", "응답: ${decided.db}, 결과: ${body.outcome.db}")
+                            }
+                        }
                     }
                     val now = deps.now()
                     Alerts.update({ Alerts.alertId eq alertId }) {

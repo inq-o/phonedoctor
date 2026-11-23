@@ -8,9 +8,12 @@ import io.ktor.server.routing.post
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import org.jetbrains.exposed.v1.core.Expression
 import org.jetbrains.exposed.v1.core.JoinType
+import org.jetbrains.exposed.v1.core.ResultRow
 import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.core.greater
 import org.jetbrains.exposed.v1.core.isNotNull
 import org.jetbrains.exposed.v1.core.isNull
 import org.jetbrains.exposed.v1.core.less
@@ -23,6 +26,7 @@ import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import java.time.Duration
+import java.time.Instant
 
 /** 예약 작업 호출 인증. 운영은 Cloud Scheduler의 OIDC 토큰, 시험은 가짜 */
 fun interface SchedulerAuth {
@@ -40,6 +44,9 @@ class GoogleOidcAuth(private val audience: String, private val serviceAccount: S
         val payload = verifier.verify(bearer).payload
         payload["email"] == serviceAccount && payload["email_verified"] == true
     } catch (_: GoogleTokenVerifier.VerificationException) {
+        false
+    } catch (_: IllegalArgumentException) {
+        // 점이 없거나 base64가 아닌 등 형식이 깨진 토큰 (JsonWebSignature.parse). 500이 아니라 401로
         false
     }
 }
@@ -62,17 +69,36 @@ val DEVICE_DELETE_AFTER: Duration = Duration.ofDays(180)
 
 /**
  * 시간이 지나 생기는 일을 한 번에 처리한다. Cloud Scheduler가 15분마다 부른다 (README 배포 절).
+ * 단계마다 트랜잭션을 커밋한 뒤 바로 그 단계의 푸시를 보낸다: 뒤 단계가 실패해도 이미 표시를 바꾼(커밋한) 앞 단계의 푸시는 나간다.
  * 겹쳐 불려도(재시도) 같은 푸시가 두 번 가지 않게 대상 행을 잠그고 같은 트랜잭션에서 표시를 바꾼다.
- * 푸시는 커밋 뒤에 보낸다
+ * 푸시는 최대 1번이다(보낸 직후 서버가 죽으면 다시 보내지 않음). 앱이 목록을 당겨 와 보완한다 (push-messages.md §1)
  */
 fun runTick(deps: Deps): TickResult {
     val now = deps.now()
-    val pushes = mutableListOf<Push>()
 
-    // 1. 보호자 재알림 (FR-026, 24시간 무응답 1회). 응답과 동시에 와도 요청 행 잠금으로 하나씩
-    val reminded = transaction(deps.db) {
+    /** [block]을 커밋하고 그 단계의 푸시를 보낸다 */
+    fun <T> step(block: (MutableList<Push>) -> T): T {
+        val pushes = mutableListOf<Push>()
+        val result = transaction(deps.db) { block(pushes) }
+        deps.sendAll(pushes)
+        return result
+    }
+
+    // 1. 7일 무응답 → expired (FR-023). 앱은 목록을 당겨 올 때 반영 (푸시 없음)
+    val expired = step {
+        Alerts.update({ (Alerts.status eq AlertStatus.OPEN.db) and (Alerts.expiresAt lessEq now.utc()) }) {
+            it[status] = AlertStatus.EXPIRED.db
+            it[remindAt] = null
+            it[updatedAt] = now.utc()
+        }
+    }
+
+    // 2. 보호자 재알림 (FR-026, 24시간 무응답 1회). 만료 처리 뒤에 해, 예약 작업이 늦게 불려도 만료된 요청에는 보내지 않는다.
+    //    응답과 동시에 와도 요청 행 잠금으로 하나씩
+    val reminded = step { pushes ->
         val due = Alerts.selectAll().where {
-            (Alerts.status eq AlertStatus.OPEN.db) and Alerts.remindAt.isNotNull() and (Alerts.remindAt lessEq now.utc())
+            (Alerts.status eq AlertStatus.OPEN.db) and Alerts.remindAt.isNotNull() and (Alerts.remindAt lessEq now.utc()) and
+                (Alerts.expiresAt greater now.utc())
         }.forUpdate(ForUpdateOption.ForUpdate).map { it[Alerts.alertId] }
         for (id in due) {
             Alerts.update({ Alerts.alertId eq id }) { it[remindAt] = null }
@@ -82,33 +108,30 @@ fun runTick(deps: Deps): TickResult {
         due.size
     }
 
-    // 2. 7일 무응답 → expired (FR-023). 앱은 목록을 당겨 올 때 반영 (푸시 없음)
-    val expired = transaction(deps.db) {
-        Alerts.update({ (Alerts.status eq AlertStatus.OPEN.db) and (Alerts.expiresAt lessEq now.utc()) }) {
-            it[status] = AlertStatus.EXPIRED.db
-            it[remindAt] = null
-            it[updatedAt] = now.utc()
-        }
-    }
-
     // 3. 보관 기간(생성 + 90일)이 지난 요청 삭제 (NFR-09)
-    val deletedAlerts = transaction(deps.db) { Alerts.deleteWhere { Alerts.deleteAt lessEq now.utc() } }
+    val deletedAlerts = step { Alerts.deleteWhere { Alerts.deleteAt lessEq now.utc() } }
 
-    // 4. 연락 끊김 (F6): 확정된 연결에서 마지막 검사 보고(없으면 연결 확정 시각)가 48시간 넘게 없으면 보호자에게 1번.
-    //    알린 뒤 새 보고가 오면 다음 끊김 때 다시 알린다
-    val contactLost = transaction(deps.db) {
-        val rows = Links.join(Devices, JoinType.INNER, Links.protectedDeviceId, Devices.deviceId)
-            .select(Links.linkId, Links.guardianDeviceId, Links.activatedAt, Links.contactLostAt, Devices.lastCheckedAt, Devices.displayName)
-            .where { Links.status eq LinkStatus.ACTIVE.db }
-            .forUpdate(ForUpdateOption.ForUpdate)
-            .toList()
+    // 4. 연락 끊김 (F6): 확정된 연결에서 기준 시각 = max(마지막 검사 보고, 연결 확정)이 48시간 넘게 지났으면 보호자에게 1번.
+    //    알린 기준 시각을 남겨, 기준이 바뀐 뒤(새 보고가 옴) 다시 끊기면 또 알린다
+    val contactLost = step { pushes ->
+        fun baseline(lastChecked: java.time.OffsetDateTime?, activated: java.time.OffsetDateTime?): Instant =
+            listOfNotNull(lastChecked?.toInstant(), activated?.toInstant()).max()
+        fun due(r: ResultRow): Boolean {
+            val since = baseline(r[Devices.lastCheckedAt], r[Links.activatedAt])
+            val notified = r[Links.contactLostBaseline]?.toInstant()
+            return since.plus(CONTACT_LOST_AFTER) <= now && (notified == null || since > notified)
+        }
+        val join = Links.join(Devices, JoinType.INNER, Links.protectedDeviceId, Devices.deviceId)
+        val columns = listOf<Expression<*>>(Links.linkId, Links.guardianDeviceId, Links.activatedAt, Links.contactLostBaseline, Devices.lastCheckedAt, Devices.displayName)
+        // 후보는 잠그지 않고 고른 뒤, 그 연결 행만 ID 순으로 잠그고 다시 확인한다.
+        // 시니어 기기까지 잠그면 연결 해제(시니어 기기 → 연결 순)와 순서가 엇갈려 교착할 수 있고, 모든 연결을 잠그면 15분마다 확정·해제가 막힌다
+        val candidates = join.select(columns).where { Links.status eq LinkStatus.ACTIVE.db }.filter(::due).map { it[Links.linkId] }.sorted()
         var n = 0
-        for (r in rows) {
-            val since = r[Devices.lastCheckedAt]?.toInstant() ?: r[Links.activatedAt]!!.toInstant()
-            val notified = r[Links.contactLostAt]?.toInstant()
-            if (since.plus(CONTACT_LOST_AFTER) > now || (notified != null && notified >= since)) continue
-            val linkId = r[Links.linkId]
-            Links.update({ Links.linkId eq linkId }) { it[contactLostAt] = now.utc() }
+        for (linkId in candidates) {
+            val r = join.select(columns).where { (Links.linkId eq linkId) and (Links.status eq LinkStatus.ACTIVE.db) }
+                .forUpdate(ForUpdateOption.PostgreSQL.ForUpdate(null, Links)).singleOrNull() ?: continue
+            if (!due(r)) continue
+            Links.update({ Links.linkId eq linkId }) { it[contactLostBaseline] = baseline(r[Devices.lastCheckedAt], r[Links.activatedAt]).utc() }
             pushes += PushType.CONTACT_LOST.to(fcmToken(r[Links.guardianDeviceId]), "linkId" to linkId, "protectedName" to r[Devices.displayName])
             n++
         }
@@ -116,22 +139,21 @@ fun runTick(deps: Deps): TickResult {
     }
 
     // 5. 오래 접속하지 않은 기기 삭제 (data-model §2, 마지막 접속 180일). 연결 상대에게 LINK_REVOKED
-    val deletedDevices = transaction(deps.db) {
+    val deletedDevices = step { pushes ->
         val cutoff = now.minus(DEVICE_DELETE_AFTER).utc()
         val stale = Devices.select(Devices.deviceId).where {
             (Devices.lastSeenAt less cutoff) or (Devices.lastSeenAt.isNull() and (Devices.createdAt less cutoff))
-        }.forUpdate(ForUpdateOption.ForUpdate).map { it[Devices.deviceId] }
+        }.orderBy(Devices.deviceId).forUpdate(ForUpdateOption.ForUpdate).map { it[Devices.deviceId] }
         stale.forEach { pushes += deleteDevice(it) }
         stale.size
     }
 
     // 6. 만료 1시간 지난 연결 코드, 1분 지난 코드 입력 시도
-    val deletedCodes = transaction(deps.db) {
+    val deletedCodes = step {
         PairingAttempts.deleteWhere { PairingAttempts.attemptedAt less now.minus(Duration.ofMinutes(1)).utc() }
         PairingCodes.deleteWhere { PairingCodes.expiresAt less now.minus(CODE_KEEP_AFTER_EXPIRY).utc() }
     }
 
-    deps.sendAll(pushes)
     return TickResult(reminded, expired, deletedAlerts, contactLost, deletedDevices, deletedCodes)
 }
 

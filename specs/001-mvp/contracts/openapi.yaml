@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: 폰주치의 API
-  version: 0.5.2
+  version: 0.5.3
   summary: 시니어 기기 ↔ 보호자 기기 승인 요청 중계 API
   description: |
     - 판정은 기기 안에서 끝남. 서버는 연결(Link), 승인 요청(Alert), 모델 배포만 담당 (constitution IV)
@@ -280,7 +280,8 @@ paths:
         - `source = symptom`: 증상 감지 기준을 넘은 앱 (FR-010). `symptom` 근거 필수, `verdict`는 설치 시점 판정이 있으면 함께
         - 출처와 상관없이 같은 (packageName, signingCertSha256, versionCode)의 open 요청이 있으면 새로 만들지 않고 기존 것을 반환 (200)
           - 기존 요청에 없는 근거가 오면(예: `install_scan` 요청에 나중에 `symptom`) 그 근거를 붙이고 `updatedAt`을 갱신한 뒤 보호자 전원에게 ALERT_UPDATED 푸시. `source`는 처음 출처 그대로
-          - 이미 `symptom` 근거가 있으면 받은 값이 더 최신일 때만((date, count) 순서로 비교) 통째로 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED(알림 없음). 오래된 값(재전송 순서 뒤바뀜)은 무시. `verdict`는 덮어쓰지 않음
+          - 이미 `symptom` 근거가 있으면 받은 값이 더 최신일 때만((date, count) 순서로 비교) 통째로 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED(알림 없음). 오래된 값(재전송 순서 뒤바뀜)은 무시
+          - `verdict`는 없던 것을 붙이거나 단계가 올라갈 때(CAUTION → RISK)만 바꾸고 `updatedAt` 갱신 + 보호자 전원에게 ALERT_UPDATED. 같거나 낮은 단계는 무시
           - `kind`도 처음 값 그대로
         - `kind = notice`: 보호자가 허용한 앱(FR-007)이 증상 기준을 넘음. `source = symptom`만. 보호자 전원에게 ALERT_CREATED 대신 ALERT_NOTICE 푸시, 재알림(`remindAt`) 없음, 7일 뒤 expired. 같은 (packageName, signingCertSha256, versionCode) 조합당 1번(열린 요청 식별 조건과 같음)은 시니어 기기가 지킴
         - 받는 보호자 = 지금 active인 연결. 증상 근거 없이 설치 시점 CAUTION만 있으면 "주의 단계도 받기"(`notifyCaution`)를 켠 보호자만. 받는 연결은 `linkIds`에 남고, 그 보호자만 요청을 봄
@@ -328,7 +329,7 @@ paths:
           schema: { $ref: '#/components/schemas/AlertStatus' }
         - name: updatedSince
           in: query
-          description: 이 시각 이후 변경분만 (동기화용)
+          description: 이 시각 이후 변경분만 (동기화용). 같은 시각도 포함하므로(같은 ms에 바뀐 다른 요청을 놓치지 않게) 이미 받은 요청이 다시 올 수 있음 — `alertId`로 덮어쓰기
           schema: { type: string, format: date-time }
         - name: pageToken
           in: query
@@ -420,6 +421,7 @@ paths:
       summary: (시니어) 처리 결과 보고 → 보호자에게 ALERT_RESOLVED 푸시
       description: |
         - 보호자 응답 전(open)에는 `already_removed`만 (data-model §2 상태 전이). 다른 결과는 409 (type = .../problems/not-decided)
+        - 응답과 맞는 결과만: `allow` → `allowed`·`already_removed`, `recommend_uninstall` → `allowed` 밖의 결과. 어긋나면 409 (type = .../problems/outcome-mismatch)
         - 이미 resolved면 같은 결과는 200(재전송, 푸시 없음), 다른 결과·만료된 요청은 409 (type = .../problems/alert-closed)
         - `occurredAt`은 서버 시각을 넘지 않게 자름
       parameters:

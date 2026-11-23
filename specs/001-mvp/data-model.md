@@ -36,7 +36,7 @@ erDiagram
       timestamp createdAt
       timestamp activatedAt
       timestamp revokedAt
-      timestamp contactLostAt "연락 끊김(F6) 알림 보낸 시각"
+      timestamp contactLostBaseline "연락 끊김(F6)을 알린 기준 시각 max(lastCheckedAt, activatedAt)"
     }
     PAIRING_CODE {
       string code PK "6자리, 10분"

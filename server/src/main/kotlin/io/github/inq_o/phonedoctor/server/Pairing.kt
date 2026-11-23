@@ -270,8 +270,11 @@ fun Route.pairingRoutes(deps: Deps) {
                         ?.get(Links.protectedDeviceId) ?: throw notFound("연결 없음")
                     // 잠금 순서: 시니어 기기 → 연결 → 요청 (요청 생성과 같음). 해제와 생성, 두 보호자의 동시 해제가 하나씩 처리돼
                     // 해제된 연결에 요청이 붙거나 받은 연결이 없는 요청이 남지 않는다
-                    Devices.selectAll().where { Devices.deviceId eq protectedId }.forUpdate(ForUpdateOption.ForUpdate).single()
-                    val row = Links.selectAll().where { Links.linkId eq linkId }.forUpdate(ForUpdateOption.ForUpdate).single()
+                    // 그사이 기기 삭제로 연결이 지워졌으면 404 (500이 아니라)
+                    Devices.selectAll().where { Devices.deviceId eq protectedId }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
+                        ?: throw notFound("연결 없음")
+                    val row = Links.selectAll().where { Links.linkId eq linkId }.forUpdate(ForUpdateOption.ForUpdate).singleOrNull()
+                        ?: throw notFound("연결 없음")
                     val myId = me[Devices.deviceId]
                     if (myId != row[Links.protectedDeviceId] && myId != row[Links.guardianDeviceId]) throw forbidden("내 연결이 아님")
                     if (row[Links.status] == LinkStatus.REVOKED.db) return@transaction emptyList()
