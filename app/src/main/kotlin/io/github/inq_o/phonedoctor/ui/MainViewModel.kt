@@ -8,6 +8,7 @@ import io.github.inq_o.phonedoctor.core.data.ScanScheduler
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import io.github.inq_o.phonedoctor.core.data.isGuardianPhone
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -107,6 +108,16 @@ class MainViewModel @Inject constructor(
     fun onAppOpened() {
         viewModelScope.launch {
             if (start.filterNotNull().first() == StartScreen.SENIOR_HOME) scheduler.scanNow("app_open")
+        }
+        // 앱이 업데이트됐으면 서버의 기기 정보를 고친다 (등록한 폰만, 실패하면 다음에 열 때)
+        viewModelScope.launch {
+            try {
+                family.reportAppVersion()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // 다음에
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package io.github.inq_o.phonedoctor.feature.guardian.impl
 
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.model.PairingCode
@@ -72,6 +73,7 @@ internal class FakeFamily : FamilyRepository {
     override suspend fun confirmLink(linkId: String): FamilyLink = error("보호자 화면에서 부르지 않음")
     override suspend fun updatePushToken(token: String) = Unit
     override suspend fun deleteAllData() = Unit
+    override suspend fun reportAppVersion() = Unit
 }
 
 internal class FakeNotifier : Notifier {
@@ -79,6 +81,7 @@ internal class FakeNotifier : Notifier {
     override fun canNotify() = true
     override fun notifyAlert(alert: SymptomAlert) = Unit
     override fun cancelAlert(alertId: Long) = Unit
+    override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
     override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
     override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
     override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit

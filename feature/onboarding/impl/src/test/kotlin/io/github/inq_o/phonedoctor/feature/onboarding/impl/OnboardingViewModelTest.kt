@@ -5,6 +5,7 @@ import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.ScanScheduler
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.PairingCode
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
@@ -119,6 +120,7 @@ class OnboardingViewModelTest {
         override fun canNotify() = true
         override fun notifyAlert(alert: SymptomAlert) = Unit
         override fun cancelAlert(alertId: Long) = Unit
+        override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
         override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
         override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
@@ -137,5 +139,6 @@ class OnboardingViewModelTest {
         override suspend fun revokeLink(linkId: String) = error("부르지 않음")
         override suspend fun updatePushToken(token: String) = error("부르지 않음")
         override suspend fun deleteAllData() = error("부르지 않음")
+        override suspend fun reportAppVersion() = Unit
     }
 }

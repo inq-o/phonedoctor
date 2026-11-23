@@ -21,6 +21,29 @@ enum class AlertOutcome {
 
     /** 앱이 업데이트돼 근거를 모은 판과 달라짐. 새 판은 새로 센다 */
     VERSION_CHANGED,
+
+    /** 보호자가 [괜찮은 앱이에요]로 허용함 (FR-007). 같은 판은 다시 묻지 않는다 */
+    ALLOWED,
+}
+
+/** approval = 보호자에게 승인 요청 / notice = 보호자가 허용한 앱이 다시 기준을 넘었다는 알림 전용 (FR-007) */
+enum class AlertKind { APPROVAL, NOTICE }
+
+/** 보호자의 응답 (US4) */
+enum class FamilyDecision { RECOMMEND_UNINSTALL, ALLOW }
+
+/**
+ * 가족에게 보낸 요청의 상태. 가족과 연결한 시니어 폰에서 서버가 요청을 받은 뒤에만 있다.
+ * [answered]가 false면 보호자 답을 기다리는 중
+ */
+data class AlertFamilyState(
+    val decision: FamilyDecision?,
+    val guardianName: String?,
+    val messageToSenior: String?,
+    /** 서버 요청이 응답 없이 끝남(만료 등). 기다리지 않는다 */
+    val closed: Boolean,
+) {
+    val waiting: Boolean get() = decision == null && !closed
 }
 
 /** 앱별 하루 앱 밖 광고 추정 횟수 (검사 기록 화면용) */
@@ -44,4 +67,7 @@ data class SymptomAlert(
     val detectorVersion: String,
     val createdAt: Long,
     val updatedAt: Long,
+    val kind: AlertKind = AlertKind.APPROVAL,
+    /** 가족에게 보낸 요청이면 그 상태. 연결 전이거나 아직 보내지 못했으면 null */
+    val family: AlertFamilyState? = null,
 )

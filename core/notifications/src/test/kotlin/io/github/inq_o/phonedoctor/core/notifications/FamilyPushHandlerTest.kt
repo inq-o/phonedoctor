@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.core.notifications
 
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -47,6 +48,7 @@ class FamilyPushHandlerTest {
         override fun canNotify() = true
         override fun notifyAlert(alert: SymptomAlert) = Unit
         override fun cancelAlert(alertId: Long) = Unit
+        override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
         override fun notifyLinkRequested(linkId: String, guardianName: String?) {
             calls += "requested:$linkId:$guardianName"
         }

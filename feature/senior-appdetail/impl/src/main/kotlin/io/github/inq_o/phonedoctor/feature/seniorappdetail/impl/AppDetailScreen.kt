@@ -28,8 +28,10 @@ import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusCircle
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusKind
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
+import io.github.inq_o.phonedoctor.core.model.AlertFamilyState
 import io.github.inq_o.phonedoctor.core.model.AlertStatus
 import io.github.inq_o.phonedoctor.core.model.AppIdentity
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.Josa
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
@@ -66,8 +68,13 @@ internal fun AppDetailScreen(
         actions = {
             when {
                 state is AppDetailUiState.Loading -> Unit
-                state is AppDetailUiState.Gone || removed ->
+                state is AppDetailUiState.Gone || state is AppDetailUiState.Allowed || removed ->
                     PdPrimaryButton(stringResource(R.string.feature_senior_appdetail_impl_home), onBack)
+                // 가족 답을 기다리는 동안은 빨간 버튼 대신 테두리 버튼으로 (지우라고 재촉하지 않되, 본인이 정할 수 있게)
+                state is AppDetailUiState.Ready && state.waitingForFamily -> {
+                    PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack)
+                    PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_uninstall_now), onUninstall)
+                }
                 state is AppDetailUiState.Ready -> {
                     PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack)
                     PdPrimaryButton(
@@ -94,6 +101,14 @@ internal fun AppDetailScreen(
                 Headline(stringResource(R.string.feature_senior_appdetail_impl_gone_title))
                 Body(stringResource(R.string.feature_senior_appdetail_impl_gone_body), center = true)
             }
+            is AppDetailUiState.Allowed -> {
+                StatusCircle(StatusKind.OK)
+                Headline(stringResource(R.string.feature_senior_appdetail_impl_allowed_title))
+                Body(
+                    stringResource(R.string.feature_senior_appdetail_impl_allowed_body, guardian(state.guardianName)),
+                    center = true,
+                )
+            }
             is AppDetailUiState.Ready ->
                 if (removed) {
                     StatusCircle(StatusKind.OK)
@@ -102,6 +117,20 @@ internal fun AppDetailScreen(
                 } else {
                     AppIcon(state.alert.app.packageName, size = 96.dp)
                     Headline(state.alert.label)
+                    val family = state.alert.family
+                    if (state.familyRecommends && family != null) {
+                        // 보호자가 지우자고 함 + 한마디 (ux-flows S2 "💬 민지(딸)")
+                        Notice(
+                            stringResource(R.string.feature_senior_appdetail_impl_family_recommends, guardian(family.guardianName)),
+                            family.messageToSenior?.takeIf { it.isNotBlank() }?.let { "“$it”" }.orEmpty(),
+                        )
+                    } else if (state.waitingForFamily) {
+                        Notice(
+                            stringResource(R.string.feature_senior_appdetail_impl_family_waiting_title),
+                            stringResource(R.string.feature_senior_appdetail_impl_family_waiting_body),
+                            emphasis = false,
+                        )
+                    }
                     when (state.phase) {
                         UninstallPhase.STILL_INSTALLED -> {
                             Notice(
@@ -169,19 +198,27 @@ private fun Body(text: String, center: Boolean = false) {
     Spacer(Modifier.height(12.dp))
 }
 
-/** 삭제가 끝나지 않았을 때의 안내. 화면 낭독이 바뀐 내용을 읽어 준다 */
+/**
+ * 눈에 띄게 알릴 문장 (삭제가 안 끝남, 가족 소식). 화면 낭독이 바뀐 내용을 읽어 준다.
+ * [emphasis]가 false면 빨간 글자를 쓰지 않는다 (기다리는 중은 경고가 아님)
+ */
 @Composable
-private fun Notice(title: String, body: String) {
+private fun Notice(title: String, body: String, emphasis: Boolean = true) {
     Text(
         text = title,
         style = MaterialTheme.typography.titleLarge,
-        color = MaterialTheme.colorScheme.error,
+        color = if (emphasis) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onBackground,
         modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
     )
     Spacer(Modifier.height(4.dp))
-    Body(body)
+    if (body.isNotEmpty()) Body(body)
     Spacer(Modifier.height(8.dp))
 }
+
+/** 보호자 이름. 비었으면 "가족" */
+@Composable
+private fun guardian(name: String?): String =
+    name?.trim()?.ifEmpty { null } ?: stringResource(R.string.feature_senior_appdetail_impl_family_fallback)
 
 private val PreviewAlert = SymptomAlert(
     1, AppIdentity("com.example.cleaner", "00", 1), "초고속 클리너", AlertStatus.OPEN, null,
@@ -198,6 +235,20 @@ private fun ReadyPreview() {
 @Composable
 private fun StillInstalledLargeFontPreview() {
     PhoneDoctorTheme { AppDetailScreen(AppDetailUiState.Ready(PreviewAlert, UninstallPhase.STILL_INSTALLED), {}, {}) }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 720)
+@Composable
+private fun FamilyRecommendsPreview() {
+    val alert = PreviewAlert.copy(family = AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", "엄마 이거 광고 앱이에요", closed = false))
+    PhoneDoctorTheme { AppDetailScreen(AppDetailUiState.Ready(alert, UninstallPhase.IDLE), {}, {}) }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 720, fontScale = 2f)
+@Composable
+private fun FamilyWaitingLargeFontPreview() {
+    val alert = PreviewAlert.copy(family = AlertFamilyState(null, null, null, closed = false))
+    PhoneDoctorTheme { AppDetailScreen(AppDetailUiState.Ready(alert, UninstallPhase.IDLE), {}, {}) }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 720)

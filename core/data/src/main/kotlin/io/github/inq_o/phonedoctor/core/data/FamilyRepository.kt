@@ -61,6 +61,9 @@ interface FamilyRepository {
     /** 연결 끊기 (F4). 시니어·보호자 모두 */
     suspend fun revokeLink(linkId: String)
 
+    /** 앱이 업데이트됐으면 서버의 기기 정보(appVersionCode)를 고친다. 등록 전이면 아무것도 안 한다 */
+    suspend fun reportAppVersion()
+
     /** FCM 토큰이 바뀌었을 때. 등록 전이면 아무것도 안 한다(다음 등록 때 새 토큰을 보냄) */
     suspend fun updatePushToken(token: String)
 
@@ -130,6 +133,7 @@ internal class DefaultFamilyRepository @Inject constructor(
     private val account: FamilyAccount,
     private val pushTokens: PushTokens,
     private val deviceInfo: DeviceInfo,
+    private val linkEvents: FamilyLinkEvents,
 ) : FamilyRepository {
     /**
      * 서버를 바꾸는 동작은 하나씩. 등록이 겹치거나, 코드 받기를 두 번 눌러 뒤늦게 온 응답(서버가 이미 폐기한 코드)이 화면에 남거나,
@@ -176,11 +180,27 @@ internal class DefaultFamilyRepository @Inject constructor(
     override suspend fun confirmLink(linkId: String): FamilyLink = serialized {
         requireRegistered()
         forgettingGoneDevice { withKey("confirm:$linkId") { network.confirmLink(it, linkId) } }.toModel()
+            .also { linkEvents.onLinkConfirmed() }
     }
 
     override suspend fun revokeLink(linkId: String) = serialized {
         requireRegistered()
         forgettingGoneDevice { network.revokeLink(linkId) }
+    }
+
+    override suspend fun reportAppVersion() {
+        if (!available) return
+        mutex.withLock {
+            val device = registered() ?: return
+            val version = deviceInfo.appVersionCode
+            if (preferences.reportedAppVersion.first() == version) return
+            try {
+                network.updateDevice(device.deviceId, NetworkDeviceUpdate(appVersionCode = version))
+                preferences.setReportedAppVersion(version)
+            } catch (e: ApiException) {
+                if (e.status == 404) forgetDevice() else throw e
+            }
+        }
     }
 
     override suspend fun updatePushToken(token: String) {
@@ -209,6 +229,8 @@ internal class DefaultFamilyRepository @Inject constructor(
             forgetDevice()
         }
         preferences.setPendingRegistrationRole(null)
+        preferences.setReportedAppVersion(null)
+        linkEvents.onDataDeleted()
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()
         account.deleteUser()
@@ -294,6 +316,7 @@ internal class DefaultFamilyRepository @Inject constructor(
         }
         val registered = RegisteredDevice(device.deviceId, role.name)
         preferences.setRegisteredDevice(registered)
+        preferences.setReportedAppVersion(deviceInfo.appVersionCode)
         preferences.setPendingRegistrationRole(null)
         pushTokens.setAutoRefresh(true)
         return registered

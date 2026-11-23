@@ -40,6 +40,10 @@ interface ScanRunDao {
     @Query("SELECT * FROM scan_run WHERE result = :result ORDER BY startedAt DESC, id DESC LIMIT 1")
     fun observeLatest(result: String): Flow<ScanRunEntity?>
 
+    /** 마지막 검사 시도 시각 (결과와 관계없이). 가족에게 "폰주치의가 돌고 있음"을 보고할 때 쓴다 */
+    @Query("SELECT MAX(startedAt) FROM scan_run")
+    suspend fun latestStartedAt(): Long?
+
     @Query("DELETE FROM scan_run WHERE startedAt < :before")
     suspend fun deleteOlderThan(before: Long)
 }

@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.core.data
 import android.util.Log
 import io.github.inq_o.phonedoctor.core.database.AlertLocalDao
 import io.github.inq_o.phonedoctor.core.database.AlertLocalEntity
+import io.github.inq_o.phonedoctor.core.database.AllowEntryDao
 import io.github.inq_o.phonedoctor.core.database.DatabaseTransactions
 import io.github.inq_o.phonedoctor.core.database.DetectorStateDao
 import io.github.inq_o.phonedoctor.core.database.DetectorStateEntity
@@ -43,7 +44,7 @@ data class ScanReport(val run: ScanRun, val opened: List<SymptomAlert>, val clos
 /**
  * 증상 감지 검사 1회 (FR-009~012): 사용 기록 조회 → 판정 → 광고로 센 전환 저장 → 하루 기준 확인.
  * 판정 결과·판정기 상태·확인 요청·검사 기록을 한 트랜잭션으로 저장해, 중간에 죽어도 다시 실행하면 같은 결과가 나온다.
- * 기기 밖으로는 아무것도 보내지 않는다.
+ * 기기 밖으로는 아무것도 보내지 않는다. 가족에게 보낼 것은 표시(needsSync)만 하고 보내기는 FamilyAlertSync가 한다.
  */
 @Singleton
 class SymptomScanner @Inject constructor(
@@ -55,6 +56,7 @@ class SymptomScanner @Inject constructor(
     private val stateDao: DetectorStateDao,
     private val scanRunDao: ScanRunDao,
     private val alertDao: AlertLocalDao,
+    private val allowDao: AllowEntryDao,
 ) {
     private val mutex = Mutex()
     private val scanningFlow = MutableStateFlow(false)
@@ -183,6 +185,8 @@ class SymptomScanner @Inject constructor(
     /** 새 근거가 생긴 앱의 하루 횟수를 기준과 비교한다. 시니어에게 알릴 요청이면 돌려준다 */
     private suspend fun evaluate(app: AppIdentity, firstNewDate: String, now: Long): SymptomAlert? {
         val existing = alertDao.find(app.packageName, app.signingCertSha256, app.versionCode)
+        // 보호자가 괜찮다고 한 판 (FR-007): 시니어에게 묻지 않고, 기준을 넘으면 보호자에게 알림 전용(notice)으로 한 번만 알린다
+        if (allowDao.isAllowed(app.packageName, app.signingCertSha256, app.versionCode)) return notice(app, existing, firstNewDate, now)
         val open = existing?.takeIf { it.status == AlertStatus.OPEN.name }
         val since = open?.openedDate ?: firstNewDate
         val days = symptomDao.dailyCounts(app.packageName, app.signingCertSha256, app.versionCode, since)
@@ -195,7 +199,10 @@ class SymptomScanner @Inject constructor(
             is AlertDecision.Update -> {
                 val e = decision.evidence
                 alertDao.update(
-                    existing!!.copy(date = e.date, count = e.count, days = decision.days, firstAt = e.firstAt, lastAt = e.lastAt, updatedAt = now),
+                    existing!!.copy(
+                        date = e.date, count = e.count, days = decision.days, firstAt = e.firstAt, lastAt = e.lastAt, updatedAt = now,
+                        needsSync = true,
+                    ),
                 )
                 null
             }
@@ -211,10 +218,34 @@ class SymptomScanner @Inject constructor(
                     label = label, status = AlertStatus.OPEN.name, outcome = null, date = e.date, count = e.count,
                     days = decision.days, firstAt = e.firstAt, lastAt = e.lastAt, openedDate = e.date, updatedAt = now,
                     detectorVersion = SymptomPolicy.DETECTOR_VERSION,
-                )
+                ).reopenedForFamily()
                 if (existing == null) entity.copy(id = alertDao.insert(entity)).toModel() else entity.also { alertDao.update(it) }.toModel()
             }
         }
+    }
+
+    /** 허용한 판이 기준을 넘음. 같은 판에 notice를 이미 만들었으면 다시 만들지 않는다 (서버 계약: 조합당 1번은 시니어 기기가 지킴) */
+    private suspend fun notice(app: AppIdentity, existing: AlertLocalEntity?, firstNewDate: String, now: Long): SymptomAlert? {
+        if (existing?.kind == KIND_NOTICE) return null
+        val days = symptomDao.dailyCounts(app.packageName, app.signingCertSha256, app.versionCode, firstNewDate)
+            .map { DayEvidence(it.localDate, it.count, it.firstAt, it.lastAt) }
+        // 허용 뒤에 생긴 근거만 본다
+        val e = days.filter { it.count >= SymptomPolicy.DAILY_THRESHOLD && (existing == null || it.lastAt > existing.updatedAt) }.lastOrNull()
+            ?: return null
+        val label = installedApps.label(app.packageName) ?: existing?.label ?: app.packageName
+        // 시니어 화면의 열린 요청 목록에는 넣지 않는다(닫힌 상태, 결과는 허용)
+        val entity = (existing ?: AlertLocalEntity(
+            packageName = app.packageName, signingCertSha256 = app.signingCertSha256, versionCode = app.versionCode,
+            label = label, source = SOURCE_SYMPTOM, status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name,
+            date = e.date, count = e.count, days = 1, firstAt = e.firstAt, lastAt = e.lastAt,
+            detectorVersion = SymptomPolicy.DETECTOR_VERSION, openedDate = e.date, createdAt = now, updatedAt = now,
+        )).copy(
+            label = label, status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name, date = e.date, count = e.count,
+            days = 1, firstAt = e.firstAt, lastAt = e.lastAt, openedDate = e.date, createdAt = now, updatedAt = now,
+            detectorVersion = SymptomPolicy.DETECTOR_VERSION,
+        ).reopenedForFamily().copy(kind = KIND_NOTICE, outcomeSent = true)
+        if (existing == null) alertDao.insert(entity) else alertDao.update(entity)
+        return null
     }
 
     /**
@@ -231,9 +262,15 @@ class SymptomScanner @Inject constructor(
                 AlertOutcome.VERSION_CHANGED
             }
         }
-        alertDao.update(alert.copy(status = AlertStatus.RESOLVED.name, outcome = outcome.name, updatedAt = now))
+        alertDao.update(alert.copy(status = AlertStatus.RESOLVED.name, outcome = outcome.name, updatedAt = now, needsSync = true))
         alert.id
     }
+
+    /** 다시 열린 요청은 서버에서도 새 요청이다 (예전 요청은 닫혔다). 서버 사본을 비우고 보낼 것으로 표시한다 */
+    private fun AlertLocalEntity.reopenedForFamily() = copy(
+        kind = KIND_APPROVAL, serverAlertId = null, sentDate = null, sentCount = null, serverStatus = null, decision = null,
+        guardianName = null, messageToSenior = null, outcomeSent = false, needsSync = true,
+    )
 
     private data class ScanRunRecord(
         val clock: DeviceClock,

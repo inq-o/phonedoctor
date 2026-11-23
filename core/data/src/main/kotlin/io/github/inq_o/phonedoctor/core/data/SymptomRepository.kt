@@ -51,6 +51,7 @@ class DefaultSymptomRepository @Inject constructor(
     private val symptomDao: SymptomEventDao,
     private val installedApps: InstalledApps,
     scanner: SymptomScanner,
+    private val familySync: FamilySyncScheduler,
 ) : SymptomRepository {
     override val openAlerts: Flow<List<SymptomAlert>> = alertDao.observeOpen().map { list -> list.map { it.toModel() } }
 
@@ -77,7 +78,9 @@ class DefaultSymptomRepository @Inject constructor(
     override suspend fun recordOutcome(id: Long, outcome: AlertOutcome) {
         val alert = alertDao.get(id) ?: return
         val status = if (outcome == AlertOutcome.FAILED) alert.status else AlertStatus.RESOLVED.name
-        alertDao.update(alert.copy(status = status, outcome = outcome.name, updatedAt = System.currentTimeMillis()))
+        alertDao.update(alert.copy(status = status, outcome = outcome.name, updatedAt = System.currentTimeMillis(), needsSync = true))
+        // 가족에게 보낸 요청이면 결과를 알린다 (보내지 않은 요청이면 동기화가 표시만 지운다)
+        if (alert.serverAlertId != null) familySync.schedule()
     }
 
     override suspend fun confirmRemoved(id: Long, requested: Boolean): Boolean? = withContext(Dispatchers.IO) {
