@@ -19,6 +19,8 @@ from check_labels import errors as label_errors
 HEADER = ["package", "tool", "tool_version", "device", "batch", "result", "warning", "scanned"]
 TOOLS = ("citizen_conan", "play_protect")
 RESULTS = {"flagged", "source_only", "clean", "not_scanned"}
+VERSION_OK = {"yes", "no", "unverified"}
+MAX_SPAN_DAYS = 3  # 한 도구는 이 기간 안에 다 잰다 (서버 쪽 정보가 바뀔 수 있음)
 
 
 def errors(rows, sample):
@@ -27,6 +29,7 @@ def errors(rows, sample):
         return [f"헤더가 {HEADER}가 아님: {rows[0] if rows else '빈 파일'}"]
     seen = set()
     versions = defaultdict(set)
+    days = defaultdict(set)
     for n, r in enumerate(rows[1:], start=2):
         if len(r) != len(HEADER):
             out.append(f"{n}행: 열 {len(r)}개 (쉼표가 든 경고 문구는 따옴표로 감쌀 것)")
@@ -53,13 +56,39 @@ def errors(rows, sample):
         try:
             if len(scanned) != 10:
                 raise ValueError
-            date.fromisoformat(scanned)
+            days[tool].add(date.fromisoformat(scanned))
         except ValueError:
             out.append(f"{n}행: scanned {scanned!r}는 YYYY-MM-DD가 아님")
     for tool, vs in versions.items():
         if len(vs) > 1:
             out.append(f"{tool}: 판·기기가 섞임 {sorted(vs)} (한 판·한 기기로 다시 잴 것)")
+    for tool, ds in days.items():
+        if (max(ds) - min(ds)).days > MAX_SPAN_DAYS - 1:
+            out.append(f"{tool}: 검사 날짜가 {min(ds)}~{max(ds)}로 {MAX_SPAN_DAYS}일을 넘음 (한 번에 다시 잴 것)")
     return out
+
+
+def version_errors(rows):
+    """apk_versions.py 결과: package·ok 열, 앱마다 한 줄, ok는 yes/no/unverified"""
+    if not rows or not {"package", "ok"} <= set(rows[0]):
+        return ["판 대조 결과에 package·ok 열이 없음"]
+    out, seen = [], set()
+    head = rows[0]
+    for n, r in enumerate(rows[1:], start=2):
+        row = dict(zip(head, r))
+        if row.get("package", "") in seen:
+            out.append(f"판 대조 {n}행: {row.get('package')} 중복")
+        seen.add(row.get("package", ""))
+        if row.get("ok") not in VERSION_OK:
+            out.append(f"판 대조 {n}행: ok {row.get('ok')!r} 허용 안 됨")
+    return out
+
+
+def date_ranges(rows):
+    ds = defaultdict(list)
+    for r in rows:
+        ds[r["tool"]].append(r["scanned"])
+    return {t: (min(v), max(v)) for t, v in ds.items()}
 
 
 def truth(label_rows, version_rows):
@@ -116,8 +145,9 @@ def main(labels_path, sample_path, versions_path, control_path):
     errs = label_errors(label_raw, sample)
     raw = read_csv(control_path)
     errs += errors(raw, sample)
-    with open(versions_path, encoding="utf-8") as f:
-        version_rows = list(csv.DictReader(f))
+    version_raw = read_csv(versions_path)
+    errs += version_errors(version_raw)
+    version_rows = [dict(zip(version_raw[0], r)) for r in version_raw[1:]] if version_raw else []
     labelled = {r[0] for r in label_raw[1:]}
     if {r["package"] for r in version_rows} != labelled:
         errs.append(f"판 대조 결과({versions_path})의 앱이 라벨 파일과 다름 (같은 라벨 파일로 apk_versions.py를 다시 돌릴 것)")
@@ -133,6 +163,8 @@ def main(labels_path, sample_path, versions_path, control_path):
             print(f"{tool}: 기록 없는 정답 앱 {len(pkgs)}개 (예: {', '.join(pkgs[:3])})")
         sys.exit("모든 정답 앱을 두 도구로 기록한 뒤 집계 (도구마다 분모가 달라지지 않게)")
     print(f"정답 앱 {len(answers)}개 (adware {sum(answers.values())}, normal {len(answers) - sum(answers.values())}), 판 대조 미통과로 뺀 라벨 {dropped}개")
+    for tool, (a, b) in sorted(date_ranges(rows).items()):
+        print(f"{tool}: 검사 날짜 {a}~{b}")
     for tool, m in sorted(metrics(answers, rows).items()):
         print(f"{tool}: Recall {ratio(m['recall'])}, 앱 단위 FPR {ratio(m['fpr'])}, "
               f"검사 못 함 {m['not_scanned']}, 설치 경로 경고만 {m['source_only']}")
@@ -148,6 +180,12 @@ def _check():
     assert errors([HEADER, ok[:5] + ["clean", "악성"] + ok[7:]], {"p1"})
     assert errors([HEADER, ok[:7] + ["20261124"]], {"p1"})  # 날짜 형식
     assert errors([HEADER, ok, ["p2"] + ok[1:2] + ["gms 26.2"] + ok[3:]], {"p1", "p2"})  # 판 섞임
+    assert errors([HEADER, ok, ["p2"] + ok[1:7] + ["2026-11-26"]], {"p1", "p2"}) == []  # 3일 안
+    assert errors([HEADER, ok, ["p2"] + ok[1:7] + ["2026-11-27"]], {"p1", "p2"})  # 3일 넘음
+    assert version_errors([["package", "ok"], ["a", "yes"]]) == []
+    assert version_errors([["package", "ok"], ["a", "no"], ["a", "yes"]])  # 중복
+    assert version_errors([["package", "ok"], ["a", "maybe"]])
+    assert version_errors([["package"], ["a"]])
     labels = [
         {"package": "a1", "label": "adware", "confidence": ""},
         {"package": "a2", "label": "adware", "confidence": ""},
