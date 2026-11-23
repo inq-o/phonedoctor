@@ -35,7 +35,10 @@ class Reply(val status: HttpStatusCode, val body: String, val pushes: List<Push>
 inline fun <reified T> reply(status: HttpStatusCode, value: T, pushes: List<Push> = emptyList(), alertId: String? = null) =
     Reply(status, ApiJson.encodeToString(value), pushes, alertId)
 
-private val KEEP = Duration.ofHours(24)
+/** 저장 응답 보관 기간 (openapi 공통 규칙). 예약 작업(Jobs.kt)도 이 기준으로 지운다 */
+val IDEMPOTENCY_KEEP: Duration = Duration.ofHours(24)
+
+private val KEEP = IDEMPOTENCY_KEEP
 
 /**
  * POST 공통 규칙: `Idempotency-Key`(UUID) 필수, 같은 키로 다시 오면 첫 성공 응답을 그대로 돌려준다.

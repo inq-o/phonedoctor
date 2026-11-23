@@ -264,3 +264,25 @@ class TickReviewFollowupTest {
         for (t in listOf("garbage", "a.b", "%%%.%%%.%%%")) assertEquals(false, auth.verify(t), t)
     }
 }
+
+class RetentionCleanupTest {
+    @Test
+    fun `24시간 지난 저장 응답은 새 요청이 없어도 예약 작업이 지움`() = serverTest { clock ->
+        join(SENIOR, "protected")
+        clock.instant = clock.instant.plus(Duration.ofHours(24)).minusSeconds(1)
+        assertEquals(0, ticked().n("deletedKeys"))
+        clock.instant = clock.instant.plusSeconds(2)
+        assertEquals(1, ticked().n("deletedKeys"))
+        assertEquals(0L, transaction(TestDb.db) { IdempotencyKeys.selectAll().count() })
+    }
+
+    @Test
+    fun `기기를 지우면 코드 입력 시도 기록도 지움`() = serverTest {
+        join(SENIOR, "protected")
+        val g = join(GUARDIAN, "guardian")
+        client.api(Post, "/pairing-codes/000000/accept", GUARDIAN)
+        assertEquals(1L, transaction(TestDb.db) { PairingAttempts.selectAll().count() })
+        client.api(io.ktor.http.HttpMethod.Delete, "/devices/$g", GUARDIAN)
+        assertEquals(0L, transaction(TestDb.db) { PairingAttempts.selectAll().count() })
+    }
+}

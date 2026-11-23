@@ -71,11 +71,11 @@
   - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)
   - [x] 예약 작업 — 재알림 24시간·만료 7일·삭제 90일·연락 끊김 48시간·기기 180일 (Cloud Scheduler → `/internal/tick`, ADR-0001)
   - [ ] 배포 — Neon·GCP 결제 계정은 사람이 (server/README.md 배포 절)
-- [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`. 서버 통신은 `core:network` — 앱에 붙일 때 할 일: 릴리스 API 주소 주입(자리표시 `.invalid`면 릴리스 빌드 실패), `Application.onCreate`에서 App Check Play Integrity 공급자 설치(디버그는 Debug 공급자), 디버그만 `10.0.2.2` 평문 허용(network security config), 익명 오탐 신고 경로는 ID 토큰 없이(App Check만)
+- [ ] T054 [P] [US3] 연결 흐름 (O-S4, O-G2, S3) — `feature/pairing`. 기기 등록(`POST /devices`)은 연결을 시작할 때(연결 전 서버 전송 없음), "모든 데이터 지우기"는 `DELETE /devices/{id}` + Firebase 사용자 삭제 (개인정보처리방침 3·6절). 서버 통신은 `core:network` — 앱에 붙일 때 할 일: 릴리스 API 주소 주입(자리표시 `.invalid`면 릴리스 빌드 실패), `Application.onCreate`에서 App Check Play Integrity 공급자 설치(디버그는 Debug 공급자), 디버그만 `10.0.2.2` 평문 허용(network security config), 익명 오탐 신고 경로는 ID 토큰 없이(App Check만)
 - [ ] T055 [US4] 보호자 요청 상세·응답 (G1, G2) — `feature/guardian-*`
 - [ ] T055a [US4] 연락 끊김 경고 (F6, 서버 판정·알림은 T053 예약 작업으로 완료) — 시니어 `PUT /devices/{id}/status` 6시간 간격 보고 + 서버 `lastCheckedAt` 48시간 판정 + G1 경고 카드(권한 꺼짐 표시 포함) + 보호자 알림 1회
 - [ ] T056 [US5] 시니어 삭제 유도 (S2) + PackageInstaller.uninstall
-- [ ] T057 [P] 개인정보처리방침 공개 — 초안 `docs/privacy-policy.md`(인터넷 권한 없음, 기기 밖 전송 없음 기준). 공개 주소(GitHub Pages 등)는 확인 후. 서버를 붙이면 다시 고침
+- [ ] T057 [P] 개인정보처리방침 공개 — 지금 판 `docs/privacy-policy.md`(인터넷 권한 없음, 기기 밖 전송 없음 기준). 가족 연결 판 초안 `docs/privacy-policy-family.md`(서버 코드와 대조, 출시 전 `[확인 필요]` 채우고 앱 동작 다시 대조). 공개 주소(GitHub Pages 등)는 확인 후. 서버를 붙이면 다시 고침
 - [x] T058 [P] 공개 고지 화면 (O-S1, FR-041) — 첫 설정 1단계 "폰주치의가 하는 일" (PR #5)
 - [ ] T059 [US10] Chrome 사이트 광고 알림 끄기 — 알림 리스너(Chrome 외 알림 즉시 폐기) + 사이트별 기록 + 판정 + 채널 설정 화면 열기 (FR-050~054). 알림 접근 공개 고지는 T058에 포함
 - [ ] T059a [US10] 알림 접근 미허용 대체 안내 화면 (S6, FR-040)

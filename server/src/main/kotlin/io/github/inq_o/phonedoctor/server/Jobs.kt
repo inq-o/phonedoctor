@@ -59,6 +59,7 @@ data class TickResult(
     val contactLost: Int,
     val deletedDevices: Int,
     val deletedCodes: Int,
+    val deletedKeys: Int,
 )
 
 /** F6 연락 끊김 기준 (ux-flows F6) */
@@ -154,7 +155,10 @@ fun runTick(deps: Deps): TickResult {
         PairingCodes.deleteWhere { PairingCodes.expiresAt less now.minus(CODE_KEEP_AFTER_EXPIRY).utc() }
     }
 
-    return TickResult(reminded, expired, deletedAlerts, contactLost, deletedDevices, deletedCodes)
+    // 7. 보관 기간(24시간)이 지난 재전송 확인용 저장 응답. POST가 올 때의 정리(Idempotency.kt)만으로는 요청이 없으면 계속 남는다
+    val deletedKeys = step { IdempotencyKeys.deleteWhere { IdempotencyKeys.createdAt less now.minus(IDEMPOTENCY_KEEP).utc() } }
+
+    return TickResult(reminded, expired, deletedAlerts, contactLost, deletedDevices, deletedCodes, deletedKeys)
 }
 
 /** 예약 작업 경로. 앱 토큰(`/v1`)이 아니라 Cloud Scheduler 토큰으로 인증. 설정이 없으면 꺼 둔다(404) */
