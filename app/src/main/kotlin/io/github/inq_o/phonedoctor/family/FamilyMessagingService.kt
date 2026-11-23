@@ -4,6 +4,7 @@ import com.google.firebase.messaging.FirebaseMessagingService
 import com.google.firebase.messaging.RemoteMessage
 import dagger.hilt.android.AndroidEntryPoint
 import io.github.inq_o.phonedoctor.core.data.FamilyAlertSync
+import io.github.inq_o.phonedoctor.core.data.FamilyLinkEvents
 import io.github.inq_o.phonedoctor.core.data.FamilySyncScheduler
 import io.github.inq_o.phonedoctor.core.data.PushTokenSync
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
@@ -30,6 +31,9 @@ class FamilyMessagingService : FirebaseMessagingService() {
     @Inject
     lateinit var notifier: Notifier
 
+    @Inject
+    lateinit var linkEvents: FamilyLinkEvents
+
     // 서비스는 이 함수가 끝나면 바로 멈출 수 있어 여기서 보내지 않고 WorkManager에 맡긴다(망이 되면 보내고, 실패하면 다시 시도)
     override fun onNewToken(token: String) = pushTokenSync.schedule(token)
 
@@ -40,6 +44,8 @@ class FamilyMessagingService : FirebaseMessagingService() {
             return
         }
         pushHandler.handle(data)
+        // 연결이 끊김: 남은 연결이 없으면 서버가 요청을 지웠으니 동기화가 사본을 정리한다
+        if (data["v"] == "1" && data["type"] == "LINK_REVOKED") runBlocking { linkEvents.onLinkRevoked() }
     }
 
     /**

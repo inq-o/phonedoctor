@@ -186,6 +186,7 @@ internal class DefaultFamilyRepository @Inject constructor(
     override suspend fun revokeLink(linkId: String) = serialized {
         requireRegistered()
         forgettingGoneDevice { network.revokeLink(linkId) }
+        linkEvents.onLinkRevoked()
     }
 
     override suspend fun reportAppVersion() {
@@ -227,10 +228,9 @@ internal class DefaultFamilyRepository @Inject constructor(
             network.deleteDevice(it.deviceId) // 이미 없어도 서버는 204
             // 서버에서 지운 뒤 바로 비운다. 아래 Firebase 삭제가 실패해 다시 눌러도 서버 삭제를 되풀이하지 않게
             forgetDevice()
-        }
+        } ?: linkEvents.onDataDeleted()
         preferences.setPendingRegistrationRole(null)
         preferences.setReportedAppVersion(null)
-        linkEvents.onDataDeleted()
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()
         account.deleteUser()
@@ -322,7 +322,11 @@ internal class DefaultFamilyRepository @Inject constructor(
         return registered
     }
 
-    private suspend fun forgetDevice() = preferences.setRegisteredDevice(null)
+    /** 서버에 이 기기가 없다 (지웠거나 서버가 정리함). 연결·요청도 서버에 없으므로 요청 사본도 비운다 */
+    private suspend fun forgetDevice() {
+        preferences.setRegisteredDevice(null)
+        linkEvents.onDataDeleted()
+    }
 
     private suspend fun registered(): RegisteredDevice? = preferences.registeredDevice.first()
 

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 2,
-    "identityHash": "7e00ac3c5b6b4dcd5add5523d818da11",
+    "identityHash": "9828108d31067222c9ccf9010fcd308d",
     "entities": [
       {
         "tableName": "symptom_event",
@@ -248,7 +248,7 @@
       },
       {
         "tableName": "alert_local",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `signingCertSha256` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `label` TEXT NOT NULL, `source` TEXT NOT NULL, `status` TEXT NOT NULL, `outcome` TEXT, `date` TEXT NOT NULL, `count` INTEGER NOT NULL, `days` INTEGER NOT NULL, `firstAt` INTEGER NOT NULL, `lastAt` INTEGER NOT NULL, `detectorVersion` TEXT NOT NULL, `openedDate` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `kind` TEXT NOT NULL DEFAULT 'approval', `serverAlertId` TEXT DEFAULT NULL, `sentDate` TEXT DEFAULT NULL, `sentCount` INTEGER DEFAULT NULL, `serverStatus` TEXT DEFAULT NULL, `decision` TEXT DEFAULT NULL, `guardianName` TEXT DEFAULT NULL, `messageToSenior` TEXT DEFAULT NULL, `outcomeSent` INTEGER NOT NULL DEFAULT 0, `needsSync` INTEGER NOT NULL DEFAULT 0)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `packageName` TEXT NOT NULL, `signingCertSha256` TEXT NOT NULL, `versionCode` INTEGER NOT NULL, `label` TEXT NOT NULL, `source` TEXT NOT NULL, `status` TEXT NOT NULL, `outcome` TEXT, `date` TEXT NOT NULL, `count` INTEGER NOT NULL, `days` INTEGER NOT NULL, `firstAt` INTEGER NOT NULL, `lastAt` INTEGER NOT NULL, `detectorVersion` TEXT NOT NULL, `openedDate` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `kind` TEXT NOT NULL DEFAULT 'approval', `serverAlertId` TEXT DEFAULT NULL, `sentDate` TEXT DEFAULT NULL, `sentCount` INTEGER DEFAULT NULL, `serverStatus` TEXT DEFAULT NULL, `decision` TEXT DEFAULT NULL, `guardianName` TEXT DEFAULT NULL, `messageToSenior` TEXT DEFAULT NULL, `outcomeSent` INTEGER NOT NULL DEFAULT 0, `needsSync` INTEGER NOT NULL DEFAULT 0, `pendingKey` TEXT DEFAULT NULL, `pendingDate` TEXT DEFAULT NULL, `pendingCount` INTEGER DEFAULT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -413,6 +413,24 @@
             "affinity": "INTEGER",
             "notNull": true,
             "defaultValue": "0"
+          },
+          {
+            "fieldPath": "pendingKey",
+            "columnName": "pendingKey",
+            "affinity": "TEXT",
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "pendingDate",
+            "columnName": "pendingDate",
+            "affinity": "TEXT",
+            "defaultValue": "NULL"
+          },
+          {
+            "fieldPath": "pendingCount",
+            "columnName": "pendingCount",
+            "affinity": "INTEGER",
+            "defaultValue": "NULL"
           }
         ],
         "primaryKey": {
@@ -491,7 +509,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7e00ac3c5b6b4dcd5add5523d818da11')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '9828108d31067222c9ccf9010fcd308d')"
     ]
   }
 }

@@ -226,6 +226,28 @@ class FamilyAlertSyncTest {
     }
 
     @Test
+    fun `응답을 안 요청은 서버 상태가 늦게 적혔어도 근거를 보내지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        s.sync()
+        // 응답은 적혔는데 서버 상태는 아직 open으로 남은 순간
+        alerts.rows[1] = alerts.rows.getValue(1).copy(decision = "recommend_uninstall", serverStatus = SERVER_OPEN, count = 9, needsSync = true, updatedAt = 900)
+        s.sync()
+        assertEquals(1, server.created.size)
+    }
+
+    @Test
+    fun `결과를 4xx로 거절하면 다시 보내지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        s.sync()
+        alerts.rows[1] = alerts.rows.getValue(1).copy(status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.UNINSTALLED.name, needsSync = true, updatedAt = 900)
+        server.fail["reportOutcome"] = ApiException(400, "bad-request", null, null, null, null)
+        assertTrue(s.sync().complete)
+        assertTrue(alerts.rows.getValue(1).outcomeSent)
+    }
+
+    @Test
     fun `알림 전용은 kind notice로 보내고 결과는 보내지 않는다`() = runTest {
         openAlert().also {
             alerts.rows[1] = it.copy(kind = "notice", status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name, outcomeSent = true)
@@ -276,12 +298,107 @@ class FamilyAlertSyncTest {
     }
 
     @Test
-    fun `새 보호자와 연결하면 열린 요청을 다시 보내게 한다`() = runTest {
-        openAlert().also { alerts.rows[1] = it.copy(needsSync = false) }
+    fun `새 보호자와 연결하면 근거가 같아도 열린 요청을 다시 보낸다`() = runTest {
+        openAlert()
         val s = sync()
+        s.sync()
         s.onLinkConfirmed()
-        assertTrue(alerts.rows.getValue(1).needsSync)
         assertEquals(1, scheduled)
+        s.sync()
+        // 서버는 열린 요청에 다시 보낼 때 새 보호자를 받는 사람에 더한다
+        assertEquals(2, server.created.size)
+        assertEquals(5, server.created.last().symptom?.count)
+        // 이미 답한 요청은 다시 보내지 않는다 (서버가 새 요청을 만든다)
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        s.onLinkConfirmed()
+        s.sync()
+        assertEquals(2, server.created.size)
+    }
+
+    @Test
+    fun `연결한 보호자가 없으면 아무것도 보내지 않고 서버 사본을 비운다`() = runTest {
+        openAlert()
+        val s = sync()
+        s.sync()
+        server.activeLink = false
+        s.onLinkRevoked()
+        scans.latest = 1_700_000_000_000
+        alerts.rows[1] = alerts.rows.getValue(1).copy(count = 9, needsSync = true, updatedAt = 900)
+        s.sync()
+        assertEquals(1, server.created.size)
+        assertTrue(server.statuses.isEmpty())
+        assertNull(alerts.rows.getValue(1).serverAlertId)
+        assertEquals(listOf("listLinks"), server.calls.drop(server.calls.lastIndexOf("listLinks")))
+    }
+
+    @Test
+    fun `응답을 못 받으면 같은 키로 다시 보내 이미 답한 요청 옆에 새 요청을 만들지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        server.loseCreateResponse = true
+        assertFalse(s.sync().complete)
+        assertNull(alerts.rows.getValue(1).serverAlertId)
+        // 그사이 보호자가 답함
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        // 처음 결과를 돌려받아 같은 요청으로 이어지고, 그 요청의 응답도 받아 알린다
+        val applied = s.sync().decisions.single()
+        assertEquals("srv-1", alerts.rows.getValue(1).serverAlertId)
+        assertNull(server.alert("srv-2"))
+        assertEquals(FamilyDecision.RECOMMEND_UNINSTALL, applied.decision)
+        assertEquals(1, server.created.size)
+    }
+
+    @Test
+    fun `응답을 못 받아 왔으면 근거를 보내지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        server.fail["listAlerts"] = IOException("offline")
+        assertFalse(s.sync().complete)
+        assertTrue(server.created.isEmpty())
+        assertTrue(alerts.rows.getValue(1).needsSync)
+    }
+
+    @Test
+    fun `서버가 형식을 거절하면 매번 다시 보내지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        server.fail["createAlert"] = ApiException(400, "bad-request", null, null, null, null)
+        s.sync()
+        assertFalse(alerts.rows.getValue(1).needsSync)
+        s.sync()
+        assertEquals(1, server.calls.count { it == "createAlert" })
+    }
+
+    @Test
+    fun `허용한 앱의 알림 전용에 지우자고 하면 시니어에게 다시 묻는다`() = runTest {
+        openAlert().also {
+            alerts.rows[1] = it.copy(kind = "notice", status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name, outcomeSent = true)
+        }
+        allow.insert(AllowEntryEntity("com.ad.cleaner", "ab".repeat(32), 7, "민지", 100))
+        val s = sync()
+        s.sync()
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        val applied = s.sync().decisions.single()
+        assertTrue(applied.notify)
+        assertEquals(AlertStatus.OPEN, applied.alert.status)
+        assertNull(applied.alert.outcome)
+        assertTrue(allow.entries.isEmpty())
+        // 지우면 결과를 보낸다
+        alerts.rows[1] = alerts.rows.getValue(1).copy(status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.UNINSTALLED.name, needsSync = true, updatedAt = 900)
+        s.sync()
+        assertEquals(listOf(NetworkOutcomeType.UNINSTALLED), server.outcomes.map { it.second.outcome })
+    }
+
+    @Test
+    fun `서버가 지운 요청은 기다리지 않는다`() = runTest {
+        openAlert()
+        val s = sync()
+        s.sync()
+        server.remove("srv-1")
+        s.refresh(1)
+        assertNull(alerts.rows.getValue(1).serverAlertId)
+        assertNull(alerts.rows.getValue(1).let { it.toModel().family })
     }
 
     @Test
@@ -342,21 +459,43 @@ private class FakeAlertDao : AlertLocalDao {
     override suspend fun pendingSync() = rows.values.filter { it.needsSync }
     override suspend fun findByServerId(serverAlertId: String) = rows.values.firstOrNull { it.serverAlertId == serverAlertId }
     override suspend fun markSent(id: Long, serverAlertId: String, date: String, count: Int, serverStatus: String) =
-        edit(id) { it.copy(serverAlertId = serverAlertId, sentDate = date, sentCount = count, serverStatus = serverStatus) }
+        edit(id) {
+            it.copy(
+                serverAlertId = serverAlertId, sentDate = date, sentCount = count, serverStatus = serverStatus,
+                pendingKey = null, pendingDate = null, pendingCount = null,
+            )
+        }
+    override suspend fun setPendingKey(id: Long, key: String?, date: String?, count: Int?) =
+        edit(id) { it.copy(pendingKey = key, pendingDate = date, pendingCount = count) }
+    override suspend fun reopenForDecision(id: Long, at: Long) =
+        edit(id) { it.copy(status = "OPEN", outcome = null, outcomeSent = false, updatedAt = at) }
+    override suspend fun forgetServerFor(id: Long, serverAlertId: String) =
+        edit(id) { if (it.serverAlertId == serverAlertId) it.copy(serverAlertId = null, serverStatus = null, sentDate = null, sentCount = null, decision = null) else it }
+    override suspend fun waitingOnServer() = rows.values.filter { it.status == "OPEN" && it.serverAlertId != null && it.decision == null }
     override suspend fun setServerStatus(id: Long, serverStatus: String) = edit(id) { it.copy(serverStatus = serverStatus) }
     override suspend fun setDecision(id: Long, serverStatus: String, decision: String, guardianName: String?, messageToSenior: String?) =
         edit(id) { it.copy(serverStatus = serverStatus, decision = decision, guardianName = guardianName, messageToSenior = messageToSenior ?: it.messageToSenior) }
+    override suspend fun setOutcome(id: Long, status: String, outcome: String, at: Long) =
+        edit(id) { it.copy(status = status, outcome = outcome, updatedAt = at, needsSync = true) }
     override suspend fun markOutcomeSent(id: Long) = edit(id) { it.copy(outcomeSent = true) }
     override suspend fun clearNeedsSync(id: Long, seenUpdatedAt: Long) = edit(id) { if (it.updatedAt == seenUpdatedAt) it.copy(needsSync = false) else it }
     override suspend fun markOpenForSync() {
-        rows.keys.toList().forEach { id -> edit(id) { if (it.status == "OPEN") it.copy(needsSync = true) else it } }
+        rows.keys.toList().forEach { id ->
+            edit(id) {
+                when {
+                    it.status != "OPEN" -> it
+                    it.decision == null -> it.copy(needsSync = true, sentDate = null, sentCount = null)
+                    else -> it.copy(needsSync = true)
+                }
+            }
+        }
     }
     override suspend fun forgetServer() {
         rows.keys.toList().forEach { id ->
             edit(id) {
                 it.copy(
                     serverAlertId = null, sentDate = null, sentCount = null, serverStatus = null, decision = null, guardianName = null,
-                    messageToSenior = null, outcomeSent = false, needsSync = false,
+                    messageToSenior = null, outcomeSent = false, needsSync = false, pendingKey = null, pendingDate = null, pendingCount = null,
                 )
             }
         }
@@ -368,8 +507,11 @@ private class FakeAllowDao : AllowEntryDao {
     override suspend fun insert(entry: AllowEntryEntity) {
         if (entries.none { it.packageName == entry.packageName && it.versionCode == entry.versionCode }) entries += entry
     }
-    override suspend fun isAllowed(packageName: String, cert: String, versionCode: Long) =
-        entries.any { it.packageName == packageName && it.signingCertSha256 == cert && it.versionCode == versionCode }
+    override suspend fun allowedAt(packageName: String, cert: String, versionCode: Long) =
+        entries.firstOrNull { it.packageName == packageName && it.signingCertSha256 == cert && it.versionCode == versionCode }?.createdAt
+    override suspend fun delete(packageName: String, cert: String, versionCode: Long) {
+        entries.removeAll { it.packageName == packageName && it.signingCertSha256 == cert && it.versionCode == versionCode }
+    }
 }
 
 private class FakeScanRunDao : ScanRunDao {
@@ -389,7 +531,16 @@ private class FakeServer : PhoneDoctorNetworkDataSource {
     val outcomes = mutableListOf<Pair<String, NetworkOutcomeCreate>>()
     val statuses = mutableListOf<NetworkDeviceStatus>()
     var onCreate: () -> Unit = {}
+    var activeLink = true
+
+    /** 다음 한 번: 처리는 하고 응답만 잃는다 (망 끊김) */
+    var loseCreateResponse = false
+    private val replies = mutableMapOf<String, NetworkAlert>()
     private val alerts = linkedMapOf<String, NetworkAlert>()
+    fun alert(id: String) = alerts[id]
+    fun remove(id: String) {
+        alerts.remove(id)
+    }
     private var seq = 0
     private var tick = 0
 
@@ -415,6 +566,8 @@ private class FakeServer : PhoneDoctorNetworkDataSource {
 
     override suspend fun createAlert(key: String, body: NetworkAlertCreate): NetworkAlert {
         record("createAlert")
+        // 같은 키는 처음 결과를 그대로 (서버 Idempotency.kt)
+        replies[key]?.let { return it }
         onCreate()
         created += body
         val open = alerts.values.firstOrNull { it.app.packageName == body.app.packageName && it.status == NetworkAlertStatus.OPEN }
@@ -423,6 +576,11 @@ private class FakeServer : PhoneDoctorNetworkDataSource {
             app = body.app, symptom = body.symptom, detectedAt = body.detectedAt, createdAt = stamp(), updatedAt = stamp(),
         )
         alerts[alert.alertId] = alert
+        replies[key] = alert
+        if (loseCreateResponse) {
+            loseCreateResponse = false
+            throw IOException("응답 유실")
+        }
         return alert
     }
 
@@ -454,7 +612,19 @@ private class FakeServer : PhoneDoctorNetworkDataSource {
     override suspend fun deleteDevice(deviceId: String) = TODO()
     override suspend fun createPairingCode(key: String): NetworkPairingCode = TODO()
     override suspend fun acceptPairingCode(key: String, code: String): NetworkLink = TODO()
-    override suspend fun listLinks(status: NetworkLinkStatus?): List<NetworkLink> = TODO()
+    override suspend fun listLinks(status: NetworkLinkStatus?): List<NetworkLink> {
+        record("listLinks")
+        return if (!activeLink) {
+            emptyList()
+        } else {
+            listOf(
+                NetworkLink(
+                    "link-1", NetworkLinkStatus.ACTIVE, NetworkDeviceSummary("dev-1", "엄마"), NetworkDeviceSummary("g-1", "민지"),
+                    "2026-11-23T00:00:00Z",
+                ),
+            )
+        }
+    }
     override suspend fun confirmLink(key: String, linkId: String): NetworkLink = TODO()
     override suspend fun revokeLink(linkId: String) = TODO()
     override suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate): NetworkAlert = TODO()

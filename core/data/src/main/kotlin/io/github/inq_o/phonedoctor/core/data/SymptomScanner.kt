@@ -186,7 +186,7 @@ class SymptomScanner @Inject constructor(
     private suspend fun evaluate(app: AppIdentity, firstNewDate: String, now: Long): SymptomAlert? {
         val existing = alertDao.find(app.packageName, app.signingCertSha256, app.versionCode)
         // 보호자가 괜찮다고 한 판 (FR-007): 시니어에게 묻지 않고, 기준을 넘으면 보호자에게 알림 전용(notice)으로 한 번만 알린다
-        if (allowDao.isAllowed(app.packageName, app.signingCertSha256, app.versionCode)) return notice(app, existing, firstNewDate, now)
+        allowDao.allowedAt(app.packageName, app.signingCertSha256, app.versionCode)?.let { return notice(app, existing, it, now) }
         val open = existing?.takeIf { it.status == AlertStatus.OPEN.name }
         val since = open?.openedDate ?: firstNewDate
         val days = symptomDao.dailyCounts(app.packageName, app.signingCertSha256, app.versionCode, since)
@@ -194,6 +194,9 @@ class SymptomScanner @Inject constructor(
         val known = existing?.let {
             ExistingAlert(AlertStatus.valueOf(it.status), it.outcome?.let(AlertOutcome::valueOf), it.date, it.openedDate, it.updatedAt)
         }
+        // 닫힌 요청의 처리 결과를 아직 가족 서버에 못 보냈으면 다시 열지 않는다(다시 열면 서버 요청 사본을 비워 결과를 영영 못 보냄).
+        // 보내고 나면 다음 검사가 연다 (근거는 그대로 남아 있다)
+        if (existing != null && existing.status != AlertStatus.OPEN.name && existing.serverAlertId != null && !existing.outcomeSent) return null
         return when (val decision = SymptomPolicy.decide(known, days)) {
             AlertDecision.None -> null
             is AlertDecision.Update -> {
@@ -224,14 +227,17 @@ class SymptomScanner @Inject constructor(
         }
     }
 
-    /** 허용한 판이 기준을 넘음. 같은 판에 notice를 이미 만들었으면 다시 만들지 않는다 (서버 계약: 조합당 1번은 시니어 기기가 지킴) */
-    private suspend fun notice(app: AppIdentity, existing: AlertLocalEntity?, firstNewDate: String, now: Long): SymptomAlert? {
+    /**
+     * 허용한 판이 기준을 넘음. 같은 판에 notice를 이미 만들었으면 다시 만들지 않는다 (서버 계약: 조합당 1번은 시니어 기기가 지킴).
+     * 허용한 뒤([allowedAt])에 센 전환만 센다: 허용하기 전 같은 날의 광고까지 세면 허용 직후 광고 한 번에 알림이 간다
+     */
+    private suspend fun notice(app: AppIdentity, existing: AlertLocalEntity?, allowedAt: Long, now: Long): SymptomAlert? {
         if (existing?.kind == KIND_NOTICE) return null
-        val days = symptomDao.dailyCounts(app.packageName, app.signingCertSha256, app.versionCode, firstNewDate)
+        // 허용 결과를 아직 서버에 못 보냈으면 그 줄을 덮지 않는다 (보낸 뒤 다음 검사에서)
+        if (existing != null && existing.serverAlertId != null && !existing.outcomeSent) return null
+        val e = symptomDao.dailyCountsAfter(app.packageName, app.signingCertSha256, app.versionCode, allowedAt)
             .map { DayEvidence(it.localDate, it.count, it.firstAt, it.lastAt) }
-        // 허용 뒤에 생긴 근거만 본다
-        val e = days.filter { it.count >= SymptomPolicy.DAILY_THRESHOLD && (existing == null || it.lastAt > existing.updatedAt) }.lastOrNull()
-            ?: return null
+            .lastOrNull { it.count >= SymptomPolicy.DAILY_THRESHOLD } ?: return null
         val label = installedApps.label(app.packageName) ?: existing?.label ?: app.packageName
         // 시니어 화면의 열린 요청 목록에는 넣지 않는다(닫힌 상태, 결과는 허용)
         val entity = (existing ?: AlertLocalEntity(
@@ -270,6 +276,7 @@ class SymptomScanner @Inject constructor(
     private fun AlertLocalEntity.reopenedForFamily() = copy(
         kind = KIND_APPROVAL, serverAlertId = null, sentDate = null, sentCount = null, serverStatus = null, decision = null,
         guardianName = null, messageToSenior = null, outcomeSent = false, needsSync = true,
+        pendingKey = null, pendingDate = null, pendingCount = null,
     )
 
     private data class ScanRunRecord(

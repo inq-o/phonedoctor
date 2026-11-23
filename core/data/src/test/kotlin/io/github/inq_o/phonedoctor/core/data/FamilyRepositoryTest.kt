@@ -190,6 +190,14 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `연결을 끊으면 가족 동기화가 남은 연결을 다시 확인하게 한다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        repo.revokeLink("link-1")
+        assertEquals(listOf("revoked"), linkEvents.calls)
+    }
+
+    @Test
     fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
         val repo = repo()
         repo.reportAppVersion()
@@ -397,6 +405,9 @@ private class FakeLinkEvents : FamilyLinkEvents {
     }
     override suspend fun onDataDeleted() {
         calls += "deleted"
+    }
+    override suspend fun onLinkRevoked() {
+        calls += "revoked"
     }
 }
 

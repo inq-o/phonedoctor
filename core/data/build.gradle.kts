@@ -22,6 +22,8 @@ plugins {
 
 android {
     namespace = "io.github.inq_o.phonedoctor.core.data"
+    // 단위 시험에서 android.util.Log 같은 기기 API는 아무것도 하지 않게
+    testOptions.unitTests.isReturnDefaultValues = true
 }
 
 dependencies {

@@ -30,6 +30,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkAppInfo
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDecisionType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkDeviceStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkInstallSource
+import io.github.inq_o.phonedoctor.core.network.model.NetworkLinkStatus
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkProtectionState
@@ -62,6 +63,9 @@ fun interface ProtectionStatus {
 interface FamilyLinkEvents {
     /** 시니어가 새 보호자와 연결함: 열린 요청을 새 보호자에게도 알린다 */
     suspend fun onLinkConfirmed()
+
+    /** 연결이 끊김 (이 폰이 끊었거나 LINK_REVOKED 푸시). 남은 연결이 있는지 다시 확인한다 */
+    suspend fun onLinkRevoked()
 
     /** 모든 데이터 지우기: 서버 요청의 사본과 당겨 오기·보고 기록을 비운다 */
     suspend fun onDataDeleted()
@@ -105,6 +109,10 @@ internal class DefaultFamilyAlertSync @Inject constructor(
     /** 응답 반영은 푸시와 동기화가 동시에 할 수 있다. 같은 응답을 두 번 알리지 않게 하나씩 */
     private val decisionLock = Mutex()
 
+    /** 활성 연결이 있는지 마지막으로 확인한 값과 시각. 연결 이벤트가 오면 버린다 */
+    @Volatile private var linked: Boolean? = null
+    @Volatile private var linkedCheckedAt = 0L
+
     override suspend fun sync(): FamilySyncResult {
         if (!available) return FamilySyncResult(true, emptyList())
         val device = preferences.registeredDevice.first()
@@ -113,14 +121,17 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         var complete = true
         var deviceGone = false
         val decisions = mutableListOf<AppliedDecision>()
-        suspend fun step(block: suspend () -> Unit) {
-            if (deviceGone) return
-            try {
+        /** 성공하면 true */
+        suspend fun step(block: suspend () -> Unit): Boolean {
+            if (deviceGone) return false
+            return try {
                 block()
+                true
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
                 complete = false
+                false
             } catch (e: ApiException) {
                 if (e.status == 403 && e.slug == "device-not-registered") {
                     deviceGone = true
@@ -129,20 +140,44 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                 } else {
                     Log.w(TAG, "가족 동기화 거절: ${e.message}")
                 }
+                false
             }
         }
 
-        step { decisions += pull() }
-        for (row in alertDao.pendingSync()) step { push(row, decisions) }
-        step { reportStatusIfDue(device.deviceId) }
+        // 연결한 보호자가 없으면 아무것도 보내지 않는다 (연결 코드만 받고 연결하지 않았거나, 모두 끊음).
+        // 마지막 연결이 끊기면 서버는 요청을 지웠으므로 사본도 비운다. 다시 연결하면 열린 요청을 새로 보낸다
+        var active = false
+        if (!step { active = hasActiveLink() }) return finish(deviceGone, complete, decisions)
+        if (!active) {
+            alertDao.forgetServer()
+            return FamilySyncResult(complete, decisions)
+        }
+        // 응답을 먼저 받아 와야 이미 답한 요청에 근거를 다시 보내 새 요청을 만들지 않는다. 못 받아 왔으면 이번에는 근거를 보내지 않는다
+        val pulled = step { decisions += pull() }
+        for (row in alertDao.pendingSync()) step { push(row.id, pulled, decisions) }
+        step { reportStatusIfDue(device.deviceId, decisions) }
+        return finish(deviceGone, complete, decisions)
+    }
+
+    private suspend fun finish(deviceGone: Boolean, complete: Boolean, decisions: List<AppliedDecision>): FamilySyncResult {
 
         if (deviceGone) {
             // 서버가 기기를 지웠다 (오래 안 씀 등). 연결도 요청도 서버에 없으니 사본을 비우고, 다음 연결 때 새로 등록한다
             preferences.setRegisteredDevice(null)
             preferences.setAlertPullCursor(null)
             alertDao.forgetServer()
+            linked = null
         }
         return FamilySyncResult(complete, decisions)
+    }
+
+    private suspend fun hasActiveLink(): Boolean {
+        val cached = linked
+        if (cached != null && now() - linkedCheckedAt < LINK_CHECK_MS) return cached
+        val active = network.listLinks(NetworkLinkStatus.ACTIVE).any { it.status == NetworkLinkStatus.ACTIVE }
+        linked = active
+        linkedCheckedAt = now()
+        return active
     }
 
     override suspend fun applyDecision(serverAlertId: String, decision: String, guardianName: String?, messageToSenior: String?): AppliedDecision? =
@@ -155,35 +190,63 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                 if (messageToSenior != null) alertDao.setDecision(row.id, row.serverStatus ?: SERVER_DECIDED, known, row.guardianName ?: guardianName, messageToSenior)
                 return@withLock null
             }
-            alertDao.setDecision(row.id, SERVER_DECIDED, type.wire, guardianName, messageToSenior)
-            val wasOpen = row.status == AlertStatus.OPEN.name
-            if (type == FamilyDecision.ALLOW) {
-                allowDao.insert(AllowEntryEntity(row.packageName, row.signingCertSha256, row.versionCode, guardianName.orEmpty(), now()))
-                if (wasOpen) {
-                    // 시니어 화면의 요청을 닫고, 서버에 "허용함" 결과를 보낼 것으로 표시
-                    val fresh = alertDao.get(row.id) ?: return@withLock null
-                    alertDao.update(fresh.copy(status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name, updatedAt = now(), needsSync = true))
+            // 응답을 적는 것은 마지막에: 중간에 앱이 죽으면 다음 반영(푸시 재전송·당겨 오기)이 처음부터 다시 한다
+            val notice = row.kind == KIND_NOTICE
+            val notify = when {
+                // 알림 전용(허용한 앱)인데 지우자고 함: 허용을 거두고 시니어에게 다시 묻는다 (G2의 notice에도 [지우자고 하기]가 있다)
+                notice && type == FamilyDecision.RECOMMEND_UNINSTALL -> {
+                    allowDao.delete(row.packageName, row.signingCertSha256, row.versionCode)
+                    alertDao.reopenForDecision(row.id, now())
+                    true
                 }
+                notice -> false
+                type == FamilyDecision.ALLOW -> {
+                    allowDao.insert(AllowEntryEntity(row.packageName, row.signingCertSha256, row.versionCode, guardianName.orEmpty(), now()))
+                    // 시니어 화면의 요청을 닫고, 서버에 "허용함" 결과를 보낼 것으로 표시
+                    if (row.status == AlertStatus.OPEN.name) alertDao.setOutcome(row.id, AlertStatus.RESOLVED.name, AlertOutcome.ALLOWED.name, now())
+                    row.status == AlertStatus.OPEN.name
+                }
+                else -> row.status == AlertStatus.OPEN.name
             }
+            alertDao.setDecision(row.id, SERVER_DECIDED, type.wire, guardianName, messageToSenior)
             val updated = alertDao.get(row.id)?.toModel() ?: return@withLock null
-            AppliedDecision(updated, type, guardianName, notify = wasOpen)
+            AppliedDecision(updated, type, guardianName, notify)
         }
 
     override suspend fun onLinkConfirmed() {
+        linked = true
+        linkedCheckedAt = now()
         alertDao.markOpenForSync()
         scheduler.schedule()
     }
 
+    override suspend fun onLinkRevoked() {
+        linked = null
+        scheduler.schedule()
+    }
+
     override suspend fun onDataDeleted() {
+        linked = null
         alertDao.forgetServer()
         preferences.setAlertPullCursor(null)
         preferences.setLastStatusReportAt(0)
     }
 
     override suspend fun refresh(localId: Long) {
-        val row = alertDao.get(localId) ?: return
-        val id = row.serverAlertId ?: return
-        absorb(network.getAlert(id))
+        refreshRow(localId)
+    }
+
+    /** 서버 요청을 다시 읽어 사본에 반영한다. 새로 안 응답이면 돌려준다 */
+    private suspend fun refreshRow(localId: Long): AppliedDecision? {
+        val row = alertDao.get(localId) ?: return null
+        val id = row.serverAlertId ?: return null
+        return try {
+            absorb(network.getAlert(id))
+        } catch (e: ApiException) {
+            // 받을 보호자가 모두 끊어 서버가 지운 요청. 답을 기다리지 않게 사본을 비운다
+            if (e.status == 404) alertDao.forgetServerFor(row.id, id) else throw e
+            null
+        }
     }
 
     /** 내 요청 중 바뀐 것을 받아 온다 (DECISION_MADE 푸시를 놓쳤을 때 대비, push-messages.md §1) */
@@ -215,24 +278,45 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         return applied
     }
 
-    private suspend fun push(row: AlertLocalEntity, decisions: MutableList<AppliedDecision>) {
+    /** [pulled]: 이번에 응답을 받아 왔는지. 못 받아 왔으면 근거는 보내지 않는다 (이미 답한 요청 옆에 새 요청이 생길 수 있음) */
+    private suspend fun push(id: Long, pulled: Boolean, decisions: MutableList<AppliedDecision>) {
+        // 목록을 읽은 뒤 푸시·당겨 오기가 응답을 적었을 수 있어 다시 읽는다
+        val row = alertDao.get(id) ?: return
         val evidenceChanged = row.sentDate != row.date || row.sentCount != row.count
         // 서버 요청이 답 없이 7일 만료됐는데 이 폰에서는 또 광고를 띄움: 서버에 새 요청으로 연다
         val serverWaiting = row.serverStatus == SERVER_OPEN || row.serverStatus == SERVER_EXPIRED
-        val wantsEvidence = (row.kind == KIND_NOTICE || row.status == AlertStatus.OPEN.name) &&
+        val wantsEvidence = row.decision == null && row.serverStatus != SERVER_DECIDED &&
+            (row.kind == KIND_NOTICE || row.status == AlertStatus.OPEN.name) &&
             (row.serverAlertId == null || (serverWaiting && evidenceChanged))
+        // 보낼 근거가 있는데 응답을 못 받아 왔으면 표시를 남겨 두고 다음에
+        if (wantsEvidence && !pulled) return
         if (wantsEvidence) {
+            // 응답을 못 받은 보내기가 있으면 같은 키로: 서버가 처음 결과를 돌려준다 (그때 보낸 근거로 적는다)
+            val key = row.pendingKey ?: newKey().also { alertDao.setPendingKey(row.id, it, row.date, row.count) }
+            val sentDate = row.pendingDate ?: row.date
+            val sentCount = row.pendingCount ?: row.count
             try {
-                val alert = network.createAlert(newKey(), alertBody(row))
-                alertDao.markSent(row.id, alert.alertId, row.date, row.count, alert.status.wire() ?: SERVER_OPEN)
+                val alert = network.createAlert(key, alertBody(row))
+                alertDao.markSent(row.id, alert.alertId, sentDate, sentCount, alert.status.wire() ?: SERVER_OPEN)
                 absorb(alert)?.let(decisions::add)
             } catch (e: ApiException) {
-                // 받을 보호자가 없음(연결 전·모두 끊김). 새 근거가 생기거나 새로 연결되면 다시 보낸다
-                if (!(e.status == 409 && (e.slug == "no-active-link" || e.slug == "no-recipient"))) throw e
+                when {
+                    // 받을 보호자가 없음(모두 끊김). 새 근거가 생기거나 새로 연결되면 다시 보낸다
+                    e.status == 409 && (e.slug == "no-active-link" || e.slug == "no-recipient") -> alertDao.setPendingKey(row.id, null, null, null)
+                    // 다시 보내도 같은 거절 (형식 오류 등). 매 검사마다 되풀이하지 않는다
+                    e.status in 400..499 && e.status != 429 && !(e.status == 403 && e.slug == "device-not-registered") -> {
+                        Log.w(TAG, "요청 보내기 거절: ${e.message}")
+                        alertDao.setPendingKey(row.id, null, null, null)
+                        alertDao.clearNeedsSync(row.id, row.updatedAt)
+                        return
+                    }
+                    else -> throw e
+                }
             }
         }
         val fresh = alertDao.get(row.id) ?: return
-        if (fresh.status == AlertStatus.RESOLVED.name && fresh.serverAlertId != null && !fresh.outcomeSent && fresh.kind == KIND_APPROVAL) {
+        // 알림 전용은 만들 때 결과를 보낸 것으로 둔다. 보호자가 지우자고 해 다시 열렸을 때만 결과를 보낸다
+        if (fresh.status == AlertStatus.RESOLVED.name && fresh.serverAlertId != null && !fresh.outcomeSent) {
             sendOutcome(fresh)
         }
         alertDao.clearNeedsSync(row.id, row.updatedAt)
@@ -260,15 +344,17 @@ internal class DefaultFamilyAlertSync @Inject constructor(
             network.reportOutcome(newKey(), id, NetworkOutcomeCreate(send, Instant.ofEpochMilli(row.updatedAt).toString()))
             alertDao.setServerStatus(row.id, SERVER_RESOLVED)
         } catch (e: ApiException) {
-            // 응답과 안 맞거나 이미 끝난 요청: 다시 보내도 같다
-            if (e.status != 409 && e.status != 404) throw e
+            // 응답과 안 맞거나 이미 끝난 요청 등 4xx: 다시 보내도 같다
+            if (e.status !in 400..499 || e.status == 429 || (e.status == 403 && e.slug == "device-not-registered")) throw e
         }
         alertDao.markOutcomeSent(row.id)
     }
 
-    private suspend fun reportStatusIfDue(deviceId: String) {
+    private suspend fun reportStatusIfDue(deviceId: String, decisions: MutableList<AppliedDecision>) {
         val at = now()
         if (at - preferences.lastStatusReportAt.first() < STATUS_INTERVAL_MS) return
+        // 6시간마다 답을 기다리는 요청이 서버에 아직 있는지도 본다 (받을 보호자가 모두 끊으면 서버가 지운다). 그때 안 응답도 알린다
+        for (row in alertDao.waitingOnServer()) refreshRow(row.id)?.let(decisions::add)
         // 검사가 한 번도 돌지 않았으면 알릴 것이 없다
         val checked = scanRunDao.latestStartedAt() ?: return
         val p = protection.current()
@@ -316,6 +402,7 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         const val PAGE_SIZE = 50
         const val APP_LABEL_MAX = 60
         const val STATUS_INTERVAL_MS = 6 * 60 * 60 * 1000L
+        const val LINK_CHECK_MS = 60 * 60 * 1000L
     }
 }
 

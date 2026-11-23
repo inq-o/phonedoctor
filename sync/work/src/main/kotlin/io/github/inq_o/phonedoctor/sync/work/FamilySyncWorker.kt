@@ -59,8 +59,8 @@ class WorkManagerFamilySyncScheduler @Inject constructor(
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        // 도는 중에 새로 생긴 일은 그 뒤에 한 번 더 (방금 기록한 결과를 놓치지 않게)
-        WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
+        // 이미 기다리는 작업이 있으면 그것 하나로 (망이 없는 동안 검사마다 쌓이지 않게). 도는 중에 생긴 일은 다음 검사 뒤 작업이 보낸다
+        WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.KEEP, request)
     }
 
     private companion object {
