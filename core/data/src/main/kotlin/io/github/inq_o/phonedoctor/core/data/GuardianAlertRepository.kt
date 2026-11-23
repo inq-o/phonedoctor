@@ -69,8 +69,11 @@ data class FalsePositive(
  * 오탐 신고를 망이 될 때까지 재시도하며 보낸다 (sync:work). [id]마다 한 번.
  * 응답(로그인한 요청)과 시각으로 이어지지 않게 몇 시간 늦춰 보낸다
  */
-fun interface FalsePositiveReporter {
+interface FalsePositiveReporter {
     fun schedule(id: String, report: FalsePositive)
+
+    /** 아직 보내지 않은 신고를 모두 거둔다 (설정을 끄거나 모든 데이터를 지울 때) */
+    fun cancelAll()
 }
 
 /** 먼저 온 응답만 유효하다 (FR-024). [answer]는 먼저 답한 응답 */
@@ -91,7 +94,11 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
 ) : GuardianAlertRepository {
     override val falsePositiveFeedback: Flow<Boolean> = preferences.falsePositiveFeedback
 
-    override suspend fun setFalsePositiveFeedback(enabled: Boolean) = preferences.setFalsePositiveFeedback(enabled)
+    override suspend fun setFalsePositiveFeedback(enabled: Boolean) {
+        preferences.setFalsePositiveFeedback(enabled)
+        // 끄면 이미 맡겨 둔 것도 보내지 않는다 (작업도 보낼 때 설정을 다시 본다)
+        if (!enabled) falsePositives.cancelAll()
+    }
 
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -140,15 +147,7 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
             keysLock.withLock { pendingKeys.remove(op) }
             // 괜찮은 앱이라고 답함 = 판정이 틀렸을 수 있음. 켜 두었으면 근거마다 익명으로 알린다 (요청·근거마다 한 번).
             // 부가 기능이라 실패해도 응답은 성공으로 (서버는 이미 반영함)
-            if (decision == FamilyDecision.ALLOW) {
-                try {
-                    reportFalsePositives(alertId, alert)
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    // 다음 기회 없음: 신고 하나를 놓칠 뿐이다
-                }
-            }
+            if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert)
             alert.toModel()
         } catch (e: IOException) {
             throw e // 서버가 처리했는지 모름 → 다시 누르면 같은 키
@@ -160,13 +159,27 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
                     // 망 오류로 결과를 못 받은 내 응답이 이미 같은 답으로 들어가 있음 (서버도 같은 보호자·같은 답만 성공으로 본다).
                     // 다른 답이면 먼저 들어간 내 답을 보여 준다
                     if (existing != null && existing.decidedBy.deviceId == registeredDevice()?.deviceId && existing.decision == body.decision) {
-                        return guarded { network.getAlert(alertId) }.toModel()
+                        val alert = guarded { network.getAlert(alertId) }
+                        // 앱이 다시 켜져 키를 잃은 뒤 같은 답을 다시 보낸 경우: 첫 응답에서 못 맡긴 신고를 여기서 맡긴다 (보낸 표시가 있으면 건너뜀)
+                        if (decision == FamilyDecision.ALLOW) reportQuietly(alertId, alert)
+                        return alert.toModel()
                     }
                     throw AlreadyAnsweredException(existing?.toAnswer())
                 }
                 e.status == 409 && e.slug == "alert-closed" -> throw AlertClosedException()
                 else -> throw e
             }
+        }
+    }
+
+    /** 부가 기능이라 실패해도 응답은 성공으로 (서버는 이미 반영함). 신고 하나를 놓칠 뿐이다 */
+    private suspend fun reportQuietly(alertId: String, alert: NetworkAlert) {
+        try {
+            reportFalsePositives(alertId, alert)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // 무시
         }
     }
 

@@ -167,6 +167,7 @@ internal class DefaultFamilyRepository @Inject constructor(
     private val pushTokens: PushTokens,
     private val deviceInfo: DeviceInfo,
     private val linkEvents: FamilyLinkEvents,
+    private val falsePositives: FalsePositiveReporter,
 ) : FamilyRepository {
     /**
      * 서버를 바꾸는 동작은 하나씩. 등록이 겹치거나, 코드 받기를 두 번 눌러 뒤늦게 온 응답(서버가 이미 폐기한 코드)이 화면에 남거나,
@@ -307,6 +308,9 @@ internal class DefaultFamilyRepository @Inject constructor(
         // 이 폰에 정해 둔 이름·설정도 지운다: 다음에 다른 역할·계정으로 등록할 때 따라가지 않게 (개인정보처리방침: 표시 이름도 지우는 정보)
         preferences.setDisplayName(null)
         preferences.setNotifyCaution(false)
+        // 아직 보내지 않은 오탐 신고도 거둔다 (지운 뒤 몇 시간 있다 나가지 않게)
+        falsePositives.cancelAll()
+        preferences.clearFalsePositiveState()
         if (!touchedServer) return
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()

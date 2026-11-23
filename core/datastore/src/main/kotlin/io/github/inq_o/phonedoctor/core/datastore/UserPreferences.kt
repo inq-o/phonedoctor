@@ -106,6 +106,14 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
      */
     val reportedFalsePositives: Flow<Set<String>> = store.data.map { it[REPORTED_FALSE_POSITIVES] ?: emptySet() }
 
+    /** 모든 데이터 지우기: 신고 설정과 보낸 표시를 처음 상태로 */
+    suspend fun clearFalsePositiveState() {
+        store.edit {
+            it.remove(FALSE_POSITIVE_FEEDBACK)
+            it.remove(REPORTED_FALSE_POSITIVES)
+        }
+    }
+
     /** 처음 맡기는 것이면 true (적어 둔다) */
     suspend fun markFalsePositiveReported(id: String): Boolean {
         var added = false

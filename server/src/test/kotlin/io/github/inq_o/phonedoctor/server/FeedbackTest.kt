@@ -6,12 +6,17 @@ import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.HttpMethod.Companion.Get
 import io.ktor.http.HttpMethod.Companion.Post
+import io.ktor.http.content.OutgoingContent
 import io.ktor.http.contentType
+import io.ktor.utils.io.ByteWriteChannel
+import io.ktor.utils.io.writeFully
 import io.ktor.http.HttpStatusCode
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class FeedbackTest {
     private val cert = "ab".repeat(32)
@@ -74,6 +79,58 @@ class FeedbackTest {
             assertEquals(HttpStatusCode.Accepted, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = from).status)
         }
         assertEquals(HttpStatusCode.TooManyRequests, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = from).status)
+    }
+
+    @Test
+    fun `길이를 밝히지 않은 큰 본문도 막는다`() = serverTest {
+        val big = """{"source":"symptom","packageName":"com.ad","versionCode":7,"signingCertSha256":"$cert","detectorVersion":"v","pad":"${"x".repeat(5000)}"}"""
+        fun chunked(text: String) = object : OutgoingContent.WriteChannelContent() {
+            override val contentType = ContentType.Application.Json
+            override suspend fun writeTo(channel: ByteWriteChannel) = channel.writeFully(text.encodeToByteArray())
+        }
+        val r = client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            setBody(chunked(big))
+        }
+        assertEquals(HttpStatusCode.PayloadTooLarge, r.status)
+        val ok = client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            setBody(chunked(symptom))
+        }
+        assertEquals(HttpStatusCode.Accepted, ok.status)
+        // JSON이 아니면 415, 깨진 JSON은 400 (receive를 쓰지 않아도 같은 오류 형식)
+        val text = client.post("/v1/feedback/false-positives") {
+            header("X-Firebase-AppCheck", "ok")
+            contentType(ContentType.Text.Plain)
+            setBody(symptom)
+        }
+        assertEquals(HttpStatusCode.UnsupportedMediaType, text.status)
+        assertEquals(HttpStatusCode.BadRequest, client.api(Post, "/feedback/false-positives", token = null, key = null, body = "{").status)
+    }
+
+    @Test
+    fun `X-Forwarded-For 앞쪽을 바꿔도 같은 곳으로 센다`() = serverTest {
+        repeat(30) { n ->
+            val spoofed: io.ktor.client.request.HttpRequestBuilder.() -> Unit = { header("X-Forwarded-For", "10.0.0.$n, 203.0.113.9") }
+            assertEquals(HttpStatusCode.Accepted, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = spoofed).status)
+        }
+        val again: io.ktor.client.request.HttpRequestBuilder.() -> Unit = { header("X-Forwarded-For", "10.9.9.9, 203.0.113.9") }
+        assertEquals(HttpStatusCode.TooManyRequests, client.api(Post, "/feedback/false-positives", token = null, key = null, body = symptom, extra = again).status)
+        assertEquals("203.0.113.9", sourceOf("1.2.3.4, 203.0.113.9", "x"))
+        assertEquals("x", sourceOf(null, "x"))
+        assertEquals("x", sourceOf(" ", "x"))
+    }
+
+    @Test
+    fun `보낸 곳 표가 가득 차면 새 곳은 받지 않고 기존 곳은 계속 받는다`() {
+        clearFeedbackLimits()
+        val now = java.time.Instant.parse("2026-11-24T00:00:00Z")
+        repeat(10_000) { assertTrue(allow("s$it", now)) }
+        assertFalse(allow("new", now))
+        assertTrue(allow("s1", now))
+        // 한 시간 지나면 오래된 곳을 비우고 다시 받는다
+        assertTrue(allow("new", now.plusSeconds(3601)))
+        clearFeedbackLimits()
     }
 
     @Test

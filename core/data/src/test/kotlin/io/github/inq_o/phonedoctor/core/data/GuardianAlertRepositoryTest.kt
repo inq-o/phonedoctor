@@ -55,6 +55,16 @@ class GuardianAlertRepositoryTest {
     private val server = AlertServer()
     private var stores = 0
     private val reported = mutableListOf<Pair<String, FalsePositive>>()
+    private var cancelled = 0
+    private val reporter = object : FalsePositiveReporter {
+        override fun schedule(id: String, report: FalsePositive) {
+            reported += id to report
+        }
+
+        override fun cancelAll() {
+            cancelled++
+        }
+    }
     private lateinit var prefs: UserPreferences
 
     private suspend fun TestScope.repo(role: String? = "GUARDIAN", available: Boolean = true): DefaultGuardianAlertRepository {
@@ -63,7 +73,7 @@ class GuardianAlertRepositoryTest {
         }
         prefs = UserPreferences(store)
         role?.let { prefs.setRegisteredDevice(RegisteredDevice("dev-2", it)) }
-        return DefaultGuardianAlertRepository(available, server, prefs) { id, r -> reported += id to r }
+        return DefaultGuardianAlertRepository(available, server, prefs, reporter)
     }
 
     @Test
@@ -218,8 +228,24 @@ class GuardianAlertRepositoryTest {
 
         server.single = alert("a2")
         repo.setFalsePositiveFeedback(false)
+        // 끄면 이미 맡긴 것도 거둔다
+        assertEquals(1, cancelled)
         repo.decide("a2", FamilyDecision.ALLOW, null)
         assertEquals(1, reported.size)
+        repo.setFalsePositiveFeedback(true)
+        assertEquals(1, cancelled)
+    }
+
+    @Test
+    fun `응답을 못 받고 앱이 다시 켜져 같은 답을 다시 보내도 신고를 맡긴다`() = runTest {
+        server.single = alert("a1", status = NetworkAlertStatus.DECIDED)
+        val mine = Json.encodeToJsonElement(
+            NetworkDecision.serializer(),
+            NetworkDecision(NetworkDecisionType.ALLOW, null, NetworkDeviceSummary("dev-2", "민지"), "2026-11-23T03:00:00Z"),
+        )
+        server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to mine)), null)
+        repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(listOf("a1:symptom"), reported.map { it.first })
     }
 
     @Test
@@ -242,7 +268,10 @@ class GuardianAlertRepositoryTest {
             PreferenceDataStoreFactory.create(scope = CoroutineScope(UnconfinedTestDispatcher(testScheduler))) {
                 tmp.newFile("prefs-fail.preferences_pb").also { it.delete() }
             },
-        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }) { _, _ -> error("WorkManager 오류") }
+        ).also { it.setRegisteredDevice(RegisteredDevice("dev-2", "GUARDIAN")) }, object : FalsePositiveReporter {
+            override fun schedule(id: String, report: FalsePositive) = error("WorkManager 오류")
+            override fun cancelAll() = Unit
+        })
         assertEquals(FamilyAlertStatus.DECIDED, repo.decide("a1", FamilyDecision.ALLOW, null).status)
     }
 

@@ -74,7 +74,7 @@ fun Application.installProblems() {
     }
 }
 
-private fun unsupportedMedia() =
+internal fun unsupportedMedia() =
     ApiProblem(HttpStatusCode.UnsupportedMediaType, "unsupported-media-type", "지원하지 않는 본문 형식", "Content-Type: application/json 으로 보내세요")
 
 private val ProblemSent = AttributeKey<Unit>("problem-sent")

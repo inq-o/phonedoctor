@@ -48,6 +48,13 @@ class FamilyRepositoryTest {
     private val account = FakeAccount()
     private val push = FakePushTokens()
     private val linkEvents = FakeLinkEvents()
+    private var cancelledReports = 0
+    private val reporter = object : FalsePositiveReporter {
+        override fun schedule(id: String, report: FalsePositive) = Unit
+        override fun cancelAll() {
+            cancelledReports++
+        }
+    }
     private val deviceInfo = FakeDeviceInfo()
     private lateinit var prefs: UserPreferences
 
@@ -56,7 +63,7 @@ class FamilyRepositoryTest {
             tmp.newFile("prefs.preferences_pb").also { it.delete() }
         }
         prefs = UserPreferences(store)
-        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents)
+        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents, reporter)
     }
 
     @Test
@@ -178,6 +185,8 @@ class FamilyRepositoryTest {
     fun `모든 데이터 지우기는 서버 기기와 Firebase 사용자를 지운다`() = runTest {
         val repo = repo()
         repo.createPairingCode()
+        prefs.setFalsePositiveFeedback(false)
+        prefs.markFalsePositiveReported("a1:symptom")
         repo.deleteAllData()
         assertEquals("deleteDevice", network.calls.last())
         assertEquals(listOf("dev-1"), network.deleted)
@@ -187,6 +196,10 @@ class FamilyRepositoryTest {
         assertFalse(push.autoRefreshOn)
         assertEquals(1, push.deleted)
         assertEquals(listOf("deleted"), linkEvents.calls)
+        // 아직 보내지 않은 오탐 신고도 거두고 설정은 처음으로
+        assertEquals(1, cancelledReports)
+        assertTrue(prefs.falsePositiveFeedback.first())
+        assertTrue(prefs.reportedFalsePositives.first().isEmpty())
     }
 
     @Test

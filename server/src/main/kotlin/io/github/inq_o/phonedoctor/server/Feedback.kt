@@ -3,7 +3,12 @@ package io.github.inq_o.phonedoctor.server
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.contentLength
-import io.ktor.server.request.receive
+import io.ktor.http.ContentType
+import io.ktor.server.request.contentType
+import io.ktor.server.request.receiveChannel
+import io.ktor.utils.io.readRemaining
+import kotlinx.io.readByteArray
+import kotlinx.serialization.SerializationException
 import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.post
@@ -61,11 +66,19 @@ private const val BODY_MAX = 4_096L
  */
 private const val PER_SOURCE_PER_HOUR = 30
 private val recent = ConcurrentHashMap<String, MutableList<Instant>>()
+private const val SOURCES_MAX = 10_000
+
+/**
+ * 보낸 곳 주소. Cloud Run 앞단(Google Front End)은 실제 접속 주소를 X-Forwarded-For **맨 뒤**에 덧붙인다.
+ * 앞쪽 값은 보낸 쪽이 마음대로 넣을 수 있어 쓰지 않는다 (매번 바꿔 제한을 피하지 못하게)
+ */
+internal fun sourceOf(forwardedFor: String?, remoteHost: String): String =
+    forwardedFor?.substringAfterLast(',')?.trim()?.ifEmpty { null } ?: remoteHost
 
 /** 시험마다 비운다 */
 internal fun clearFeedbackLimits() = recent.clear()
 
-private fun allow(source: String, now: Instant): Boolean {
+internal fun allow(source: String, now: Instant): Boolean {
     val since = now.minus(Duration.ofHours(1))
     var ok = false
     recent.compute(source) { _, list ->
@@ -74,8 +87,14 @@ private fun allow(source: String, now: Instant): Boolean {
         if (ok) kept += now
         kept.ifEmpty { null }
     }
-    // 오래 조용한 주소는 버린다 (메모리가 늘지 않게)
-    if (recent.size > 10_000) recent.entries.removeIf { e -> e.value.all { it <= since } }
+    // 오래 조용한 주소는 버린다 (메모리가 늘지 않게). 그래도 가득하면 새 주소는 받지 않는다 (한 시간 뒤 비워짐)
+    if (recent.size > SOURCES_MAX) {
+        recent.entries.removeIf { e -> e.value.all { it <= since } }
+        if (recent.size > SOURCES_MAX) {
+            recent.remove(source)
+            return false
+        }
+    }
     return ok
 }
 
@@ -111,11 +130,21 @@ private fun FalsePositiveReport.validate() {
  */
 fun Route.feedbackRoutes(deps: Deps) {
     post("/feedback/false-positives") {
-        if ((call.request.contentLength() ?: 0L) > BODY_MAX) throw ApiProblem(HttpStatusCode.PayloadTooLarge, "too-large", "본문이 너무 큼")
-        // Cloud Run 앞단이 붙인 보낸 곳 주소 (없으면 바로 붙은 주소)
-        val source = call.request.headers["X-Forwarded-For"]?.substringBefore(',')?.trim()?.ifEmpty { null } ?: call.request.origin.remoteHost
+        val tooLarge = ApiProblem(HttpStatusCode.PayloadTooLarge, "too-large", "본문이 너무 큼")
+        if ((call.request.contentLength() ?: 0L) > BODY_MAX) throw tooLarge
+        val source = sourceOf(call.request.headers["X-Forwarded-For"], call.request.origin.remoteHost)
         if (!allow(source, deps.now())) throw ApiProblem(HttpStatusCode.TooManyRequests, "too-many-reports", "신고가 너무 잦음", headers = mapOf("Retry-After" to "3600"))
-        val body = call.receive<FalsePositiveReport>()
+        if (call.request.contentType().withoutParameters() != ContentType.Application.Json) throw unsupportedMedia()
+        // 길이를 밝히지 않은(chunked) 본문도 상한까지만 읽는다
+        val bytes = call.receiveChannel().readRemaining(BODY_MAX + 1).readByteArray()
+        if (bytes.size > BODY_MAX) throw tooLarge
+        val body = try {
+            ApiJson.decodeFromString<FalsePositiveReport>(bytes.decodeToString())
+        } catch (e: SerializationException) {
+            throw badRequest(e.message ?: "JSON 형식 오류")
+        } catch (e: IllegalArgumentException) {
+            throw badRequest(e.message ?: "JSON 형식 오류")
+        }
         body.validate()
         val today = deps.now().atOffset(ZoneOffset.UTC).toLocalDate()
         val judge = (if (body.source == AlertSource.INSTALL_SCAN) body.modelVersion else body.detectorVersion)!!.trim()
