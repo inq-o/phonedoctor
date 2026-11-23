@@ -4,6 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -49,6 +50,8 @@ fun SeniorSettingsScreen(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    // 지우는 도중 뒤로 가면 화면과 함께 작업이 취소돼 반쯤 지운 채 남는다
+    BackHandler(enabled = state.working) {}
     SeniorSettingsScreen(
         state = state,
         onRename = viewModel::rename,

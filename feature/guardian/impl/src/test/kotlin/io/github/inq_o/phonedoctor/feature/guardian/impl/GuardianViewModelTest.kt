@@ -641,6 +641,19 @@ class GuardianViewModelTest {
     }
 
     @Test
+    fun reauthWithAnotherAccountAsksForTheFirstOne() = runTest(main.dispatcher) {
+        val vm = GuardianSettingsViewModel(family, FakeSettings())
+        vm.startReauth()
+        family.fail["reauth"] = io.github.inq_o.phonedoctor.core.data.ReauthAccountMismatchException()
+        vm.onReauthToken("other")
+        advanceUntilIdle()
+        assertTrue(vm.uiState.value.wrongAccount)
+        assertEquals(0, family.deletes)
+        assertTrue(vm.startReauth())
+        assertFalse(vm.uiState.value.wrongAccount)
+    }
+
+    @Test
     fun closingTheReauthPickerIsQuiet() {
         val vm = GuardianSettingsViewModel(family, FakeSettings())
         vm.startReauth()

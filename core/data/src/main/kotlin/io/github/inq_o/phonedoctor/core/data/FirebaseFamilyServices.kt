@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Build
 import com.google.firebase.FirebaseNetworkException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.FirebaseAuthRecentLoginRequiredException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.messaging.FirebaseMessaging
@@ -40,6 +41,9 @@ internal class FirebaseFamilyAccount @Inject constructor() : FamilyAccount {
         val user = auth.currentUser ?: return
         try {
             user.reauthenticate(GoogleAuthProvider.getCredential(idToken, null)).await()
+        } catch (e: FirebaseAuthInvalidUserException) {
+            // ERROR_USER_MISMATCH: 처음 로그인한 계정과 다른 계정을 고름
+            throw ReauthAccountMismatchException()
         } catch (e: FirebaseNetworkException) {
             throw IOException(e)
         }

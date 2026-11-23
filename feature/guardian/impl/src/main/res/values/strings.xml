@@ -159,6 +159,7 @@
     <string name="feature_guardian_impl_settings_delete_dialog_title">모든 데이터를 지울까요?</string>
     <string name="feature_guardian_impl_settings_delete_dialog_body">연결한 부모님 폰과 모두 끊기고 요청 기록도 볼 수 없어요. 다시 쓰려면 처음부터 시작해야 해요.</string>
     <string name="feature_guardian_impl_settings_reauth">Google로 다시 로그인</string>
+    <string name="feature_guardian_impl_settings_reauth_wrong_account">처음 로그인한 Google 계정을 골라 주세요.</string>
     <string name="feature_guardian_impl_settings_reauth_body">로그인한 지 오래돼서 지우기 전에 한 번 더 로그인해야 해요. 서버의 정보는 이미 지웠어요.</string>
 
     <string name="feature_guardian_impl_notifications_off_title">알림이 꺼져 있어요</string>

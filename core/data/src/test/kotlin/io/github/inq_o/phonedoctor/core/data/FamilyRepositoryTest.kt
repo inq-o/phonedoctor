@@ -260,6 +260,65 @@ class FamilyRepositoryTest {
     }
 
     @Test
+    fun `모든 데이터 지우기는 이름과 주의 단계 설정도 비워 다음 등록에 따라가지 않는다`() = runTest {
+        val repo = repo()
+        account.signedIn = true
+        repo.setDisplayName("큰딸")
+        repo.setNotifyCaution(true)
+        repo.acceptPairingCode("482913")
+        repo.deleteAllData()
+        assertNull(repo.displayName.first())
+        assertFalse(repo.notifyCaution.first())
+        network.updates.clear()
+        repo.createPairingCode()
+        assertNull(network.registrations.last().displayName)
+        assertTrue(network.updates.isEmpty())
+    }
+
+    @Test
+    fun `연결을 시작한 적 없는 폰은 지울 때 아무것도 보내지 않는다`() = runTest {
+        val repo = repo()
+        repo.setDisplayName("엄마")
+        repo.deleteAllData()
+        assertTrue(network.calls.isEmpty())
+        assertEquals(0, push.deleted)
+        assertEquals(0, account.deleted)
+        assertNull(repo.displayName.first())
+    }
+
+    @Test
+    fun `익명 사용자에게 다시 로그인을 요구하면 로그아웃으로 끝낸다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        account.deleteError = RecentLoginRequiredException()
+        repo.deleteAllData()
+        assertFalse(account.isSignedIn)
+        assertEquals(listOf("dev-1"), network.deleted)
+    }
+
+    @Test
+    fun `응답을 못 받은 등록은 지금 로그인 방식과 맞을 때만 다시 보낸다`() = runTest {
+        val repo = repo()
+        prefs.setPendingRegistrationRole(DeviceRole.SENIOR.name)
+        // 그 뒤 보호자로 Google 로그인함
+        account.signedIn = true
+        account.anonymous = false
+        repo.deleteAllData()
+        assertTrue(network.registrations.isEmpty())
+        assertEquals(1, account.deleted)
+    }
+
+    @Test
+    fun `등록 뒤 주의 단계도 받기를 못 보내면 스위치를 끈다`() = runTest {
+        val repo = repo()
+        repo.setNotifyCaution(true)
+        account.signedIn = true
+        network.fail["updateDevice"] = IOException("offline")
+        repo.acceptPairingCode("482913")
+        assertFalse(repo.notifyCaution.first())
+    }
+
+    @Test
     fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
         val repo = repo()
         repo.reportAppVersion()

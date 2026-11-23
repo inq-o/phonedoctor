@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.DISPLAY_NAME_MAX
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.data.ReauthAccountMismatchException
 import io.github.inq_o.phonedoctor.core.data.RecentLoginRequiredException
 import io.github.inq_o.phonedoctor.core.data.UserSettingsRepository
 import kotlinx.coroutines.CancellationException
@@ -24,6 +25,8 @@ data class GuardianSettingsUiState(
     val error: GuardianError? = null,
     /** 지우려면 Google로 다시 로그인해야 함 (오래전에 로그인함) */
     val needsReauth: Boolean = false,
+    /** 다시 로그인할 때 처음과 다른 Google 계정을 고름 */
+    val wrongAccount: Boolean = false,
     /** 다 지웠음. 화면이 역할 선택으로 넘어간 뒤 [GuardianSettingsViewModel.consumeDeleted] */
     val deleted: Boolean = false,
 )
@@ -56,7 +59,7 @@ class GuardianSettingsViewModel @Inject constructor(
     /** [Google로 다시 로그인]을 누름. 이미 진행 중이면 false (로그인 창을 두 번 띄우지 않게) */
     fun startReauth(): Boolean {
         if (state.value.working) return false
-        state.update { it.copy(working = true, error = null) }
+        state.update { it.copy(working = true, error = null, wrongAccount = false) }
         return true
     }
 
@@ -96,6 +99,8 @@ class GuardianSettingsViewModel @Inject constructor(
                 throw e
             } catch (e: RecentLoginRequiredException) {
                 state.update { it.copy(working = false, needsReauth = true) }
+            } catch (e: ReauthAccountMismatchException) {
+                state.update { it.copy(working = false, wrongAccount = true) }
             } catch (e: Exception) {
                 state.update { it.copy(working = false, error = e.toGuardianError()) }
             }

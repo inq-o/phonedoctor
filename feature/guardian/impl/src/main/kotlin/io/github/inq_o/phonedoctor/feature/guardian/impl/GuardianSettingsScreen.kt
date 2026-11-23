@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -57,6 +58,8 @@ fun GuardianSettingsScreen(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // 지우는 도중 뒤로 가면 화면과 함께 작업이 취소돼 반쯤 지운 채 남는다
+    BackHandler(enabled = state.working) {}
     LaunchedEffect(state.deleted) {
         if (state.deleted) {
             viewModel.consumeDeleted()
@@ -112,6 +115,7 @@ internal fun GuardianSettingsScreen(
     ) {
         state.error?.let { ErrorText(it.message()) }
         if (state.needsReauth) ErrorText(stringResource(R.string.feature_guardian_impl_settings_reauth_body))
+        if (state.wrongAccount) ErrorText(stringResource(R.string.feature_guardian_impl_settings_reauth_wrong_account))
         if (state.saved) Body(stringResource(R.string.feature_guardian_impl_settings_saved))
         if (state.working) CircularProgressIndicator()
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
