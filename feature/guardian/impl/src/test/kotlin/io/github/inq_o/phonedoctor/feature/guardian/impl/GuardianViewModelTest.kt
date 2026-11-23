@@ -296,10 +296,10 @@ class GuardianViewModelTest {
     }
 
     @Test
-    fun contactLostNeedsAReportAndCountsFromTheLaterOfReportAndLink() {
+    fun contactLostCountsFromTheLaterOfReportAndLinkLikeTheServer() {
         val old = now.minus(Duration.ofHours(49))
-        // 보고가 없는 연결은 경고하지 않는다 (시니어 보고 T055a 전)
-        assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = old).isContactLost(now))
+        // 연결한 뒤 보고가 한 번도 없으면 연결 시각부터 센다 (CONTACT_LOST 알림과 같은 판단)
+        assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = old).isContactLost(now))
         assertTrue(link("a", LinkStatus.ACTIVE, activatedAt = old, lastCheckedAt = old).isContactLost(now))
         // 보고가 오래돼도 방금 연결했으면 연결 시각부터 센다
         assertFalse(link("a", LinkStatus.ACTIVE, activatedAt = now.minus(Duration.ofHours(1)), lastCheckedAt = old).isContactLost(now))
@@ -372,6 +372,8 @@ class GuardianViewModelTest {
         advanceUntilIdle()
         val ready = vm.uiState.value as GuardianHomeUiState.Ready
         assertEquals(listOf("open", "notice"), ready.requests.map { it.alertId })
+        // 열린 요청만 받아 온다 (목록이 길어도 답할 것이 잘리지 않게)
+        assertEquals(listOf(FamilyAlertStatus.OPEN), requests.statusAsked)
         assertTrue(ready.hasHistory)
     }
 
@@ -390,7 +392,7 @@ class GuardianViewModelTest {
         assertEquals(listOf("open"), ready.requests.map { it.alertId })
     }
 
-    private fun detail(id: String = "a1") = AlertDetailViewModel(id, requests, notifier)
+    private fun detail(id: String = "a1") = AlertDetailViewModel(id, requests, notifier).also { it.onShown() }
 
     @Test
     fun detailClearsNotificationAndSendsAnswerWithMessage() = runTest(main.dispatcher) {
@@ -476,5 +478,49 @@ class GuardianViewModelTest {
         vm.refresh()
         advanceUntilIdle()
         assertEquals(2, (vm.uiState.value as AlertHistoryUiState.Ready).alerts.size)
+    }
+
+    @Test
+    fun rejectedAnswerHidesButtonsEvenIfReloadFails() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        requests.fail["decide"] = AlertClosedException()
+        requests.fail["alert"] = IOException("offline")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertTrue(ready.rejected)
+        assertFalse(ready.canAnswer)
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        assertTrue(requests.decided.isEmpty())
+    }
+
+    @Test
+    fun networkErrorRereadsTheRequestToShowAnAnswerThatGotThrough() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        // 서버는 받았는데 응답을 잃음
+        requests.alerts[0] = request("a1", status = FamilyAlertStatus.DECIDED, answer = FamilyAnswer(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, Instant.EPOCH))
+        requests.fail["decide"] = IOException("offline")
+        vm.decide(FamilyDecision.RECOMMEND_UNINSTALL)
+        advanceUntilIdle()
+        val ready = vm.uiState.value as AlertDetailUiState.Ready
+        assertFalse(ready.canAnswer)
+        assertEquals(FamilyDecision.RECOMMEND_UNINSTALL, ready.alert.answer?.decision)
+    }
+
+    @Test
+    fun reopeningTheSameRequestReloadsIt() = runTest(main.dispatcher) {
+        requests.alerts += request("a1")
+        val vm = detail()
+        advanceUntilIdle()
+        requests.alerts[0] = request("a1", status = FamilyAlertStatus.RESOLVED)
+        vm.onShown()
+        advanceUntilIdle()
+        assertEquals(FamilyAlertStatus.RESOLVED, (vm.uiState.value as AlertDetailUiState.Ready).alert.status)
+        assertEquals(listOf("request:a1", "request:a1"), notifier.cancelled)
     }
 }

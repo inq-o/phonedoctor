@@ -8,6 +8,7 @@ import io.github.inq_o.phonedoctor.core.model.FamilyAnswer
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyOutcome
 import io.github.inq_o.phonedoctor.core.model.FamilySymptom
+import io.github.inq_o.phonedoctor.core.model.FamilyVerdict
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlert
@@ -29,8 +30,11 @@ import javax.inject.Singleton
 
 /** (보호자) 연결한 부모님 폰들의 요청 (US4: G1 목록, G2 상세·응답, G3 기록). 서버에서 바로 읽는다 */
 interface GuardianAlertRepository {
-    /** 볼 수 있는 요청 전부(지금 연결로 받은 것, 90일 안), 최근에 바뀐 것부터. 등록 전이면 빈 목록 */
-    suspend fun alerts(): List<FamilyAlert>
+    /**
+     * 볼 수 있는 요청(지금 연결로 받은 것, 90일 안), 최근에 바뀐 것부터. [status]면 그 상태만 (G1은 열린 요청만).
+     * 등록 전이면 빈 목록
+     */
+    suspend fun alerts(status: FamilyAlertStatus? = null): List<FamilyAlert>
 
     /** 요청 하나. 볼 수 없으면(연결을 끊음·지워짐) ApiException 404 */
     suspend fun alert(alertId: String): FamilyAlert
@@ -63,13 +67,20 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
     private val pendingKeys = mutableMapOf<String, String>()
     private val keysLock = Mutex()
 
-    override suspend fun alerts(): List<FamilyAlert> {
-        if (!available || !registeredGuardian()) return emptyList()
+    override suspend fun alerts(status: FamilyAlertStatus?): List<FamilyAlert> {
+        if (!available || registeredDevice()?.role != DeviceRole.GUARDIAN.name) return emptyList()
+        val filter = when (status) {
+            FamilyAlertStatus.OPEN -> NetworkAlertStatus.OPEN
+            FamilyAlertStatus.DECIDED -> NetworkAlertStatus.DECIDED
+            FamilyAlertStatus.RESOLVED -> NetworkAlertStatus.RESOLVED
+            FamilyAlertStatus.EXPIRED -> NetworkAlertStatus.EXPIRED
+            FamilyAlertStatus.UNKNOWN, null -> null
+        }
         val items = mutableListOf<NetworkAlert>()
         var page: String? = null
         var pages = 0
         do {
-            val list = guarded { network.listAlerts(pageToken = page, pageSize = PAGE_SIZE) }
+            val list = guarded { network.listAlerts(status = filter, pageToken = page, pageSize = PAGE_SIZE) }
             items += list.items
             page = list.nextPageToken
         } while (page != null && ++pages < MAX_PAGES)
@@ -98,20 +109,27 @@ internal class DefaultGuardianAlertRepository @Inject constructor(
         } catch (e: ApiException) {
             keysLock.withLock { pendingKeys.remove(op) }
             when {
-                e.status == 409 && e.slug == "already-decided" -> throw AlreadyAnsweredException(existingAnswer(e))
+                e.status == 409 && e.slug == "already-decided" -> {
+                    val existing = existingDecision(e)
+                    // 망 오류로 결과를 못 받은 내 응답이 이미 들어가 있음 (그 뒤 다른 버튼을 누름): 내가 먼저 답한 것이다
+                    if (existing != null && existing.decidedBy.deviceId == registeredDevice()?.deviceId) {
+                        return guarded { network.getAlert(alertId) }.toModel()
+                    }
+                    throw AlreadyAnsweredException(existing?.toAnswer())
+                }
                 e.status == 409 && e.slug == "alert-closed" -> throw AlertClosedException()
                 else -> throw e
             }
         }
     }
 
-    private fun existingAnswer(e: ApiException): FamilyAnswer? = try {
-        e.body?.get("existingDecision")?.let { json.decodeFromJsonElement(NetworkDecision.serializer(), it) }?.toAnswer()
+    private fun existingDecision(e: ApiException): NetworkDecision? = try {
+        e.body?.get("existingDecision")?.let { json.decodeFromJsonElement(NetworkDecision.serializer(), it) }
     } catch (_: Exception) {
         null
     }
 
-    private suspend fun registeredGuardian() = preferences.registeredDevice.first()?.role == DeviceRole.GUARDIAN.name
+    private suspend fun registeredDevice() = preferences.registeredDevice.first()
 
     /** 서버가 이 기기를 지웠으면 등록 없음으로 알린다 (FamilyRepository가 다음 연결 때 새로 등록) */
     private suspend fun <T> guarded(block: suspend () -> T): T = try {
@@ -154,6 +172,7 @@ internal fun NetworkAlert.toModel() = FamilyAlert(
     installSource = app.installSource.name.takeIf { it != "UNKNOWN" },
     firstInstallTime = runCatching { app.firstInstallTime.toInstant() }.getOrNull(),
     symptom = symptom?.let { FamilySymptom(it.date, it.count, it.days, it.firstAt.toInstant(), it.lastAt.toInstant(), it.detectorVersion) },
+    verdict = verdict?.let { v -> FamilyVerdict(v.level.name, v.score, v.modelVersion, v.reasons.map { it.code }) },
     answer = decision?.toAnswer(),
     outcome = outcome?.let {
         when (it.outcome) {

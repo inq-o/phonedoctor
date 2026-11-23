@@ -43,6 +43,9 @@ enum class FamilyOutcome { UNINSTALLED, DECLINED, ALREADY_REMOVED, SUSPENDED, AL
 /** 증상 감지 근거 (openapi SymptomEvidence). [date]는 시니어 폰의 현지 날짜 */
 data class FamilySymptom(val date: String, val count: Int, val days: Int, val firstAt: Instant, val lastAt: Instant, val detectorVersion: String)
 
+/** 설치 시점 판정 (openapi Verdict). [reasons]는 근거 코드 (classifier.md §4), 앱이 모르는 코드도 그대로 */
+data class FamilyVerdict(val level: String, val score: Double, val modelVersion: String, val reasons: List<String>)
+
 /** 보호자의 응답 */
 data class FamilyAnswer(val decision: FamilyDecision, val guardianName: String, val message: String?, val decidedAt: Instant)
 
@@ -61,6 +64,7 @@ data class FamilyAlert(
     val installSource: String?,
     val firstInstallTime: Instant?,
     val symptom: FamilySymptom?,
+    val verdict: FamilyVerdict? = null,
     val answer: FamilyAnswer?,
     val outcome: FamilyOutcome?,
     val createdAt: Instant,

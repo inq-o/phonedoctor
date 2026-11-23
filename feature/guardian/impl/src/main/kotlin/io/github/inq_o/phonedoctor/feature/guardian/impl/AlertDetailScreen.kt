@@ -17,6 +17,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.data.MESSAGE_TO_SENIOR_MAX
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianOutlinedButton
@@ -27,6 +28,7 @@ import io.github.inq_o.phonedoctor.core.model.FamilyAlert
 import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilySymptom
+import io.github.inq_o.phonedoctor.core.model.FamilyVerdict
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -44,6 +46,10 @@ fun AlertDetailScreen(
     ),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LifecycleResumeEffect(Unit) {
+        viewModel.onShown()
+        onPauseOrDispose {}
+    }
     AlertDetailScreen(
         state = state,
         onMessageChange = viewModel::onMessageChange,
@@ -65,7 +71,7 @@ internal fun AlertDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val ready = state as? AlertDetailUiState.Ready
-    val answerable = ready != null && ready.alert.answerable && ready.answeredFirst == null
+    val answerable = ready != null && ready.canAnswer
     GuardianScreen(
         title = ready?.let { stringResource(R.string.feature_guardian_impl_home_phone, seniorName(it.alert.seniorName)) },
         modifier = modifier,
@@ -124,18 +130,29 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
     }
     Spacer(Modifier.height(16.dp))
 
-    // 지금 상태: 방금 답함 / 먼저 온 답 / 결과 / 만료 / 알림 전용 안내
+    // 지금 상태: 방금 답함 / 먼저 온 답 / 거절됨 / 결과 / 만료 / 알림 전용 안내
     when {
         state.answeredFirst != null -> ErrorText(
             stringResource(R.string.feature_guardian_impl_answered_first, state.answeredFirst.guardianName.trim().ifEmpty { stringResource(R.string.feature_guardian_impl_guardian_fallback) }),
         )
-        state.answered -> Headline(stringResource(R.string.feature_guardian_impl_answer_sent, seniorName(alert.seniorName)), announce = true)
+        state.answered -> Headline(
+            if (alert.answer?.decision == FamilyDecision.ALLOW) {
+                stringResource(R.string.feature_guardian_impl_answer_sent_allow)
+            } else {
+                stringResource(R.string.feature_guardian_impl_answer_sent, seniorName(alert.seniorName))
+            },
+            announce = true,
+        )
+        state.rejected && alert.answerable -> ErrorText(stringResource(R.string.feature_guardian_impl_answer_rejected))
         !alert.answerable || alert.status == FamilyAlertStatus.EXPIRED -> Headline(statusLine(alert))
         alert.notice -> Body(stringResource(R.string.feature_guardian_impl_detail_notice))
     }
     state.error?.let { ErrorText(it.message()) }
 
-    alert.symptom?.let { Evidence(it) } ?: Body(stringResource(R.string.feature_guardian_impl_alert_install_scan))
+    // 둘 다 있으면 감지 근거 위·판정 근거 아래 (ux-flows G2)
+    alert.symptom?.let { Evidence(it) }
+    alert.verdict?.let { Verdict(it) }
+    if (alert.symptom == null && alert.verdict == null) Body(stringResource(R.string.feature_guardian_impl_alert_install_scan))
     alert.answer?.message?.takeIf { it.isNotBlank() }?.let {
         Body(stringResource(R.string.feature_guardian_impl_detail_message_sent, it))
     }
@@ -176,6 +193,49 @@ private fun Evidence(symptom: FamilySymptom) {
         style = MaterialTheme.typography.bodySmall,
     )
     Spacer(Modifier.height(16.dp))
+}
+
+/** 판정 근거 (설치 시점 분류기, classifier.md §4 보호자 문구) */
+@Composable
+private fun Verdict(verdict: FamilyVerdict) {
+    Text(
+        stringResource(R.string.feature_guardian_impl_detail_verdict_title),
+        style = MaterialTheme.typography.titleMedium,
+        modifier = Modifier.fillMaxWidth().semantics { heading() },
+    )
+    Spacer(Modifier.height(8.dp))
+    verdict.reasons.forEachIndexed { i, code -> Body("${i + 1}. ${reasonText(code)}") }
+    Text(
+        stringResource(R.string.feature_guardian_impl_detail_verdict_meta, levelText(verdict.level), "%.2f".format(verdict.score), verdict.modelVersion),
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Spacer(Modifier.height(16.dp))
+}
+
+@Composable
+private fun levelText(level: String): String = when (level) {
+    "RISK" -> stringResource(R.string.feature_guardian_impl_level_risk)
+    "CAUTION" -> stringResource(R.string.feature_guardian_impl_level_caution)
+    else -> level
+}
+
+/** 앱이 모르는 코드(서버·모델이 먼저 더함)는 코드 그대로 */
+@Composable
+private fun reasonText(code: String): String = when (code) {
+    "AD_SDK_HEAVY" -> stringResource(R.string.feature_guardian_impl_reason_ad_sdk)
+    "OVERLAY_PERMISSION" -> stringResource(R.string.feature_guardian_impl_reason_overlay)
+    "LAUNCHER_ICON_HIDDEN" -> stringResource(R.string.feature_guardian_impl_reason_hidden)
+    "SIDELOADED" -> stringResource(R.string.feature_guardian_impl_reason_sideloaded)
+    "DEVICE_ADMIN" -> stringResource(R.string.feature_guardian_impl_reason_device_admin)
+    "ACCESSIBILITY_SERVICE" -> stringResource(R.string.feature_guardian_impl_reason_accessibility)
+    "NOTIFICATION_LISTENER" -> stringResource(R.string.feature_guardian_impl_reason_notification_listener)
+    "SMS_CALL_ACCESS" -> stringResource(R.string.feature_guardian_impl_reason_sms_call)
+    "INSTALL_OTHER_APPS" -> stringResource(R.string.feature_guardian_impl_reason_install_other)
+    "BOOT_AUTOSTART" -> stringResource(R.string.feature_guardian_impl_reason_boot)
+    "IMPERSONATION" -> stringResource(R.string.feature_guardian_impl_reason_impersonation)
+    "FREQUENT_BACKGROUND_LAUNCH" -> stringResource(R.string.feature_guardian_impl_reason_background)
+    "CLEANER_BOOSTER_PATTERN" -> stringResource(R.string.feature_guardian_impl_reason_cleaner)
+    else -> code
 }
 
 @Composable

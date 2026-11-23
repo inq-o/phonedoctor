@@ -7,6 +7,7 @@ import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
 import io.github.inq_o.phonedoctor.core.model.FamilyAlert
+import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.ApiException
@@ -65,7 +66,8 @@ class GuardianHomeViewModel @Inject constructor(
         if (state.value is GuardianHomeUiState.Failed) state.value = GuardianHomeUiState.Loading
         loading = viewModelScope.launch {
             // 연결과 요청을 함께 불러온다. 요청만 실패하면 연결은 보여 주고 요청은 보이던 대로 둔다
-            val requests = async { runCatchingNonCancel { alerts.alerts() } }
+            // 열린 요청만 받는다 (목록이 길어도 답할 것이 잘리지 않게)
+            val requests = async { runCatchingNonCancel { alerts.alerts(FamilyAlertStatus.OPEN) } }
             val links = try {
                 family.links()
             } catch (e: CancellationException) {
@@ -78,11 +80,13 @@ class GuardianHomeViewModel @Inject constructor(
             }
             val loaded = requests.await()
             val current = state.value as? GuardianHomeUiState.Ready
+            val shown = visible(links)
             state.value = GuardianHomeUiState.Ready(
-                visible(links),
+                shown,
                 current?.revoking,
                 requests = loaded?.filter { it.answerable } ?: current?.requests.orEmpty(),
-                hasHistory = loaded?.any { !it.answerable } ?: current?.hasHistory ?: false,
+                // 연결이 있으면 지난 요청(답한 것·알림 전용·끝난 것)을 볼 수 있다
+                hasHistory = shown.any { it.link.status == LinkStatus.ACTIVE },
             )
         }
     }
@@ -143,12 +147,11 @@ internal suspend fun <T> runCatchingNonCancel(block: suspend () -> T): T? = try 
 internal val CONTACT_LOST_AFTER: Duration = Duration.ofHours(48)
 
 /**
- * 검사 보고를 한 번도 받지 않은 연결은 경고하지 않는다: 시니어 폰의 6시간 보고(T055a)가 아직 없어,
- * 서버처럼 연결 확정 시각으로 재면 모든 연결이 이틀 뒤 "연락 없음"이 된다
+ * 시니어 폰이 6시간마다 보고하므로(T055a) 보고가 한 번도 없으면 연결한 뒤 폰주치의가 돌지 않은 것이다.
+ * CONTACT_LOST 알림을 누르고 들어온 홈과 같은 판단이 되게 서버 규칙 그대로 잰다
  */
 internal fun FamilyLink.isContactLost(now: Instant): Boolean {
     if (status != LinkStatus.ACTIVE) return false
-    val checked = lastCheckedAt ?: return false
-    val since = listOfNotNull(checked, activatedAt).max()
+    val since = listOfNotNull(lastCheckedAt, activatedAt).maxOrNull() ?: return false
     return Duration.between(since, now) >= CONTACT_LOST_AFTER
 }

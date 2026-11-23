@@ -124,9 +124,11 @@ internal class FakeAlerts : GuardianAlertRepository {
         fail.remove(op)?.let { throw it }
     }
 
-    override suspend fun alerts(): List<FamilyAlert> {
+    val statusAsked = mutableListOf<FamilyAlertStatus?>()
+    override suspend fun alerts(status: FamilyAlertStatus?): List<FamilyAlert> {
         step("alerts")
-        return alerts.toList()
+        statusAsked += status
+        return alerts.filter { status == null || it.status == status }
     }
 
     override suspend fun alert(alertId: String): FamilyAlert {

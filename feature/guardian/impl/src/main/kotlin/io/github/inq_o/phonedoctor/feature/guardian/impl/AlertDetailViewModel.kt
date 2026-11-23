@@ -40,7 +40,11 @@ sealed interface AlertDetailUiState {
         val answeredFirst: FamilyAnswer? = null,
         /** 방금 이 화면에서 답함 */
         val answered: Boolean = false,
-    ) : AlertDetailUiState
+        /** 답이 거절됨 (먼저 온 답이 있거나 끝난 요청). 다시 불러오지 못해도 버튼을 거둔다 */
+        val rejected: Boolean = false,
+    ) : AlertDetailUiState {
+        val canAnswer: Boolean get() = alert.answerable && !rejected && answeredFirst == null
+    }
 }
 
 /** G2. 답하면 시니어 폰에 DECISION_MADE가 간다 */
@@ -53,13 +57,16 @@ class AlertDetailViewModel @AssistedInject constructor(
     private val state = MutableStateFlow<AlertDetailUiState>(AlertDetailUiState.Loading)
     val uiState: StateFlow<AlertDetailUiState> = state.asStateFlow()
 
-    init {
-        // 화면으로 봤으니 알림은 지운다
+    /**
+     * 화면이 보일 때마다 (알림을 눌러 같은 요청으로 돌아오거나, 다른 앱에 갔다 옴): 그사이 다른 보호자가 답했거나 결과가 왔을 수 있다.
+     * 화면으로 봤으니 알림은 지운다
+     */
+    fun onShown() {
         notifier.cancelGuardianAlert(alertId)
         load()
     }
 
-    /** 처음과 [다시 불러오기]. 보이던 내용은 불러오는 동안 그대로 둔다 */
+    /** [다시 불러오기]. 보이던 내용은 불러오는 동안 그대로 둔다 */
     fun load() {
         viewModelScope.launch {
             if (state.value is AlertDetailUiState.Failed) state.value = AlertDetailUiState.Loading
@@ -82,7 +89,7 @@ class AlertDetailViewModel @AssistedInject constructor(
 
     fun decide(decision: FamilyDecision) {
         val ready = state.value as? AlertDetailUiState.Ready ?: return
-        if (ready.sending != null || !ready.alert.answerable) return
+        if (ready.sending != null || !ready.canAnswer) return
         // 알림 전용(이미 허용한 앱)에는 [괜찮은 앱이에요]가 없다 (서버도 400)
         if (ready.alert.notice && decision == FamilyDecision.ALLOW) return
         state.value = ready.copy(sending = decision, error = null)
@@ -93,9 +100,9 @@ class AlertDetailViewModel @AssistedInject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: AlreadyAnsweredException) {
-                ready.copy(sending = null, answeredFirst = e.answer).also { reloadQuietly() }
+                ready.copy(sending = null, answeredFirst = e.answer, rejected = true).also { reloadQuietly() }
             } catch (e: AlertClosedException) {
-                ready.copy(sending = null).also { reloadQuietly() }
+                ready.copy(sending = null, rejected = true).also { reloadQuietly() }
             } catch (e: ApiException) {
                 if (e.status == 404) {
                     state.value = AlertDetailUiState.NotFound
@@ -103,7 +110,8 @@ class AlertDetailViewModel @AssistedInject constructor(
                 }
                 ready.copy(sending = null, error = e.toGuardianError())
             } catch (e: Exception) {
-                ready.copy(sending = null, error = e.toGuardianError())
+                // 망 오류: 서버가 받았을 수도 있다. 지금 상태를 다시 읽어 이미 들어간 답이면 그것을 보여 준다
+                ready.copy(sending = null, error = e.toGuardianError()).also { reloadQuietly() }
             }
             state.value = next
         }

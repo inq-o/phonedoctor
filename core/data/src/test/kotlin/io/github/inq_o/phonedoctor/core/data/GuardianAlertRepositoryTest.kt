@@ -29,6 +29,9 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcome
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeCreate
 import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkPairingCode
+import io.github.inq_o.phonedoctor.core.network.model.NetworkReason
+import io.github.inq_o.phonedoctor.core.network.model.NetworkRiskLevel
+import io.github.inq_o.phonedoctor.core.network.model.NetworkVerdict
 import io.github.inq_o.phonedoctor.core.network.model.NetworkSymptomEvidence
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.TestScope
@@ -148,6 +151,37 @@ class GuardianAlertRepositoryTest {
     }
 
     @Test
+    fun `먼저 들어간 답이 내 것이면 성공으로 본다`() = runTest {
+        server.single = alert("a1", status = NetworkAlertStatus.DECIDED)
+        val mine = Json.encodeToJsonElement(
+            NetworkDecision.serializer(),
+            NetworkDecision(NetworkDecisionType.RECOMMEND_UNINSTALL, null, NetworkDeviceSummary("dev-2", "민지"), "2026-11-23T03:00:00Z"),
+        )
+        server.fail["decideAlert"] = ApiException(409, "already-decided", null, null, JsonObject(mapOf("existingDecision" to mine)), null)
+        val a = repo().decide("a1", FamilyDecision.ALLOW, null)
+        assertEquals(FamilyAlertStatus.DECIDED, a.status)
+    }
+
+    @Test
+    fun `열린 요청만 달라고 할 수 있다`() = runTest {
+        server.pages = listOf(listOf(alert("a1")))
+        repo().alerts(FamilyAlertStatus.OPEN)
+        assertEquals(NetworkAlertStatus.OPEN, server.statuses.single())
+    }
+
+    @Test
+    fun `판정 근거를 옮긴다`() = runTest {
+        server.single = alert("a1").copy(
+            source = NetworkAlertSource.INSTALL_SCAN,
+            verdict = NetworkVerdict(NetworkRiskLevel.RISK, 0.94, "2026.11.1", listOf(NetworkReason("AD_SDK_HEAVY", 0.5))),
+        )
+        val a = repo().alert("a1")
+        assertTrue(a.fromInstallScan)
+        assertEquals(listOf("AD_SDK_HEAVY"), a.verdict?.reasons)
+        assertEquals("RISK", a.verdict?.level)
+    }
+
+    @Test
     fun `서버가 지운 기기는 등록 없음으로 알린다`() = runTest {
         server.fail["listAlerts"] = ApiException(403, "device-not-registered", null, null, null, null)
         try {
@@ -179,6 +213,7 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
     val bodies = mutableListOf<NetworkDecisionCreate>()
     var pages: List<List<NetworkAlert>> = emptyList()
     var single: NetworkAlert? = null
+    val statuses = mutableListOf<NetworkAlertStatus?>()
 
     private fun record(op: String) {
         calls += op
@@ -187,6 +222,7 @@ private class AlertServer : PhoneDoctorNetworkDataSource {
 
     override suspend fun listAlerts(status: NetworkAlertStatus?, updatedSince: String?, pageToken: String?, pageSize: Int?): NetworkAlertList {
         record("listAlerts")
+        statuses += status
         val index = pageToken?.toInt() ?: 0
         val items = pages.getOrElse(index) { emptyList() }
         return NetworkAlertList(items, if (index + 1 < pages.size) "${index + 1}" else null)
