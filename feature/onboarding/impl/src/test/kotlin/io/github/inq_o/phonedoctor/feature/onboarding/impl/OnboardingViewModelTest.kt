@@ -66,11 +66,39 @@ class OnboardingViewModelTest {
         assertEquals(false, vm.uiState.value.connectFamily)
     }
 
+    @Test
+    fun roleChoiceSavesOnceThenAllowsChoosingAgainAfterBack() = runTest(dispatcher) {
+        val vm = RoleChoiceViewModel(settings)
+        vm.choose(DeviceRole.GUARDIAN)
+        vm.choose(DeviceRole.SENIOR)
+        advanceUntilIdle()
+        assertEquals(DeviceRole.GUARDIAN, vm.chosen.value)
+        assertEquals(listOf(DeviceRole.GUARDIAN), settings.roles)
+
+        vm.consumeChosen()
+        // 넘어가는 동안 다시 누른 것은 저장하지 않는다
+        vm.choose(DeviceRole.SENIOR)
+        advanceUntilIdle()
+        assertEquals(null, vm.chosen.value)
+        assertEquals(listOf(DeviceRole.GUARDIAN), settings.roles)
+
+        vm.onShown()
+        vm.choose(DeviceRole.SENIOR)
+        advanceUntilIdle()
+        assertEquals(DeviceRole.SENIOR, vm.chosen.value)
+        assertEquals(listOf(DeviceRole.GUARDIAN, DeviceRole.SENIOR), settings.roles)
+    }
+
     private class FakeSettings : UserSettingsRepository {
         var completed = 0
+        val roles = mutableListOf<DeviceRole>()
         override val onboardingDone: Flow<Boolean> = flowOf(false)
+        override val chosenRole: Flow<DeviceRole?> = flowOf(null)
         override suspend fun completeOnboarding(disclosureVersion: Int) {
             completed++
+        }
+        override suspend fun chooseRole(role: DeviceRole) {
+            roles += role
         }
     }
 
@@ -92,7 +120,8 @@ class OnboardingViewModelTest {
         override fun notifyAlert(alert: SymptomAlert) = Unit
         override fun cancelAlert(alertId: Long) = Unit
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
-        override fun notifyLinkRevoked(linkId: String, name: String?) = Unit
+        override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
+        override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
         override fun cancelLink(linkId: String) = Unit
     }
 
@@ -100,6 +129,8 @@ class OnboardingViewModelTest {
     private class FakeFamily(override val available: Boolean) : FamilyRepository {
         override val role: Flow<DeviceRole?> = flowOf(null)
         override suspend fun createPairingCode(): PairingCode = error("첫 설정에서 코드를 받지 않음")
+        override val isGuardianSignedIn = false
+        override suspend fun signInGuardian(googleIdToken: String) = error("부르지 않음")
         override suspend fun acceptPairingCode(code: String): FamilyLink = error("부르지 않음")
         override suspend fun links(): List<FamilyLink> = error("부르지 않음")
         override suspend fun confirmLink(linkId: String): FamilyLink = error("부르지 않음")

@@ -6,10 +6,18 @@
     <string name="core_notifications_alert_text_today">%1$s 오늘 광고를 %2$d번 띄웠어요</string>
     <string name="core_notifications_alert_text_date">%1$s %2$d월 %3$d일에 광고를 %4$d번 띄웠어요</string>
     <string name="core_notifications_channel_link">가족 연결</string>
-    <string name="core_notifications_channel_link_description">가족이 연결을 요청하거나 연결이 끊겼을 때 알려 드려요</string>
+    <string name="core_notifications_channel_link_description">가족 연결 요청이 오거나, 연결되거나 끊겼을 때 알려 드려요</string>
     <string name="core_notifications_link_requested_title">가족 연결 요청이 왔어요</string>
     <string name="core_notifications_link_requested_text">%1$s님이 연결하고 싶어 해요. 눌러서 확인해 주세요</string>
     <string name="core_notifications_link_revoked_title">가족 연결이 끊겼어요</string>
     <string name="core_notifications_link_revoked_text">%1$s님과 연결이 끊겼어요</string>
+    <string name="core_notifications_link_revoked_by_senior_title">가족 연결 소식이 있어요</string>
+    <!-- 시니어가 연결을 끊었을 때와 연결 요청을 거절했을 때 모두 온다 -->
+    <string name="core_notifications_link_revoked_by_senior_text">%1$s 폰과 연결되어 있지 않아요. 눌러서 확인해 주세요</string>
+    <string name="core_notifications_link_revoked_unknown_text">가족 연결 하나가 끊겼어요. 눌러서 확인해 주세요</string>
+    <string name="core_notifications_link_activated_title">%1$s 폰과 연결됐어요</string>
+    <string name="core_notifications_link_activated_text">이제 %1$s 폰에 확인이 필요한 앱이 생기면 알려 드려요</string>
     <string name="core_notifications_family_fallback">가족</string>
+    <!-- 보호자 알림에서 시니어 이름이 비었을 때. "부모님 폰과 연결됐어요" -->
+    <string name="core_notifications_senior_fallback">부모님</string>
 </resources>

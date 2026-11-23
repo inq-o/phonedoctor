@@ -42,6 +42,13 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { if (role == null) it.remove(PENDING_ROLE) else it[PENDING_ROLE] = role }
     }
 
+    /** 첫 실행에서 고른 쓰임새(O1): DeviceRole 이름. 고르기 전·역할 선택이 없던 판에서 설정을 끝낸 기기는 null */
+    val chosenRole: Flow<String?> = store.data.map { it[CHOSEN_ROLE] }
+
+    suspend fun setChosenRole(role: String) {
+        store.edit { it[CHOSEN_ROLE] = role }
+    }
+
     suspend fun setOnboardingDone(done: Boolean) {
         store.edit { it[ONBOARDING_DONE] = done }
     }
@@ -56,6 +63,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val DEVICE_ID = stringPreferencesKey("deviceId")
         val DEVICE_ROLE = stringPreferencesKey("deviceRole")
         val PENDING_ROLE = stringPreferencesKey("pendingRegistrationRole")
+        val CHOSEN_ROLE = stringPreferencesKey("chosenRole")
     }
 }
 

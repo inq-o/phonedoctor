@@ -57,12 +57,14 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val onboardingDone by viewModel.onboardingDone.collectAsStateWithLifecycle()
+                    val start by viewModel.start.collectAsStateWithLifecycle()
                     val pendingOpen by viewModel.pendingOpen.collectAsStateWithLifecycle()
                     // 설정을 읽기 전에는 아무 화면도 그리지 않는다 (첫 설정 화면이 잠깐 보였다 사라지지 않게)
-                    onboardingDone?.let { done ->
+                    start?.let {
                         MainNavigation(
-                            onboardingDone = done,
+                            start = it,
+                            familyAvailable = viewModel.familyAvailable,
+                            guardianSignedIn = { viewModel.guardianSignedIn },
                             pendingOpen = pendingOpen,
                             onOpened = viewModel::consumePendingOpen,
                         )

@@ -37,6 +37,15 @@ interface FamilyRepository {
     /** 서버에 등록한 역할. 연결을 시작하기 전이면 null */
     val role: Flow<DeviceRole?>
 
+    /** 보호자로 Google 로그인돼 있는지. 아니면 O-G1부터 */
+    val isGuardianSignedIn: Boolean
+
+    /**
+     * 보호자: Credential Manager로 받은 Google ID 토큰으로 Firebase에 로그인한다 (O-G1). 서버에는 아직 아무것도 보내지 않는다(등록은 코드를 넣을 때).
+     * 이미 시니어로 등록한 기기면 RoleMismatchException
+     */
+    suspend fun signInGuardian(googleIdToken: String)
+
     /** 시니어: 연결 코드를 새로 받는다 (O-S4, 10분) */
     suspend fun createPairingCode(): PairingCode
 
@@ -76,6 +85,9 @@ interface FamilyAccount {
     val isSignedIn: Boolean
     val isAnonymous: Boolean
     suspend fun signInAnonymously()
+
+    /** Google ID 토큰으로 로그인 (보호자). 익명 사용자였으면 그 사용자는 버리고 Google 사용자로 바뀐다 */
+    suspend fun signInWithGoogle(idToken: String)
     fun signOut()
 
     /** 지금 사용자를 지우고 로그아웃. 로그인 전이면 아무것도 안 한다 */
@@ -129,6 +141,15 @@ internal class DefaultFamilyRepository @Inject constructor(
     private val pendingKeys = mutableMapOf<String, String>()
 
     override val role: Flow<DeviceRole?> = preferences.registeredDevice.map { it?.let { d -> DeviceRole.valueOf(d.role) } }
+
+    // 꺼진 빌드는 Firebase 설정이 없을 수 있어 로그인 상태를 읽지 않는다
+    override val isGuardianSignedIn: Boolean get() = available && account.isSignedIn && !account.isAnonymous
+
+    override suspend fun signInGuardian(googleIdToken: String) = serialized {
+        // 시니어로 등록한 기기의 익명 사용자를 Google 사용자로 바꾸면 서버의 시니어 기기에 다시 닿을 수 없다
+        registered()?.let { if (it.role != DeviceRole.GUARDIAN.name) throw RoleMismatchException(DeviceRole.valueOf(it.role)) }
+        account.signInWithGoogle(googleIdToken)
+    }
 
     override suspend fun createPairingCode(): PairingCode = serialized {
         // 새 키로 보낸다: 코드는 10분이면 만료라, 예전 키의 저장된 응답(만료된 코드)을 되받으면 안 된다. 새 코드를 받으면 예전 코드는 서버가 폐기

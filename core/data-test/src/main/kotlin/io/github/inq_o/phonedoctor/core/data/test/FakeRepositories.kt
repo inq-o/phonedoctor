@@ -7,6 +7,7 @@ import io.github.inq_o.phonedoctor.core.model.AlertOutcome
 import io.github.inq_o.phonedoctor.core.model.AlertStatus
 import io.github.inq_o.phonedoctor.core.model.AppIdentity
 import io.github.inq_o.phonedoctor.core.model.DailyAppCount
+import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.ScanRun
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import kotlinx.coroutines.flow.Flow
@@ -70,7 +71,13 @@ class FakeUserSettingsRepository @Inject constructor() : UserSettingsRepository 
     private val done = MutableStateFlow(true)
     override val onboardingDone: Flow<Boolean> = done
 
+    override val chosenRole = MutableStateFlow<DeviceRole?>(null)
+
     override suspend fun completeOnboarding(disclosureVersion: Int) {
         done.value = true
+    }
+
+    override suspend fun chooseRole(role: DeviceRole) {
+        chosenRole.value = role
     }
 }

@@ -99,6 +99,8 @@ class SeniorHomeFamilyTest {
             return links
         }
         override suspend fun createPairingCode(): PairingCode = error("홈에서 부르지 않음")
+        override val isGuardianSignedIn = false
+        override suspend fun signInGuardian(googleIdToken: String) = error("부르지 않음")
         override suspend fun acceptPairingCode(code: String): FamilyLink = error("홈에서 부르지 않음")
         override suspend fun confirmLink(linkId: String): FamilyLink = error("홈에서 부르지 않음")
         override suspend fun revokeLink(linkId: String) = error("홈에서 부르지 않음")
@@ -132,7 +134,8 @@ class SeniorHomeFamilyTest {
         override fun notifyAlert(alert: SymptomAlert) = Unit
         override fun cancelAlert(alertId: Long) = Unit
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
-        override fun notifyLinkRevoked(linkId: String, name: String?) = Unit
+        override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
+        override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
         override fun cancelLink(linkId: String) = Unit
     }
 }

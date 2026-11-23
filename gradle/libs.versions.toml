@@ -27,6 +27,10 @@ retrofit = "3.0.0"
 jsonSchemaValidator = "1.5.9"
 work = "2.11.2"
 zxing = "3.5.3"
+# 보호자 Google 로그인(Credential Manager)과 QR 읽기(Google 코드 스캐너: 카메라 권한 없이 Play 서비스 화면으로 읽음)
+credentials = "1.5.0"
+googleid = "1.1.1"
+playServicesCodeScanner = "16.1.0"
 
 [libraries]
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
@@ -80,6 +84,10 @@ junit = { module = "junit:junit", version.ref = "junit" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxing" }
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+play-services-code-scanner = { module = "com.google.android.gms:play-services-code-scanner", version.ref = "playServicesCodeScanner" }
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerializationCore" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationCore" }
 

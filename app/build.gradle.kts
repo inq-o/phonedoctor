@@ -80,6 +80,8 @@ androidComponents {
 }
 
 dependencies {
+    implementation(projects.feature.guardian.api)
+    implementation(projects.feature.guardian.impl)
     implementation(projects.feature.onboarding.api)
     implementation(projects.feature.onboarding.impl)
     implementation(projects.feature.seniorAppdetail.api)
@@ -108,6 +110,8 @@ dependencies {
     // 푸시(FCM) 토큰 갱신 받기. 출시 빌드는 가족 연결이 꺼져 있고 인터넷 권한도 뺀다 (src/release/AndroidManifest.xml)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
+
+    testImplementation(libs.junit)
 
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     // 시험용 App Check 확인(AppCheckProbeReceiver)이 Play Integrity 공급자를 직접 고른다

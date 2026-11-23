@@ -30,8 +30,14 @@ interface Notifier {
     /** 가족이 연결을 요청함 (푸시 LINK_REQUESTED). 탭하면 연결 확인 화면(S3)이 열린다 */
     fun notifyLinkRequested(linkId: String, guardianName: String?)
 
-    /** 상대가 연결을 끊음 (푸시 LINK_REVOKED). 탭하면 가족 연결 관리 화면(S5)이 열린다 */
-    fun notifyLinkRevoked(linkId: String, name: String?)
+    /** (보호자) 시니어가 연결을 받아들임 (푸시 LINK_ACTIVATED). 탭하면 보호자 홈(G1)이 열린다 */
+    fun notifyLinkActivated(linkId: String, seniorName: String?)
+
+    /**
+     * 상대가 연결을 끊음 (푸시 LINK_REVOKED). 탭하면 연결 목록(시니어 S5, 보호자 G1)이 열린다.
+     * 보호자가 끊었으면 [guardianName], 시니어가 끊었으면 [seniorName]. 기기 삭제로 끊겼으면 둘 다 null일 수 있다
+     */
+    fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?)
 
     fun cancelLink(linkId: String)
 }
@@ -90,12 +96,34 @@ class SystemNotifier @Inject constructor(
         notifyLink(linkId, context.getString(R.string.core_notifications_link_requested_title), text, launch)
     }
 
-    override fun notifyLinkRevoked(linkId: String, name: String?) {
+    override fun notifyLinkActivated(linkId: String, seniorName: String?) {
+        val launch = launchIntent() ?: return
+        launch.putExtra(EXTRA_OPEN_FAMILY, true)
+        launch.data = notificationUri("link-activated", linkId)
+        val name = seniorNameOrFallback(seniorName)
+        notifyLink(
+            linkId,
+            context.getString(R.string.core_notifications_link_activated_title, name),
+            context.getString(R.string.core_notifications_link_activated_text, name),
+            launch,
+        )
+    }
+
+    override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
         launch.data = notificationUri("link-revoked", linkId)
-        val text = context.getString(R.string.core_notifications_link_revoked_text, nameOrFallback(name))
-        notifyLink(linkId, context.getString(R.string.core_notifications_link_revoked_title), text, launch)
+        val guardian = guardianName?.trim()?.ifEmpty { null }
+        val senior = seniorName?.trim()?.ifEmpty { null }
+        val text = when {
+            guardian != null -> context.getString(R.string.core_notifications_link_revoked_text, guardian)
+            // 시니어 이름 뒤에는 "님"을 붙이지 않는다 (기본 이름이 "부모님").
+            // 시니어의 [안 할래요](요청 거절)도 같은 푸시라 "끊겼어요" 대신 지금 상태를 말한다
+            senior != null -> context.getString(R.string.core_notifications_link_revoked_by_senior_text, senior)
+            else -> context.getString(R.string.core_notifications_link_revoked_unknown_text)
+        }
+        val title = if (guardian == null && senior != null) R.string.core_notifications_link_revoked_by_senior_title else R.string.core_notifications_link_revoked_title
+        notifyLink(linkId, context.getString(title), text, launch)
     }
 
     override fun cancelLink(linkId: String) {
@@ -113,6 +141,9 @@ class SystemNotifier @Inject constructor(
 
     private fun nameOrFallback(name: String?): String =
         name?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_family_fallback)
+
+    private fun seniorNameOrFallback(name: String?): String =
+        name?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_senior_fallback)
 
     /** 연결 알림은 연결마다 하나. 같은 연결의 새 알림(요청 → 끊김)은 앞 알림을 바꾼다 */
     private fun notifyLink(linkId: String, title: String, text: String, launch: Intent) {
