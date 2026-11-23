@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.inq_o.phonedoctor.core.database.AlertLocalDao
+import io.github.inq_o.phonedoctor.core.database.AllowEntryDao
 import io.github.inq_o.phonedoctor.core.database.AppDatabase
 import io.github.inq_o.phonedoctor.core.database.DetectorStateDao
 import io.github.inq_o.phonedoctor.core.database.ScanRunDao
@@ -28,6 +29,9 @@ class DatabaseModule {
 
     @Provides
     fun provideAlertLocalDao(db: AppDatabase): AlertLocalDao = db.alertLocalDao()
+
+    @Provides
+    fun provideAllowEntryDao(db: AppDatabase): AllowEntryDao = db.allowEntryDao()
 
     @Provides
     @Singleton

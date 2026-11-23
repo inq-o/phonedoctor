@@ -13,6 +13,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.Josa
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
@@ -26,6 +27,12 @@ interface Notifier {
     fun notifyAlert(alert: SymptomAlert)
 
     fun cancelAlert(alertId: Long)
+
+    /**
+     * 보호자가 답함 (푸시 DECISION_MADE, F1 13~14). 지우자고 했으면 "민지님이 ○○을 지우자고 했어요"로 앞의 알림을 바꾸고(탭하면 S2),
+     * 괜찮다고 했으면 새로 알리지 않고 떠 있는 알림만 "괜찮다고 했어요"로 바꾼다 (ux-flows F1 끝 주석)
+     */
+    fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?)
 
     /** 가족이 연결을 요청함 (푸시 LINK_REQUESTED). 탭하면 연결 확인 화면(S3)이 열린다 */
     fun notifyLinkRequested(linkId: String, guardianName: String?)
@@ -81,6 +88,47 @@ class SystemNotifier @Inject constructor(
             NotificationManagerCompat.from(context).notify(alert.id.toInt(), notification)
         } catch (e: SecurityException) {
             // 확인 직후 권한이 꺼진 경우. 홈 화면에는 그대로 보인다
+        }
+    }
+
+    override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) {
+        if (!canNotify()) return
+        val name = nameOrFallback(guardianName)
+        val manager = NotificationManagerCompat.from(context)
+        val text = when (decision) {
+            FamilyDecision.RECOMMEND_UNINSTALL -> context.getString(R.string.core_notifications_decision_uninstall_text, name, Josa.eulReul(alert.label))
+            FamilyDecision.ALLOW -> {
+                val showing = context.getSystemService(NotificationManager::class.java).activeNotifications.any { it.id == alert.id.toInt() && it.tag == null }
+                if (!showing) return
+                context.getString(R.string.core_notifications_decision_allow_text, name, Josa.eunNeun(alert.label))
+            }
+        }
+        ensureChannel()
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        launch.putExtra(EXTRA_ALERT_ID, alert.id)
+        launch.data = notificationUri("decision", alert.id.toString())
+        val pending = PendingIntent.getActivity(
+            context, alert.id.toInt(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val uninstall = decision == FamilyDecision.RECOMMEND_UNINSTALL
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.core_notifications_ic_alert)
+            .setContentTitle(
+                context.getString(if (uninstall) R.string.core_notifications_decision_uninstall_title else R.string.core_notifications_decision_allow_title),
+            )
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(if (uninstall) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_LOW)
+            // 괜찮다는 소식은 소리 없이 앞 알림만 바꾼다
+            .setOnlyAlertOnce(!uninstall)
+            .setSilent(!uninstall)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        try {
+            manager.notify(alert.id.toInt(), notification)
+        } catch (e: SecurityException) {
+            // 확인 직후 권한이 꺼진 경우. 앱 상세 화면에는 그대로 보인다
         }
     }
 

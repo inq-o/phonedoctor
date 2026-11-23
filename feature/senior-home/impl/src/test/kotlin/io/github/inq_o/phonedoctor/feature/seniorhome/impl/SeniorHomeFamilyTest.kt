@@ -7,6 +7,7 @@ import io.github.inq_o.phonedoctor.core.data.SymptomRepository
 import io.github.inq_o.phonedoctor.core.model.AlertOutcome
 import io.github.inq_o.phonedoctor.core.model.DailyAppCount
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.model.PairingCode
@@ -106,6 +107,7 @@ class SeniorHomeFamilyTest {
         override suspend fun revokeLink(linkId: String) = error("홈에서 부르지 않음")
         override suspend fun updatePushToken(token: String) = Unit
         override suspend fun deleteAllData() = Unit
+        override suspend fun reportAppVersion() = Unit
     }
 
     private class FakeSymptoms : SymptomRepository {
@@ -133,6 +135,7 @@ class SeniorHomeFamilyTest {
         override fun canNotify() = true
         override fun notifyAlert(alert: SymptomAlert) = Unit
         override fun cancelAlert(alertId: Long) = Unit
+        override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
         override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
         override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
         override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit

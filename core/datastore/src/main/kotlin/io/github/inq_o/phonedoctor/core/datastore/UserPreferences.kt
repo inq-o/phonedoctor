@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -49,6 +50,27 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { it[CHOSEN_ROLE] = role }
     }
 
+    /** (시니어) 마지막으로 가족 서버에 상태를 보고한 시각 ms (`PUT /devices/{id}/status`, 6시간 간격) */
+    val lastStatusReportAt: Flow<Long> = store.data.map { it[LAST_STATUS_REPORT] ?: 0L }
+
+    suspend fun setLastStatusReportAt(at: Long) {
+        store.edit { it[LAST_STATUS_REPORT] = at }
+    }
+
+    /** (시니어) 서버에서 받아 온 내 요청의 마지막 updatedAt. 다음 당겨 오기의 updatedSince */
+    val alertPullCursor: Flow<String?> = store.data.map { it[ALERT_PULL_CURSOR] }
+
+    suspend fun setAlertPullCursor(cursor: String?) {
+        store.edit { if (cursor == null) it.remove(ALERT_PULL_CURSOR) else it[ALERT_PULL_CURSOR] = cursor }
+    }
+
+    /** 서버에 마지막으로 알린 앱 버전 (`appVersionCode`). 앱이 업데이트되면 다시 알린다 */
+    val reportedAppVersion: Flow<Int?> = store.data.map { it[REPORTED_APP_VERSION] }
+
+    suspend fun setReportedAppVersion(version: Int?) {
+        store.edit { if (version == null) it.remove(REPORTED_APP_VERSION) else it[REPORTED_APP_VERSION] = version }
+    }
+
     suspend fun setOnboardingDone(done: Boolean) {
         store.edit { it[ONBOARDING_DONE] = done }
     }
@@ -64,6 +86,9 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         val DEVICE_ROLE = stringPreferencesKey("deviceRole")
         val PENDING_ROLE = stringPreferencesKey("pendingRegistrationRole")
         val CHOSEN_ROLE = stringPreferencesKey("chosenRole")
+        val LAST_STATUS_REPORT = longPreferencesKey("lastStatusReportAt")
+        val ALERT_PULL_CURSOR = stringPreferencesKey("alertPullCursor")
+        val REPORTED_APP_VERSION = intPreferencesKey("reportedAppVersion")
     }
 }
 

@@ -6,6 +6,14 @@
     <string name="feature_senior_appdetail_impl_reason_days">광고가 뜬 날이 %1$d일이에요</string>
     <string name="feature_senior_appdetail_impl_reason_explain">이 앱을 쓰지 않았는데도 화면에 떴어요. 폰주치의가 광고로 본 것이라 틀릴 수도 있어요.</string>
 
+    <string name="feature_senior_appdetail_impl_family_fallback">가족</string>
+    <string name="feature_senior_appdetail_impl_family_recommends">%1$s님이 이 앱을 지우자고 했어요</string>
+    <string name="feature_senior_appdetail_impl_family_waiting_title">가족의 답을 기다리고 있어요</string>
+    <string name="feature_senior_appdetail_impl_family_waiting_body">가족에게 이 앱을 알렸어요. 답이 오면 알려 드릴게요. 기다리지 않고 지금 지워도 돼요.</string>
+    <string name="feature_senior_appdetail_impl_uninstall_now">지금 지울래요</string>
+    <string name="feature_senior_appdetail_impl_allowed_title">가족이 괜찮다고 했어요</string>
+    <string name="feature_senior_appdetail_impl_allowed_body">%1$s님이 이 앱은 그대로 써도 된다고 했어요. 더 하실 일은 없어요.</string>
+
     <string name="feature_senior_appdetail_impl_later">나중에 할게요</string>
     <string name="feature_senior_appdetail_impl_uninstall">이 앱 지우기</string>
     <string name="feature_senior_appdetail_impl_retry">다시 지우기</string>

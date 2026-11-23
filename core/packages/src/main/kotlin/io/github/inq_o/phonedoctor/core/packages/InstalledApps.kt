@@ -22,6 +22,15 @@ data class InstalledApp(
     val lastUpdateTime: Long,
 )
 
+/** 가족에게 알리는 앱 1개의 설치 정보 (openapi AppInfo). 설치 앱 목록이 아니라 확인이 필요한 앱 하나의 값만 보낸다 */
+data class AppDetails(
+    val versionName: String?,
+    /** 설치한 앱(스토어·패키지 설치 관리자)의 패키지 이름. 모르면 null */
+    val installerPackage: String?,
+    val firstInstallTime: Long,
+    val lastUpdateTime: Long,
+)
+
 interface InstalledApps {
     /** 이 앱의 패키지 이름 (판정 대상에서 뺀다) */
     val ownPackageName: String
@@ -39,6 +48,9 @@ interface InstalledApps {
 
     /** 설치돼 있으면 true, 없으면 false, 확인하지 못하면 null */
     fun isInstalled(packageName: String): Boolean?
+
+    /** 설치 정보. 없거나 못 읽으면 null */
+    fun details(packageName: String): AppDetails?
 }
 
 class AndroidInstalledApps @Inject constructor(
@@ -88,6 +100,21 @@ class AndroidInstalledApps @Inject constructor(
         false
     } catch (e: RuntimeException) {
         null
+    }
+
+    override fun details(packageName: String): AppDetails? {
+        val info = packageInfo(packageName, signing = false) ?: return null
+        val installer = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                pm.getInstallSourceInfo(packageName).installingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                pm.getInstallerPackageName(packageName)
+            }
+        } catch (e: PackageManager.NameNotFoundException) {
+            null
+        }
+        return AppDetails(info.versionName, installer, info.firstInstallTime, info.lastUpdateTime)
     }
 
     private fun packageInfo(packageName: String, signing: Boolean): PackageInfo? = try {

@@ -47,6 +47,8 @@ class FamilyRepositoryTest {
     private val network = FakeNetwork()
     private val account = FakeAccount()
     private val push = FakePushTokens()
+    private val linkEvents = FakeLinkEvents()
+    private val deviceInfo = FakeDeviceInfo()
     private lateinit var prefs: UserPreferences
 
     private fun TestScope.repo(available: Boolean = true): DefaultFamilyRepository {
@@ -54,7 +56,7 @@ class FamilyRepositoryTest {
             tmp.newFile("prefs.preferences_pb").also { it.delete() }
         }
         prefs = UserPreferences(store)
-        return DefaultFamilyRepository(available, network, prefs, account, push, FakeDeviceInfo)
+        return DefaultFamilyRepository(available, network, prefs, account, push, deviceInfo, linkEvents)
     }
 
     @Test
@@ -184,6 +186,30 @@ class FamilyRepositoryTest {
         assertEquals(1, account.deleted)
         assertFalse(push.autoRefreshOn)
         assertEquals(1, push.deleted)
+        assertEquals(listOf("deleted"), linkEvents.calls)
+    }
+
+    @Test
+    fun `연결을 끊으면 가족 동기화가 남은 연결을 다시 확인하게 한다`() = runTest {
+        val repo = repo()
+        repo.createPairingCode()
+        repo.revokeLink("link-1")
+        assertEquals(listOf("revoked"), linkEvents.calls)
+    }
+
+    @Test
+    fun `앱이 업데이트됐을 때만 기기 정보의 버전을 고친다`() = runTest {
+        val repo = repo()
+        repo.reportAppVersion()
+        assertTrue(network.updates.isEmpty())
+        repo.createPairingCode()
+        // 등록 때 보낸 버전이면 다시 보내지 않는다
+        repo.reportAppVersion()
+        assertTrue(network.updates.isEmpty())
+        deviceInfo.appVersionCode = 2
+        repo.reportAppVersion()
+        repo.reportAppVersion()
+        assertEquals(listOf(2), network.updates.map { it.second.appVersionCode })
     }
 
     @Test
@@ -229,6 +255,8 @@ class FamilyRepositoryTest {
         // 오프셋이 붙은 시각도 받는다
         assertEquals(Instant.parse("2026-11-23T00:05:00Z"), link.activatedAt)
         assertEquals("민지", link.guardianName)
+        // 새 보호자에게 열린 요청을 알리도록 동기화를 부른다
+        assertEquals(listOf("confirmed"), linkEvents.calls)
     }
 
     @Test
@@ -370,8 +398,21 @@ class FamilyRepositoryTest {
     }
 }
 
-private object FakeDeviceInfo : DeviceInfo {
-    override val appVersionCode = 1
+private class FakeLinkEvents : FamilyLinkEvents {
+    val calls = mutableListOf<String>()
+    override suspend fun onLinkConfirmed() {
+        calls += "confirmed"
+    }
+    override suspend fun onDataDeleted() {
+        calls += "deleted"
+    }
+    override suspend fun onLinkRevoked() {
+        calls += "revoked"
+    }
+}
+
+private class FakeDeviceInfo : DeviceInfo {
+    override var appVersionCode = 1
     override val sdkInt = 31
     override val manufacturer = "samsung"
     override val locale = "ko-KR"

@@ -51,6 +51,7 @@ class DefaultSymptomRepository @Inject constructor(
     private val symptomDao: SymptomEventDao,
     private val installedApps: InstalledApps,
     scanner: SymptomScanner,
+    private val familySync: FamilySyncScheduler,
 ) : SymptomRepository {
     override val openAlerts: Flow<List<SymptomAlert>> = alertDao.observeOpen().map { list -> list.map { it.toModel() } }
 
@@ -77,7 +78,10 @@ class DefaultSymptomRepository @Inject constructor(
     override suspend fun recordOutcome(id: Long, outcome: AlertOutcome) {
         val alert = alertDao.get(id) ?: return
         val status = if (outcome == AlertOutcome.FAILED) alert.status else AlertStatus.RESOLVED.name
-        alertDao.update(alert.copy(status = status, outcome = outcome.name, updatedAt = System.currentTimeMillis()))
+        // 열 단위로: 그사이 가족 동기화가 서버 ID·보호자 응답을 썼을 수 있다
+        alertDao.setOutcome(id, status, outcome.name, System.currentTimeMillis())
+        // 가족에게 보낸 요청이면 결과를 알린다 (보내지 않은 요청이면 동기화가 표시만 지운다. 읽은 뒤 서버 ID가 생겼을 수 있어 늘 맡긴다)
+        familySync.schedule()
     }
 
     override suspend fun confirmRemoved(id: Long, requested: Boolean): Boolean? = withContext(Dispatchers.IO) {

@@ -53,6 +53,15 @@ interface SymptomEventDao {
     )
     suspend fun dailyCounts(packageName: String, cert: String, versionCode: Long, sinceDate: String): List<DailySymptomCount>
 
+    /** [after] 뒤의 전환만 센 하루 횟수 (보호자가 허용한 뒤에 생긴 근거) */
+    @Query(
+        "SELECT packageName, signingCertSha256, versionCode, localDate, COUNT(*) AS n, " +
+            "MIN(resumedAt) AS firstAt, MAX(resumedAt) AS lastAt FROM symptom_event " +
+            "WHERE packageName = :packageName AND signingCertSha256 = :cert AND versionCode = :versionCode " +
+            "AND resumedAt > :after GROUP BY localDate ORDER BY localDate",
+    )
+    suspend fun dailyCountsAfter(packageName: String, cert: String, versionCode: Long, after: Long): List<DailySymptomCount>
+
     @Query(
         "SELECT packageName, signingCertSha256, versionCode, localDate, COUNT(*) AS n, " +
             "MIN(resumedAt) AS firstAt, MAX(resumedAt) AS lastAt FROM symptom_event " +

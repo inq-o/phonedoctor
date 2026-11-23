@@ -6,13 +6,16 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.inq_o.phonedoctor.core.data.FamilyAlertSync
 import io.github.inq_o.phonedoctor.core.data.SymptomRepository
 import io.github.inq_o.phonedoctor.core.model.AlertOutcome
 import io.github.inq_o.phonedoctor.core.model.AlertStatus
+import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
 import io.github.inq_o.phonedoctor.core.packages.AppUninstaller
 import io.github.inq_o.phonedoctor.core.packages.UninstallResult
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,7 +43,16 @@ sealed interface AppDetailUiState {
     /** 요청이 없거나 이미 닫힘 (오래된 알림을 눌렀을 때 등) */
     data object Gone : AppDetailUiState
 
-    data class Ready(val alert: SymptomAlert, val phase: UninstallPhase) : AppDetailUiState
+    data class Ready(val alert: SymptomAlert, val phase: UninstallPhase) : AppDetailUiState {
+        /** 가족에게 알렸고 답을 기다리는 중. 시니어는 기다리지 않고 지울 수도 있다 (ux-flows S2 "시니어 본인 결정권") */
+        val waitingForFamily: Boolean get() = alert.family?.waiting == true && phase == UninstallPhase.IDLE
+
+        /** 보호자가 지우자고 함 */
+        val familyRecommends: Boolean get() = alert.family?.decision == FamilyDecision.RECOMMEND_UNINSTALL
+    }
+
+    /** 보호자가 [괜찮은 앱이에요]로 허용함 (F1 끝 주석) */
+    data class Allowed(val guardianName: String?) : AppDetailUiState
 }
 
 @HiltViewModel(assistedFactory = AppDetailViewModel.Factory::class)
@@ -49,6 +61,7 @@ class AppDetailViewModel @AssistedInject constructor(
     private val repository: SymptomRepository,
     private val uninstaller: AppUninstaller,
     private val notifier: Notifier,
+    private val familySync: FamilyAlertSync,
 ) : ViewModel() {
     @AssistedFactory
     interface Factory {
@@ -63,12 +76,23 @@ class AppDetailViewModel @AssistedInject constructor(
             alert == null -> AppDetailUiState.Gone
             // 이 화면에서 지운 직후에는 "지웠어요"를 보여 준다
             phase == UninstallPhase.REMOVED -> AppDetailUiState.Ready(alert, phase)
+            alert.outcome == AlertOutcome.ALLOWED -> AppDetailUiState.Allowed(alert.family?.guardianName)
             alert.status != AlertStatus.OPEN -> AppDetailUiState.Gone
             else -> AppDetailUiState.Ready(alert, phase)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppDetailUiState.Loading)
 
     init {
+        // 가족에게 보낸 요청이면 서버에서 다시 읽는다: 보호자 한마디는 푸시에 없고, 푸시를 놓쳤을 수도 있다. 실패하면 지금 아는 대로 보여 준다
+        viewModelScope.launch {
+            try {
+                familySync.refresh(alertId)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // 다음 동기화 때
+            }
+        }
         viewModelScope.launch {
             uninstaller.results.collect { result ->
                 val alert = (uiState.value as? AppDetailUiState.Ready)?.alert ?: return@collect
