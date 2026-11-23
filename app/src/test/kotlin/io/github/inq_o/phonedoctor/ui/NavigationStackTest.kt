@@ -32,10 +32,10 @@ class NavigationStackTest {
         assertEquals(listOf(SeniorHomeNavKey, FamilyLinksNavKey), pendingStack(listOf(SeniorHomeNavKey), PendingOpen.FamilyLinks))
         // 사이트 광고 알림은 그 사이트 설정을 바로 여는 화면으로
         assertEquals(
-            listOf(SeniorHomeNavKey, SiteAlertNavKey("https://ads.example.com", openSettings = true)),
-            pendingStack(listOf(SeniorHomeNavKey), PendingOpen.Site("https://ads.example.com")),
+            listOf(SeniorHomeNavKey, SiteAlertNavKey("https://ads.example.com", openRequest = "n1")),
+            pendingStack(listOf(SeniorHomeNavKey), PendingOpen.Site("https://ads.example.com", "n1")),
         )
-        assertEquals(emptyList<Any>(), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.Site("https://ads.example.com")))
+        assertEquals(emptyList<Any>(), pendingStack(listOf(GuardianHomeNavKey), PendingOpen.Site("https://ads.example.com", "n1")))
     }
 
     @Test

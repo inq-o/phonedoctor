@@ -14,12 +14,11 @@ import io.github.inq_o.phonedoctor.feature.seniorsites.impl.SitesScreen
 fun EntryProviderScope<NavKey>.seniorSitesEntries(
     onOpenSite: (String) -> Unit,
     onHome: () -> Unit,
-    onBack: () -> Unit,
 ) {
     entry<SitesNavKey> {
-        SitesScreen(onOpenSite = onOpenSite, onBack = onBack)
+        SitesScreen(onOpenSite = onOpenSite, onHome = onHome)
     }
     entry<SiteAlertNavKey> { key ->
-        SiteAlertScreen(site = key.site, openSettings = key.openSettings, onHome = onHome)
+        SiteAlertScreen(site = key.site, openRequest = key.openRequest, onHome = onHome)
     }
 }

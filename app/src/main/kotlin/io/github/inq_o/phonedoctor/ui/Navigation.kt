@@ -72,7 +72,7 @@ internal fun pendingStack(stack: List<NavKey>, target: PendingOpen): List<NavKey
         PendingOpen.FamilyLinks -> listOf(SeniorHomeNavKey, FamilyLinksNavKey)
         // 보호자 요청 알림은 시니어 폰에 오지 않는다
         is PendingOpen.GuardianRequest -> emptyList()
-        is PendingOpen.Site -> listOf(SeniorHomeNavKey, SiteAlertNavKey(target.site, openSettings = true))
+        is PendingOpen.Site -> listOf(SeniorHomeNavKey, SiteAlertNavKey(target.site, openRequest = target.openRequest))
     }
     // 보호자의 연결 알림(연결됨·끊김·연락 끊김)은 연결 목록이 있는 홈으로, 요청 알림은 홈 위에 G2. 시니어 알림은 보호자 폰에 오지 않는다
     GuardianHomeNavKey -> when (target) {
@@ -153,7 +153,6 @@ fun MainNavigation(
             seniorSitesEntries(
                 onOpenSite = { push(SiteAlertNavKey(it)) },
                 onHome = toSeniorHome,
-                onBack = { backStack.removeLastOrNull() },
             )
             seniorFamilyEntries(
                 onAddFamily = { push(PairingCodeNavKey) },

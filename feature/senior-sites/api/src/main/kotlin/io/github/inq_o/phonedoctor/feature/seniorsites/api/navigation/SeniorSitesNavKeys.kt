@@ -7,6 +7,9 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object SitesNavKey : NavKey
 
-/** 광고 알림을 보내는 사이트 하나. [openSettings]면 화면이 열리자마자 그 사이트 알림 설정을 연다 (알림 한 번 탭으로, FR-052) */
+/**
+ * 광고 알림을 보내는 사이트 하나. [openRequest]가 있으면 화면이 열리자마자 그 사이트 알림 설정을 연다 (알림 한 번 탭으로, FR-052).
+ * 알림마다 다른 값이라, 같은 사이트 화면이 떠 있을 때 새 알림을 눌러도 다시 연다
+ */
 @Serializable
-data class SiteAlertNavKey(val site: String, val openSettings: Boolean = false) : NavKey
+data class SiteAlertNavKey(val site: String, val openRequest: String? = null) : NavKey

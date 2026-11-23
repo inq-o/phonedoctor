@@ -45,7 +45,7 @@ import io.github.inq_o.phonedoctor.feature.seniorsites.api.SiteAlertsFeature
 @Composable
 fun SitesScreen(
     onOpenSite: (String) -> Unit,
-    onBack: () -> Unit,
+    onHome: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SitesViewModel = hiltViewModel(),
 ) {
@@ -62,7 +62,7 @@ fun SitesScreen(
         sites = sites,
         onAllowAccess = { context.startFirst(SiteAlertsFeature.settingsIntents(context)) },
         onOpenSite = onOpenSite,
-        onBack = onBack,
+        onHome = onHome,
         modifier = modifier,
     )
 }
@@ -88,7 +88,7 @@ internal fun SitesScreen(
     sites: List<SiteAlert>?,
     onAllowAccess: () -> Unit,
     onOpenSite: (String) -> Unit,
-    onBack: () -> Unit,
+    onHome: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     SeniorScreen(
@@ -102,9 +102,9 @@ internal fun SitesScreen(
         },
         actions = {
             if (granted) {
-                PdPrimaryButton(stringResource(R.string.feature_senior_sites_impl_home), onBack)
+                PdPrimaryButton(stringResource(R.string.feature_senior_sites_impl_home), onHome)
             } else {
-                PdOutlinedButton(stringResource(R.string.feature_senior_sites_impl_home), onBack)
+                PdOutlinedButton(stringResource(R.string.feature_senior_sites_impl_home), onHome)
                 PdPrimaryButton(stringResource(R.string.feature_senior_sites_impl_allow_access), onAllowAccess)
             }
         },
@@ -175,7 +175,7 @@ internal fun Body(text: String) {
 @Preview(showBackground = true, widthDp = 360, heightDp = 800)
 @Composable
 private fun GuidePreview() {
-    PhoneDoctorTheme { SitesScreen(granted = false, sites = null, onAllowAccess = {}, onOpenSite = {}, onBack = {}) }
+    PhoneDoctorTheme { SitesScreen(granted = false, sites = null, onAllowAccess = {}, onOpenSite = {}, onHome = {}) }
 }
 
 @Preview(showBackground = true, widthDp = 360, heightDp = 800, fontScale = 2f)
@@ -185,7 +185,7 @@ private fun ListLargeFontPreview() {
         SitesScreen(
             granted = true,
             sites = listOf(SiteAlert("https://ads.example.com", "com.android.chrome", "web:https://ads.example.com;1", SiteAlertStatus.ASKED, "2026-11-23", 7)),
-            onAllowAccess = {}, onOpenSite = {}, onBack = {},
+            onAllowAccess = {}, onOpenSite = {}, onHome = {},
         )
     }
 }

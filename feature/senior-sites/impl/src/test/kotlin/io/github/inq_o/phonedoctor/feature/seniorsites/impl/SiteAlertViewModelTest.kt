@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.feature.seniorsites.impl
 
+import androidx.lifecycle.SavedStateHandle
 import io.github.inq_o.phonedoctor.core.data.SiteAlertRepository
 import io.github.inq_o.phonedoctor.core.data.SiteNotice
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
@@ -36,12 +37,16 @@ class SiteAlertViewModelTest {
     @Test
     fun openingTheScreenClearsTheNotificationAndTracksTheChoice() = runTest(dispatcher) {
         repo.sites.value = mapOf(SITE to alert(SiteAlertStatus.ASKED))
-        val vm = SiteAlertViewModel(SITE, repo, notifier)
+        val vm = SiteAlertViewModel(SITE, repo, notifier, SavedStateHandle())
         backgroundScope.launch { vm.alert.collect {} }
         assertEquals(listOf(SITE), notifier.cancelled)
         assertEquals(SiteAlertStatus.ASKED, (vm.alert.value as SiteAlertState.Ready).alert.status)
 
+        // 설정을 연 동안은 그대로, 돌아와야 끄는 화면을 연 것으로 (그때부터 오는 알림을 본다)
+        vm.onResumed()
         vm.onSettingsOpened()
+        assertEquals(SiteAlertStatus.ASKED, (vm.alert.value as SiteAlertState.Ready).alert.status)
+        vm.onResumed()
         assertEquals(SiteAlertStatus.MUTED, (vm.alert.value as SiteAlertState.Ready).alert.status)
         vm.allow()
         assertEquals(SiteAlertStatus.ALLOWED, (vm.alert.value as SiteAlertState.Ready).alert.status)
@@ -49,9 +54,23 @@ class SiteAlertViewModelTest {
 
     @Test
     fun unknownSiteIsMissing() = runTest(dispatcher) {
-        val vm = SiteAlertViewModel("https://gone.example", repo, notifier)
+        val vm = SiteAlertViewModel("https://gone.example", repo, notifier, SavedStateHandle())
         backgroundScope.launch { vm.alert.collect {} }
         assertEquals(SiteAlertState.Missing, vm.alert.value)
+    }
+
+    @Test
+    fun eachNotificationOpensSettingsOnceEvenAfterRestore() {
+        val saved = SavedStateHandle()
+        val vm = SiteAlertViewModel(SITE, repo, notifier, saved)
+        assertEquals(false, vm.shouldAutoOpen(null))
+        assertEquals(true, vm.shouldAutoOpen("n1"))
+        vm.onSettingsOpened("n1")
+        assertEquals(false, vm.shouldAutoOpen("n1"))
+        // 화면이 다시 만들어져도 같은 알림으로는 다시 열지 않는다
+        assertEquals(false, SiteAlertViewModel(SITE, repo, notifier, saved).shouldAutoOpen("n1"))
+        // 새 알림("아직 켜져 있어요")은 다시 연다
+        assertEquals(true, vm.shouldAutoOpen("n2"))
     }
 
     private fun alert(status: SiteAlertStatus) = SiteAlert(SITE, "com.android.chrome", "web:$SITE;1", status, "2026-11-23", 7)
@@ -60,7 +79,8 @@ class SiteAlertViewModelTest {
         val sites = MutableStateFlow<Map<String, SiteAlert>>(emptyMap())
         override val alerts: Flow<List<SiteAlert>> = sites.map { it.values.toList() }
         override fun alert(site: String): Flow<SiteAlert?> = sites.map { it[site] }
-        override suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long): SiteNotice? = null
+        override suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long, canNotify: Boolean): SiteNotice? = null
+        override suspend fun prune() = Unit
         override suspend fun markMuted(site: String) = set(site, SiteAlertStatus.MUTED)
         override suspend fun allow(site: String) = set(site, SiteAlertStatus.ALLOWED)
         private fun set(site: String, status: SiteAlertStatus) {

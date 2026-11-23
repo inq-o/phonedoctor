@@ -10,9 +10,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -24,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
@@ -36,12 +34,12 @@ import io.github.inq_o.phonedoctor.core.model.SiteAlertStatus
 import java.time.LocalDate
 
 /**
- * @param openSettings 알림을 탭해 들어옴: 화면이 뜨자마자 그 사이트 알림 설정을 연다 (한 번만, FR-052)
+ * @param openRequest 알림을 탭해 들어옴: 화면이 뜨자마자 그 사이트 알림 설정을 연다 (알림마다 한 번만, FR-052)
  */
 @Composable
 fun SiteAlertScreen(
     site: String,
-    openSettings: Boolean,
+    openRequest: String?,
     onHome: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SiteAlertViewModel = hiltViewModel<SiteAlertViewModel, SiteAlertViewModel.Factory>(
@@ -51,16 +49,19 @@ fun SiteAlertScreen(
 ) {
     val state by viewModel.alert.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    var autoOpened by rememberSaveable { mutableStateOf(false) }
+    LifecycleResumeEffect(Unit) {
+        viewModel.onResumed()
+        onPauseOrDispose {}
+    }
     val openChannel: (SiteAlert) -> Unit = { alert ->
         viewModel.onSettingsOpened()
         context.startFirst(channelSettings(alert))
     }
-    LaunchedEffect(state) {
+    LaunchedEffect(state, openRequest) {
         val alert = (state as? SiteAlertState.Ready)?.alert ?: return@LaunchedEffect
-        if (openSettings && !autoOpened && (alert.status == SiteAlertStatus.ASKED || alert.status == SiteAlertStatus.STILL_ON)) {
-            autoOpened = true
-            openChannel(alert)
+        if (viewModel.shouldAutoOpen(openRequest) && alert.status != SiteAlertStatus.ALLOWED) {
+            viewModel.onSettingsOpened(openRequest)
+            context.startFirst(channelSettings(alert))
         }
     }
     SiteAlertScreen(state = state, onTurnOff = openChannel, onAllow = viewModel::allow, onHome = onHome, modifier = modifier)
@@ -105,8 +106,8 @@ internal fun SiteAlertScreen(
         when {
             state == SiteAlertState.Loading -> CircularProgressIndicator()
             alert == null -> Headline(stringResource(R.string.feature_senior_sites_impl_missing))
+            // 스위치를 실제로 껐는지는 알 수 없다: 다음 알림이 오는지로만 안다 (FR-053). 그래서 "껐어요"라고 단정하지 않는다
             alert.status == SiteAlertStatus.MUTED -> {
-                StatusCircle(StatusKind.OK)
                 Headline(stringResource(R.string.feature_senior_sites_impl_muted_title), announce = true)
                 Body(stringResource(R.string.feature_senior_sites_impl_muted_body, alert.displayName))
             }

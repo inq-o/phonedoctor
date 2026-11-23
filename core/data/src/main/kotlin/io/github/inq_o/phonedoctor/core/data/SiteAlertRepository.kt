@@ -34,12 +34,15 @@ interface SiteAlertRepository {
 
     /**
      * 브라우저 알림 하나를 기록한다. 사이트 알림 채널이 아니면 기록하지 않는다. [text]는 판정에만 쓰고 저장하지 않는다.
-     * 시니어에게 알릴 것이 있으면 돌려준다
+     * 시니어에게 알릴 것이 있으면 돌려준다. [canNotify]가 false면(알림 권한 꺼짐) 물은 것으로 적지 않아 다음 알림에서 다시 판정한다
      */
-    suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long): SiteNotice?
+    suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long, canNotify: Boolean = true): SiteNotice?
 
-    /** 시니어가 그 사이트 알림 설정 화면을 열었음 */
+    /** 시니어가 그 사이트 알림 설정 화면에서 돌아옴 (돌아온 뒤에 오는 알림으로 스위치가 꺼졌는지 본다) */
     suspend fun markMuted(site: String)
+
+    /** 30일 지난 알림 기록을 지운다 (알림이 끊겨도 기록이 남지 않게 주기 검사가 부른다) */
+    suspend fun prune()
 
     /** 시니어가 괜찮은 사이트라고 함 (허용 목록) */
     suspend fun allow(site: String)
@@ -57,25 +60,31 @@ class DefaultSiteAlertRepository @Inject constructor(private val dao: SiteNotifi
 
     override fun alert(site: String): Flow<SiteAlert?> = dao.observeAlert(site).map { it?.toModel() }
 
-    override suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long): SiteNotice? {
+    override suspend fun record(browserPackage: String, channelId: String, text: String, postedAt: Long, canNotify: Boolean): SiteNotice? {
         val site = SiteAdPolicy.siteOf(channelId) ?: return null
         val date = Instant.ofEpochMilli(postedAt).atZone(zone).toLocalDate().toString()
         return lock.withLock {
             dao.insert(SiteNotificationEntity(0, site, browserPackage, channelId, postedAt, date, SiteAdPolicy.hasAdWords(text)))
             dao.deleteOlderThan(now() - SymptomPolicy.RETENTION_DAYS * 86_400_000L)
-            val existing = dao.alert(site)
+            // 끈 사이트를 다시 허용하면 Chrome이 채널을 새로 만든다(`;숫자`가 바뀜): 끄는 화면을 열 때 지금 채널을 쓰게 늘 최신으로
+            val stored = dao.alert(site)
+            val existing = if (stored != null && (stored.channelId != channelId || stored.browserPackage != browserPackage)) {
+                stored.copy(channelId = channelId, browserPackage = browserPackage).also { dao.putAlert(it) }
+            } else {
+                stored
+            }
             when (existing?.status) {
                 SiteAlertStatus.ALLOWED.name, SiteAlertStatus.STILL_ON.name, SiteAlertStatus.ASKED.name -> null
                 SiteAlertStatus.MUTED.name -> {
                     // 끄는 화면을 연 뒤에 온 알림: 스위치가 아직 켜져 있다. 화면을 열고 스위치를 끄기까지 온 것은 세지 않는다
-                    if (postedAt <= (existing.mutedAt ?: 0) + SiteAdPolicy.MUTE_GRACE_MS) return@withLock null
+                    if (postedAt <= (existing.mutedAt ?: 0) + SiteAdPolicy.MUTE_GRACE_MS || !canNotify) return@withLock null
                     val still = existing.copy(status = SiteAlertStatus.STILL_ON.name)
                     dao.putAlert(still)
                     SiteNotice.StillOn(still.toModel())
                 }
                 else -> {
                     val day = dao.dailyCount(site, date) ?: return@withLock null
-                    if (!SiteAdPolicy.isAdSender(day.n, day.adWords)) return@withLock null
+                    if (!SiteAdPolicy.isAdSender(day.n, day.adWords) || !canNotify) return@withLock null
                     val asked = SiteAlertEntity(site, browserPackage, channelId, SiteAlertStatus.ASKED.name, date, day.n, now())
                     dao.putAlert(asked)
                     SiteNotice.Ask(asked.toModel())
@@ -87,6 +96,10 @@ class DefaultSiteAlertRepository @Inject constructor(private val dao: SiteNotifi
     override suspend fun markMuted(site: String) = lock.withLock {
         val existing = dao.alert(site) ?: return@withLock
         dao.putAlert(existing.copy(status = SiteAlertStatus.MUTED.name, mutedAt = now()))
+    }
+
+    override suspend fun prune() = lock.withLock {
+        dao.deleteOlderThan(now() - SymptomPolicy.RETENTION_DAYS * 86_400_000L)
     }
 
     override suspend fun allow(site: String) = lock.withLock {

@@ -36,7 +36,7 @@ sealed interface PendingOpen {
     data class GuardianRequest(val alertId: String) : PendingOpen
 
     /** (시니어) 광고 알림을 보내는 사이트. 그 사이트 알림 설정을 바로 연다 (US10) */
-    data class Site(val site: String) : PendingOpen
+    data class Site(val site: String, val openRequest: String?) : PendingOpen
 }
 
 /** 앱을 열 때 처음 보일 화면 */

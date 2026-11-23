@@ -23,8 +23,8 @@ class SiteAlertRepositoryTest {
     }
     private val channel = "web:https://ads.example.com;123"
 
-    private suspend fun post(text: String = "새 소식", channelId: String = channel, at: Long = T0) =
-        repo.record("com.android.chrome", channelId, text, at)
+    private suspend fun post(text: String = "새 소식", channelId: String = channel, at: Long = T0, canNotify: Boolean = true) =
+        repo.record("com.android.chrome", channelId, text, at, canNotify)
 
     @Test
     fun `사이트 주소는 채널 ID에서만 뽑는다`() {
@@ -76,6 +76,40 @@ class SiteAlertRepositoryTest {
         val still = post(at = T0 + SiteAdPolicy.MUTE_GRACE_MS + 1) as SiteNotice.StillOn
         assertEquals(SiteAlertStatus.STILL_ON, still.alert.status)
         assertNull(post(at = T0 + SiteAdPolicy.MUTE_GRACE_MS + 2))
+    }
+
+    @Test
+    fun `Chrome이 채널을 새로 만들면 끄는 화면은 새 채널로 연다`() = runTest {
+        repeat(5) { post() }
+        repo.markMuted("https://ads.example.com")
+        val newChannel = "web:https://ads.example.com;456"
+        val still = post(channelId = newChannel, at = T0 + SiteAdPolicy.MUTE_GRACE_MS + 1) as SiteNotice.StillOn
+        assertEquals(newChannel, still.alert.channelId)
+    }
+
+    @Test
+    fun `아직 켜져 있어도 다시 끄는 화면을 열면 다시 본다`() = runTest {
+        repeat(5) { post() }
+        repo.markMuted("https://ads.example.com")
+        assertTrue(post(at = T0 + SiteAdPolicy.MUTE_GRACE_MS + 1) is SiteNotice.StillOn)
+        repo.markMuted("https://ads.example.com")
+        assertNull(post(at = T0 + SiteAdPolicy.MUTE_GRACE_MS))
+    }
+
+    @Test
+    fun `알림을 띄울 수 없으면 물은 것으로 적지 않고 다음에 묻는다`() = runTest {
+        repeat(5) { assertNull(post(canNotify = false)) }
+        assertTrue(post() is SiteNotice.Ask)
+    }
+
+    @Test
+    fun `오래된 기록은 알림이 끊겨도 정리한다`() = runTest {
+        dao.rows += SiteNotificationEntity(0, "https://ads.example.com", "com.android.chrome", channel, T0 - 31 * 86_400_000L, "2023-10-14", false)
+        dao.rows += SiteNotificationEntity(0, "https://ads.example.com", "com.android.chrome", channel, T0 - 29 * 86_400_000L, "2023-10-16", false)
+        repo.prune()
+        assertEquals(1, dao.rows.size)
+        dao.rows.clear()
+        assertTrue(dao.rows.isEmpty())
     }
 
     @Test

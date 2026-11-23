@@ -307,7 +307,9 @@ class SystemNotifier @Inject constructor(
         ensureChannel()
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_SITE, alert.site)
-        launch.data = notificationUri(if (stillOn) "site-still-on" else "site-ads", alert.site)
+        // 알림마다 다른 주소: 화면이 이 주소로 "설정을 바로 열기"를 한 번만 한다
+        launch.data = notificationUri(if (stillOn) "site-still-on" else "site-ads", alert.site).buildUpon()
+            .appendQueryParameter("t", System.currentTimeMillis().toString()).build()
         val pending = PendingIntent.getActivity(
             context, siteTag(alert.site).hashCode(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
