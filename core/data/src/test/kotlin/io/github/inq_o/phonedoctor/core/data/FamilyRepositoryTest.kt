@@ -214,10 +214,28 @@ class FamilyRepositoryTest {
             try {
                 call()
                 fail()
-            } catch (_: IllegalStateException) {
+            } catch (_: DeviceNotRegisteredException) {
             }
         }
         assertEquals(emptyList<String>(), network.calls)
+    }
+
+    @Test
+    fun `서버가 지운 기기의 확인·끊기는 등록을 지우고 등록 없음으로 알린다`() = runTest {
+        val repo = repo()
+        for ((op, call) in listOf<Pair<String, suspend () -> Unit>>(
+            "confirmLink" to { repo.confirmLink("link-1") },
+            "revokeLink" to { repo.revokeLink("link-1") },
+        )) {
+            repo.createPairingCode()
+            network.fail[op] = ApiException(403, "device-not-registered", null, null, null, null)
+            try {
+                call()
+                fail()
+            } catch (_: DeviceNotRegisteredException) {
+            }
+            assertNull(repo.role.first())
+        }
     }
 
     @Test
@@ -452,7 +470,7 @@ private class FakeNetwork : PhoneDoctorNetworkDataSource {
     }
 
     override suspend fun revokeLink(linkId: String) {
-        calls += "revokeLink"
+        record("revokeLink")
     }
 
     override suspend fun reportStatus(deviceId: String, body: NetworkDeviceStatus) = TODO()

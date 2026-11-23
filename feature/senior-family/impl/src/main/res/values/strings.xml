@@ -16,7 +16,7 @@
     <string name="feature_senior_family_impl_code_how">가족 폰에서 폰주치의를 열고 [가족 폰을 지켜요]를 고른 뒤, 아래 그림을 찍거나 숫자를 넣으면 돼요.</string>
     <string name="feature_senior_family_impl_code_loading">코드를 받고 있어요</string>
     <string name="feature_senior_family_impl_code_qr_description">연결용 QR 그림</string>
-    <string name="feature_senior_family_impl_code_until">%1$s까지 쓸 수 있어요.</string>
+    <string name="feature_senior_family_impl_code_valid">코드는 10분 동안 쓸 수 있어요. 가족 폰에서 시간이 지났다고 나오면 [새 코드 받기]를 눌러 주세요.</string>
     <string name="feature_senior_family_impl_code_waiting">가족이 코드를 넣으면 이 폰에서 연결할지 물어볼게요.</string>
     <string name="feature_senior_family_impl_code_failed_title">코드를 받지 못했어요</string>
     <string name="feature_senior_family_impl_code_expired_title">코드 시간이 지났어요</string>
@@ -36,7 +36,7 @@
     <string name="feature_senior_family_impl_gone_title">이 연결 요청은 없어졌어요</string>
     <string name="feature_senior_family_impl_gone_body">가족이 요청을 취소했거나 이미 끊긴 연결이에요. 다시 연결하려면 홈 화면의 [가족] 버튼에서 새 코드를 받아 주세요.</string>
     <string name="feature_senior_family_impl_limit_title">가족은 3명까지 연결할 수 있어요</string>
-    <string name="feature_senior_family_impl_limit_body">다른 가족과 연결을 끊은 뒤 다시 해 주세요.</string>
+    <string name="feature_senior_family_impl_limit_body">%1$s님과 연결하려면 홈 화면의 [가족] 버튼에서 다른 가족과 연결을 끊은 뒤 다시 답해 주세요. 연결하지 않으려면 [안 할래요]를 눌러 주세요.</string>
 
     <!-- S5 가족 연결 관리 -->
     <string name="feature_senior_family_impl_links_title">가족 연결</string>

@@ -103,7 +103,13 @@ internal fun OnboardingScreen(
                 }
                 OnboardingStep.USAGE_ACCESS ->
                     if (state.usageAccessGranted) {
-                        PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_start), onNext)
+                        // 뒤에 가족 연결 단계가 있으면 아직 시작이 아니다
+                        PdPrimaryButton(
+                            stringResource(
+                                if (state.index < state.steps.lastIndex) R.string.feature_onboarding_impl_next else R.string.feature_onboarding_impl_start,
+                            ),
+                            onNext,
+                        )
                     } else {
                         PdOutlinedButton(stringResource(R.string.feature_onboarding_impl_later), onNext)
                         PdPrimaryButton(stringResource(R.string.feature_onboarding_impl_usage_open), onOpenUsageSettings)
@@ -126,7 +132,16 @@ internal fun OnboardingScreen(
                 Title(stringResource(R.string.feature_onboarding_impl_disclosure_title))
                 Body(stringResource(R.string.feature_onboarding_impl_disclosure_body_1))
                 Body(stringResource(R.string.feature_onboarding_impl_disclosure_body_2))
-                Body(stringResource(R.string.feature_onboarding_impl_disclosure_body_3))
+                // 가족 연결을 쓸 수 있는 빌드는 "연결하면 무엇을 보내는지"까지 처음부터 밝힌다 (ux-flows §6 공개 고지 핵심)
+                Body(
+                    stringResource(
+                        if (OnboardingStep.FAMILY in state.steps) {
+                            R.string.feature_onboarding_impl_disclosure_body_3_family
+                        } else {
+                            R.string.feature_onboarding_impl_disclosure_body_3
+                        },
+                    ),
+                )
             }
             OnboardingStep.NOTIFICATION -> {
                 Title(stringResource(R.string.feature_onboarding_impl_notification_title))

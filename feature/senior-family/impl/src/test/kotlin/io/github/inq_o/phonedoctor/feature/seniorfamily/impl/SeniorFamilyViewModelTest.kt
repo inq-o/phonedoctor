@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.feature.seniorfamily.impl
 
+import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
@@ -87,6 +88,32 @@ class SeniorFamilyViewModelTest {
         assertEquals("p2", vm.linkRequested.value)
         vm.onLinkOpened()
         assertNull(vm.linkRequested.value)
+        vm.stopWatching()
+    }
+
+    @Test
+    fun oldUnansweredRequestDoesNotHijackNewCode() = runTest(main.dispatcher) {
+        // 코드 발급 시각 = 만료 - 10분 = 9400초. 그 전에 생겨 답하지 않고 둔 요청은 이 화면에서 열지 않는다
+        family.codeExpiresAt = Instant.ofEpochSecond(10_000)
+        family.links += link("old", LinkStatus.PENDING, name = "철수", createdAt = 100)
+        val vm = PairingCodeViewModel(family)
+        vm.now = { Instant.ofEpochSecond(9_500) }
+        advanceUntilIdle()
+        vm.check()
+        assertNull(vm.linkRequested.value)
+        family.links += link("new", LinkStatus.PENDING, createdAt = 9_400)
+        vm.check()
+        assertEquals("new", vm.linkRequested.value)
+    }
+
+    @Test
+    fun watchingChecksRightAwayWhenScreenShows() = runTest(main.dispatcher) {
+        val vm = PairingCodeViewModel(family)
+        vm.now = { Instant.ofEpochSecond(700) }
+        advanceUntilIdle()
+        vm.startWatching()
+        runCurrent()
+        assertEquals(true, (vm.uiState.value as PairingCodeUiState.Ready).expired)
         vm.stopWatching()
     }
 
@@ -190,9 +217,70 @@ class SeniorFamilyViewModelTest {
     }
 
     @Test
+    fun guardianLimitKeepsRequestSoSeniorCanStillDecline() = runTest(main.dispatcher) {
+        family.links += link("p1", LinkStatus.PENDING)
+        val vm = confirmVm()
+        advanceUntilIdle()
+        family.fail["confirm:p1"] = apiError(409, "guardian-limit")
+        vm.confirm()
+        advanceUntilIdle()
+        val limited = vm.uiState.value as LinkConfirmUiState.Ready
+        assertTrue(limited.limitReached)
+        assertEquals(false, limited.busy)
+        // 요청이 남아 있으니 알림도 남긴다
+        assertTrue(notifier.cancelledLinks.isEmpty())
+        vm.decline()
+        advanceUntilIdle()
+        assertEquals(LinkConfirmUiState.Declined("민지"), vm.uiState.value)
+        assertEquals(LinkStatus.REVOKED, family.links.single().status)
+    }
+
+    @Test
+    fun deviceDeletedByServerEndsRequest() = runTest(main.dispatcher) {
+        family.links += link("p1", LinkStatus.PENDING)
+        val confirming = confirmVm()
+        val declining = confirmVm()
+        advanceUntilIdle()
+        family.fail["confirm:p1"] = DeviceNotRegisteredException()
+        confirming.confirm()
+        advanceUntilIdle()
+        assertEquals(LinkConfirmUiState.Gone, confirming.uiState.value)
+        family.fail["revoke:p1"] = DeviceNotRegisteredException()
+        declining.decline()
+        advanceUntilIdle()
+        assertEquals(LinkConfirmUiState.Declined("민지"), declining.uiState.value)
+    }
+
+    @Test
+    fun declineWhileConfirmIsSendingIsIgnored() = runTest(main.dispatcher) {
+        family.links += link("p1", LinkStatus.PENDING)
+        val vm = confirmVm()
+        advanceUntilIdle()
+        family.gate["confirm:p1"] = CompletableDeferred()
+        vm.confirm()
+        runCurrent()
+        vm.decline()
+        family.gate.remove("confirm:p1")!!.complete(Unit)
+        advanceUntilIdle()
+        assertEquals(LinkConfirmUiState.Connected("민지"), vm.uiState.value)
+        assertTrue(family.calls.none { it.startsWith("revoke") })
+    }
+
+    @Test
+    fun declineNetworkFailureKeepsRequest() = runTest(main.dispatcher) {
+        family.links += link("p1", LinkStatus.PENDING)
+        val vm = confirmVm()
+        advanceUntilIdle()
+        family.fail["revoke:p1"] = IOException("offline")
+        vm.decline()
+        advanceUntilIdle()
+        assertEquals(FamilyError.NETWORK, (vm.uiState.value as LinkConfirmUiState.Ready).error)
+        assertTrue(notifier.cancelledLinks.isEmpty())
+    }
+
+    @Test
     fun confirmServerAnswersMapToScreens() = runTest(main.dispatcher) {
         for ((error, expected) in listOf(
-            apiError(409, "guardian-limit") to LinkConfirmUiState.Limit,
             apiError(409, "link-revoked") to LinkConfirmUiState.Gone,
             apiError(404) to LinkConfirmUiState.Gone,
         )) {
@@ -281,6 +369,36 @@ class SeniorFamilyViewModelTest {
         assertEquals(RevokeMessage.Revoked("민지"), ready.message)
         assertNull(ready.revoking)
         assertEquals(1, family.calls.count { it == "revoke:a" })
+    }
+
+    @Test
+    fun revokeMessageClearsOnNextRefresh() = runTest(main.dispatcher) {
+        family.links += link("a", LinkStatus.ACTIVE)
+        family.links += link("b", LinkStatus.ACTIVE, createdAt = 1)
+        val vm = FamilyLinksViewModel(family)
+        vm.refresh()
+        advanceUntilIdle()
+        vm.revoke(family.links.first())
+        advanceUntilIdle()
+        assertTrue((vm.uiState.value as FamilyLinksUiState.Ready).message is RevokeMessage.Revoked)
+        vm.refresh()
+        advanceUntilIdle()
+        val ready = vm.uiState.value as FamilyLinksUiState.Ready
+        assertNull(ready.message)
+        assertEquals(listOf("b"), ready.links.map { it.linkId })
+    }
+
+    @Test
+    fun revokeAfterServerDeletedDeviceEmptiesList() = runTest(main.dispatcher) {
+        family.links += link("a", LinkStatus.ACTIVE)
+        family.links += link("b", LinkStatus.ACTIVE, createdAt = 1)
+        val vm = FamilyLinksViewModel(family)
+        vm.refresh()
+        advanceUntilIdle()
+        family.fail["revoke:a"] = DeviceNotRegisteredException()
+        vm.revoke(family.links.first())
+        advanceUntilIdle()
+        assertTrue((vm.uiState.value as FamilyLinksUiState.Ready).links.isEmpty())
     }
 
     @Test

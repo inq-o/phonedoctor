@@ -27,9 +27,6 @@ import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 import io.github.inq_o.phonedoctor.core.model.PairingCode
 import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 @Composable
 fun PairingCodeScreen(
@@ -53,7 +50,10 @@ fun PairingCodeScreen(
     PairingCodeScreen(state = state, onNewCode = viewModel::newCode, onBack = onBack, modifier = modifier)
 }
 
-/** O-S4 연결 코드·QR. 주요 행동은 가족 폰에서 하므로 이 화면의 채운 버튼은 실패·만료 때의 "다시"뿐이다 */
+/**
+ * O-S4 연결 코드·QR. 주요 행동은 가족 폰에서 하므로 이 화면의 채운 버튼은 실패·만료 때의 "다시"뿐이다.
+ * 남은 시간은 세지 않는다 (ux-flows 원칙 6)
+ */
 @Composable
 internal fun PairingCodeScreen(
     state: PairingCodeUiState,
@@ -68,8 +68,11 @@ internal fun PairingCodeScreen(
             when (state) {
                 is PairingCodeUiState.Failed ->
                     PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onNewCode)
+                // 가족 폰에서 "코드 시간이 지났어요"가 뜨면 여기서 바로 새로 받는다 (이 폰 시계로는 아직 안 지났어도)
                 is PairingCodeUiState.Ready -> if (state.expired) {
                     PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode)
+                } else {
+                    PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode)
                 }
                 PairingCodeUiState.Loading -> Unit
             }
@@ -94,7 +97,7 @@ internal fun PairingCodeScreen(
                 Spacer(Modifier.height(16.dp))
                 QrCode(state.code.qrPayload, stringResource(R.string.feature_senior_family_impl_code_qr_description), size = 220.dp)
                 Spacer(Modifier.height(16.dp))
-                Body(stringResource(R.string.feature_senior_family_impl_code_until, timeOfDay(state.code.expiresAt)))
+                Body(stringResource(R.string.feature_senior_family_impl_code_valid))
                 Body(stringResource(R.string.feature_senior_family_impl_code_waiting))
             }
         }
@@ -111,10 +114,6 @@ private fun CodeDigits(code: String) {
         modifier = Modifier.fillMaxWidth().semantics { contentDescription = code.toList().joinToString(" ") },
     )
 }
-
-private val TimeFormat = DateTimeFormatter.ofPattern("a h:mm", Locale.KOREAN)
-
-internal fun timeOfDay(instant: Instant): String = TimeFormat.format(instant.atZone(ZoneId.systemDefault()))
 
 private val PreviewCode = PairingCode("482913", "phonedoctor://pair?c=482913", Instant.now().plusSeconds(600))
 

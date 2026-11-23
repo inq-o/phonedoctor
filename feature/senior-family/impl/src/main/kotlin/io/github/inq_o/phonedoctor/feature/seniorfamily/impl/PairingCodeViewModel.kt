@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.Duration
 import java.time.Instant
 import javax.inject.Inject
 
@@ -63,13 +64,13 @@ class PairingCodeViewModel @Inject constructor(private val family: FamilyReposit
         }
     }
 
-    /** 화면이 보일 때만 확인한다 */
+    /** 화면이 보일 때만 확인한다. 다시 보이면 바로 한 번 (자리를 비운 사이 만료·요청이 있었을 수 있다) */
     fun startWatching() {
         if (watching?.isActive == true) return
         watching = viewModelScope.launch {
             while (true) {
-                delay(POLL_INTERVAL_MS)
                 check()
+                delay(POLL_INTERVAL_MS)
             }
         }
     }
@@ -94,11 +95,18 @@ class PairingCodeViewModel @Inject constructor(private val family: FamilyReposit
         } catch (e: Exception) {
             return
         }
-        // 확인 대기가 여럿이면 가장 최근 요청부터. S3가 이름을 보여 주므로 누구의 요청인지 시니어가 보고 고른다
-        links.filter { it.status == LinkStatus.PENDING }.maxByOrNull { it.createdAt }?.let { requested.value = it.linkId }
+        // 이 코드로 생긴 요청만 (서버 시각끼리 비교: 코드 발급 시각 = 만료 - 10분). 전에 답하지 않고 둔 요청은 홈·S5에서 답한다.
+        // 그 요청까지 열면 새 코드를 보여 주자마자 옛 요청 화면으로 넘어가 다른 가족을 연결할 수 없다
+        val issuedAt = ready.code.expiresAt.minus(CODE_VALID)
+        links.filter { it.status == LinkStatus.PENDING && !it.createdAt.isBefore(issuedAt) }
+            .maxByOrNull { it.createdAt }
+            ?.let { requested.value = it.linkId }
     }
 
     private companion object {
         const val POLL_INTERVAL_MS = 5_000L
+
+        /** 연결 코드 유효 시간 (openapi createPairingCode, 서버 Pairing.kt CODE_VALID) */
+        val CODE_VALID: Duration = Duration.ofMinutes(10)
     }
 }

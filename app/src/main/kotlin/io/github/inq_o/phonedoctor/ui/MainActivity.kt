@@ -45,7 +45,12 @@ class MainActivity : ComponentActivity() {
             )
         )
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleNotificationIntent(intent)
+        // 화면 회전 등으로 다시 만들어지면 같은 시작 인텐트가 다시 온다: 이미 연 알림이면 건너뛴다.
+        // 프로세스가 죽은 뒤 새 알림을 눌러 복원된 경우는 주소가 달라 연다
+        val launchUri = intent?.dataString
+        if (savedInstanceState == null || (launchUri != null && launchUri != savedInstanceState.getString(KEY_LAUNCH_NOTIFICATION))) {
+            handleNotificationIntent(intent)
+        }
         setContent {
             PhoneDoctorTheme {
                 Surface(
@@ -77,6 +82,11 @@ class MainActivity : ComponentActivity() {
         viewModel.onAppOpened()
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString(KEY_LAUNCH_NOTIFICATION, intent?.dataString)
+    }
+
     /** 알림을 눌러 들어왔으면 그 알림의 화면으로 간다 */
     private fun handleNotificationIntent(intent: Intent?) {
         intent ?: return
@@ -87,5 +97,9 @@ class MainActivity : ComponentActivity() {
             !linkId.isNullOrBlank() -> viewModel.open(PendingOpen.LinkRequest(linkId))
             intent.getBooleanExtra(SystemNotifier.EXTRA_OPEN_FAMILY, false) -> viewModel.open(PendingOpen.FamilyLinks)
         }
+    }
+
+    private companion object {
+        const val KEY_LAUNCH_NOTIFICATION = "launchNotification"
     }
 }

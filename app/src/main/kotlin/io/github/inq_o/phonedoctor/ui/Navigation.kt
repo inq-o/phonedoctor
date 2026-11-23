@@ -47,19 +47,26 @@ fun MainNavigation(
     // 시작 화면은 처음 한 번만 정한다. 첫 설정이 끝나면 아래 onFinished에서 홈으로 바꾼다
     val backStack = rememberNavBackStack(if (onboardingDone) SeniorHomeNavKey else OnboardingNavKey)
 
-    LaunchedEffect(pendingOpen, onboardingDone) {
-        if (pendingOpen != null && onboardingDone) {
-            // 같은 종류의 화면이 이미 쌓여 있으면 지우고 새로 연다 (알림을 여러 번 눌러도 한 장만)
-            val key = when (pendingOpen) {
-                is PendingOpen.Alert -> AppDetailNavKey(pendingOpen.alertId)
-                is PendingOpen.LinkRequest -> LinkConfirmNavKey(pendingOpen.linkId)
-                PendingOpen.FamilyLinks -> FamilyLinksNavKey
-            }
-            // 연결 확인을 열면 연결 코드 화면도 닫는다 (코드는 이미 쓰였다)
-            backStack.removeAll { it::class == key::class || (key is LinkConfirmNavKey && it is PairingCodeNavKey) }
-            backStack.add(key)
+    // 첫 설정 화면이 스택에 있는 동안은 열지 않는다: 설정을 마치며 스택을 홈으로 바꿀 때 함께 지워지지 않게
+    val inOnboarding = backStack.any { it is OnboardingNavKey }
+    LaunchedEffect(pendingOpen, onboardingDone, inOnboarding) {
+        if (pendingOpen != null && onboardingDone && !inOnboarding) {
+            // 알림으로 연 화면은 홈 바로 위에: [홈으로]·뒤로가 예상대로 홈으로 가고, 같은 화면이 여러 장 쌓이지 않게
+            backStack.clear()
+            backStack.add(SeniorHomeNavKey)
+            backStack.add(
+                when (pendingOpen) {
+                    is PendingOpen.Alert -> AppDetailNavKey(pendingOpen.alertId)
+                    is PendingOpen.LinkRequest -> LinkConfirmNavKey(pendingOpen.linkId)
+                    PendingOpen.FamilyLinks -> FamilyLinksNavKey
+                },
+            )
             onOpened()
         }
+    }
+    val toHome: () -> Unit = {
+        backStack.clear()
+        backStack.add(SeniorHomeNavKey)
     }
 
     NavDisplay(
@@ -88,11 +95,12 @@ fun MainNavigation(
             seniorFamilyEntries(
                 onAddFamily = { backStack.add(PairingCodeNavKey) },
                 onAnswer = { backStack.add(LinkConfirmNavKey(it)) },
-                // 코드 화면은 닫고 연결 확인으로. 확인 뒤 [홈으로]는 코드 화면을 연 곳(홈·S5)으로 돌아간다
+                // 코드 화면은 닫고 연결 확인으로
                 onLinkRequested = { linkId ->
                     backStack.removeAll { it is PairingCodeNavKey || it is LinkConfirmNavKey }
                     backStack.add(LinkConfirmNavKey(linkId))
                 },
+                onHome = toHome,
                 onBack = { backStack.removeLastOrNull() },
             )
         }

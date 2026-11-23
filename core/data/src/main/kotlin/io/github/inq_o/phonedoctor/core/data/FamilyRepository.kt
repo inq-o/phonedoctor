@@ -62,6 +62,12 @@ interface FamilyRepository {
 /** 보호자는 Google 로그인 사용자만 서버에 등록할 수 있다 (openapi POST /devices). 화면은 O-G1로 보낸다 */
 class GuardianSignInRequiredException : IllegalStateException("보호자는 Google 로그인이 필요함")
 
+/**
+ * 이 기기가 서버에 등록돼 있지 않음: 연결을 시작하기 전이거나, 서버가 기기를 지워서(403 device-not-registered) 잊은 뒤.
+ * 어느 쪽이든 서버에 이 기기의 연결은 없다
+ */
+class DeviceNotRegisteredException : IllegalStateException("서버에 등록된 기기 없음")
+
 /** 이미 다른 역할로 등록한 기기. 역할을 바꾸려면 모든 데이터 지우기 뒤 다시 */
 class RoleMismatchException(val registered: DeviceRole) : IllegalStateException("이미 ${registered.name} 역할로 등록됨")
 
@@ -209,8 +215,9 @@ internal class DefaultFamilyRepository @Inject constructor(
     private suspend fun <T> forgettingGoneDevice(block: suspend () -> T): T = try {
         block()
     } catch (e: ApiException) {
-        if (e.isDeviceGone()) forgetDevice()
-        throw e
+        if (!e.isDeviceGone()) throw e
+        forgetDevice()
+        throw DeviceNotRegisteredException()
     }
 
     private suspend fun <T> withKey(op: String, block: suspend (String) -> T): T {
@@ -275,7 +282,7 @@ internal class DefaultFamilyRepository @Inject constructor(
 
     private suspend fun registered(): RegisteredDevice? = preferences.registeredDevice.first()
 
-    private suspend fun requireRegistered(): RegisteredDevice = registered() ?: throw IllegalStateException("연결을 시작하기 전")
+    private suspend fun requireRegistered(): RegisteredDevice = registered() ?: throw DeviceNotRegisteredException()
 
     private fun ApiException.isDeviceGone() = status == 403 && slug == "device-not-registered"
 

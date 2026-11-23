@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -49,6 +50,7 @@ class SystemNotifier @Inject constructor(
         ensureChannel()
         val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
         launch.putExtra(EXTRA_ALERT_ID, alert.id)
+        launch.data = notificationUri("alert", alert.id.toString())
         val pending = PendingIntent.getActivity(
             context, alert.id.toInt(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -83,6 +85,7 @@ class SystemNotifier @Inject constructor(
     override fun notifyLinkRequested(linkId: String, guardianName: String?) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_LINK_ID, linkId)
+        launch.data = notificationUri("link-requested", linkId)
         val text = context.getString(R.string.core_notifications_link_requested_text, nameOrFallback(guardianName))
         notifyLink(linkId, context.getString(R.string.core_notifications_link_requested_title), text, launch)
     }
@@ -90,6 +93,7 @@ class SystemNotifier @Inject constructor(
     override fun notifyLinkRevoked(linkId: String, name: String?) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
+        launch.data = notificationUri("link-revoked", linkId)
         val text = context.getString(R.string.core_notifications_link_revoked_text, nameOrFallback(name))
         notifyLink(linkId, context.getString(R.string.core_notifications_link_revoked_title), text, launch)
     }
@@ -97,6 +101,13 @@ class SystemNotifier @Inject constructor(
     override fun cancelLink(linkId: String) {
         NotificationManagerCompat.from(context).cancel(linkId, LINK_NOTIFICATION_ID)
     }
+
+    /**
+     * 알림마다 다른 주소. PendingIntent는 요청 코드와 Intent(data 포함)가 같으면 하나로 묶여 extras가 덮이므로,
+     * 요청 코드(해시)가 우연히 겹쳐도 다른 알림의 화면이 열리지 않게 한다. 화면은 이 주소로 같은 알림을 두 번 열지 않는다
+     */
+    private fun notificationUri(kind: String, id: String): Uri =
+        Uri.Builder().scheme(URI_SCHEME).authority(kind).appendPath(id).build()
 
     private fun launchIntent(): Intent? = context.packageManager.getLaunchIntentForPackage(context.packageName)
 
@@ -147,6 +158,7 @@ class SystemNotifier @Inject constructor(
 
     companion object {
         const val EXTRA_ALERT_ID = "io.github.inq_o.phonedoctor.extra.ALERT_ID"
+        private const val URI_SCHEME = "phonedoctor-notification"
         const val EXTRA_LINK_ID = "io.github.inq_o.phonedoctor.extra.LINK_ID"
         const val EXTRA_OPEN_FAMILY = "io.github.inq_o.phonedoctor.extra.OPEN_FAMILY"
         private const val CHANNEL_ALERTS = "alerts"

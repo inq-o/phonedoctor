@@ -63,7 +63,11 @@ internal fun LinkConfirmScreen(
                 }
                 is LinkConfirmUiState.Ready -> {
                     PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_confirm_no), onDecline, enabled = !state.busy)
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_confirm_yes), onConfirm, enabled = !state.busy)
+                    if (state.limitReached) {
+                        PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_home), onDone, enabled = !state.busy)
+                    } else {
+                        PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_confirm_yes), onConfirm, enabled = !state.busy)
+                    }
                 }
                 else -> PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_home), onDone)
             }
@@ -76,7 +80,12 @@ internal fun LinkConfirmScreen(
                 Headline(stringResource(R.string.feature_senior_family_impl_confirm_load_failed), announce = true)
                 Body(state.error.message())
             }
-            is LinkConfirmUiState.Ready -> {
+            is LinkConfirmUiState.Ready -> if (state.limitReached) {
+                Headline(stringResource(R.string.feature_senior_family_impl_limit_title), announce = true)
+                Body(stringResource(R.string.feature_senior_family_impl_limit_body, displayName(state.link.guardianName)))
+                state.error?.let { ErrorText(it.message()) }
+                if (state.busy) CircularProgressIndicator()
+            } else {
                 val name = displayName(state.link.guardianName)
                 Headline(stringResource(R.string.feature_senior_family_impl_confirm_title, name))
                 Body(stringResource(R.string.feature_senior_family_impl_confirm_body, name))
@@ -96,10 +105,6 @@ internal fun LinkConfirmScreen(
             LinkConfirmUiState.Gone -> {
                 Headline(stringResource(R.string.feature_senior_family_impl_gone_title), announce = true)
                 Body(stringResource(R.string.feature_senior_family_impl_gone_body))
-            }
-            LinkConfirmUiState.Limit -> {
-                Headline(stringResource(R.string.feature_senior_family_impl_limit_title), announce = true)
-                Body(stringResource(R.string.feature_senior_family_impl_limit_body))
             }
         }
     }

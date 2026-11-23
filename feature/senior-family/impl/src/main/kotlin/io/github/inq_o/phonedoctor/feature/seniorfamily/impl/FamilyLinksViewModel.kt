@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.feature.seniorfamily.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
@@ -61,8 +62,9 @@ class FamilyLinksViewModel @Inject constructor(private val family: FamilyReposit
                 if (state.value !is FamilyLinksUiState.Ready) state.value = FamilyLinksUiState.Failed(e.toFamilyError())
                 return@launch
             }
+            // 끊기 결과 안내는 다시 보일 때 지운다 (화면 낭독이 또 읽지 않게)
             val current = state.value as? FamilyLinksUiState.Ready
-            state.value = FamilyLinksUiState.Ready(visible(links), current?.revoking, current?.message)
+            state.value = FamilyLinksUiState.Ready(visible(links), current?.revoking)
         }
     }
 
@@ -71,11 +73,16 @@ class FamilyLinksViewModel @Inject constructor(private val family: FamilyReposit
         if (ready.revoking != null) return
         state.value = ready.copy(revoking = link.linkId, message = null)
         viewModelScope.launch {
+            var deviceGone = false
             val error = try {
                 family.revokeLink(link.linkId)
                 null
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: DeviceNotRegisteredException) {
+                // 서버가 이 기기를 지웠으면 연결도 모두 없다
+                deviceGone = true
+                null
             } catch (e: ApiException) {
                 // 이미 없는 연결이면 끊은 것과 같다
                 if (e.status == 404) null else e.toFamilyError()
@@ -85,7 +92,7 @@ class FamilyLinksViewModel @Inject constructor(private val family: FamilyReposit
             val now = state.value as? FamilyLinksUiState.Ready ?: return@launch
             state.value = if (error == null) {
                 now.copy(
-                    links = now.links.filterNot { it.linkId == link.linkId },
+                    links = if (deviceGone) emptyList() else now.links.filterNot { it.linkId == link.linkId },
                     revoking = null,
                     message = RevokeMessage.Revoked(link.guardianName),
                 )
