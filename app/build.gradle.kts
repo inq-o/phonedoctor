@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.phonedoctor.android.application)
     alias(libs.plugins.phonedoctor.android.application.compose)
@@ -38,8 +41,32 @@ android {
         }
     }
 
+    // 출시 서명: 레포 밖 ~/.phonedoctor/release.properties(또는 -Pphonedoctor.releaseProps=경로)가 있을 때만 쓴다 (키와 비밀번호는 레포·CI에 두지 않음).
+    // 원스토어에는 "ONE store 앱 서명 선택해제(서명한 APK 등록)"로 올려 이 키를 유지한다 (docs/onestore-listing.md 2절)
+    val explicitProps = providers.gradleProperty("phonedoctor.releaseProps").orNull?.let(::File)
+    check(explicitProps == null || explicitProps.isFile) { "phonedoctor.releaseProps 파일이 없음: $explicitProps" }
+    val releasePropsFile = (explicitProps ?: File(System.getProperty("user.home"), ".phonedoctor/release.properties"))
+        .takeIf { it.isFile }
+    val releaseProps = releasePropsFile?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+    if (releasePropsFile != null && releaseProps != null) {
+        // 빠진 값은 이름만 알린다 (값은 로그에 남기지 않음)
+        fun prop(key: String): String = requireNotNull(releaseProps.getProperty(key)?.takeIf { it.isNotBlank() }) {
+            "$releasePropsFile 에 $key 가 없음"
+        }
+        signingConfigs {
+            create("release") {
+                // 상대경로는 properties 파일이 있는 폴더 기준
+                storeFile = releasePropsFile.parentFile.resolve(prop("storeFile"))
+                storePassword = prop("storePassword")
+                keyAlias = prop("keyAlias")
+                keyPassword = prop("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releasePropsFile != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"),
                           "proguard-rules.pro")
