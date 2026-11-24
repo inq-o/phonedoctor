@@ -91,7 +91,8 @@ fun Application.module(deps: Deps) {
     install(CallLogging)
     installProblems()
     routing {
-        get("/healthz") { call.respondText("ok") }
+        // Cloud Run은 z로 끝나는 일부 경로(/healthz 등)를 앞단에서 막는다
+        get("/health") { call.respondText("ok") }
         jobRoutes(deps)
         route("/v1") {
             install(FirebaseAuthPlugin) { this.deps = deps }
