@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.phonedoctor.android.application)
     alias(libs.plugins.phonedoctor.android.application.compose)
@@ -38,8 +41,26 @@ android {
         }
     }
 
+    // 출시 서명: 레포 밖 ~/.phonedoctor/release.properties(또는 -Pphonedoctor.releaseProps=경로)가 있을 때만 쓴다 (키와 비밀번호는 레포·CI에 두지 않음).
+    // 원스토어에는 "ONE store 앱 서명 선택해제(서명한 APK 등록)"로 올려 이 키를 유지한다 (docs/onestore-listing.md 2절)
+    val releaseProps = (providers.gradleProperty("phonedoctor.releaseProps").orNull?.let(::File)
+        ?: File(System.getProperty("user.home"), ".phonedoctor/release.properties"))
+        .takeIf { it.isFile }
+        ?.let { file -> Properties().apply { file.inputStream().use { load(it) } } }
+    if (releaseProps != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = File(releaseProps.getProperty("storeFile"))
+                storePassword = releaseProps.getProperty("storePassword")
+                keyAlias = releaseProps.getProperty("keyAlias")
+                keyPassword = releaseProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (releaseProps != null) signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"),
                           "proguard-rules.pro")

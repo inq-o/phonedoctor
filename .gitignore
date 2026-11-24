@@ -16,3 +16,7 @@ app/google-services.json
 
 # 서버 배포 환경 변수 (server/README.md 배포 절)
 server/env.yaml
+# 출시 서명 키 (레포에 두지 않음)
+*.jks
+*.keystore
+release.properties
