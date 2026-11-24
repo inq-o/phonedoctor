@@ -94,9 +94,10 @@ class AppDetailViewModel @AssistedInject constructor(
             // 이 화면에서 지운 직후에는 "지웠어요"를 보여 준다
             phase == UninstallPhase.REMOVED -> AppDetailUiState.Ready(alert, phase)
             alert.outcome == AlertOutcome.ALLOWED -> AppDetailUiState.Allowed(alert.family?.guardianName, alert.family?.messageToSenior)
-            // 지우자고 한 앱을 취소한 요청은 닫혔어도 보여 준다 (하루 뒤 알림을 눌러 다시 지울 수 있게)
+            // 닫혔어도 보여 주는 요청 (다시 지울 수 있게): 지우자고 한 앱을 취소한 요청(하루 뒤 알림을 눌러 옴), 강력 모드로 멈춘 앱
             alert.status != AlertStatus.OPEN &&
-                !(alert.outcome == AlertOutcome.DECLINED && alert.family?.decision == FamilyDecision.RECOMMEND_UNINSTALL) -> AppDetailUiState.Gone
+                !(alert.outcome == AlertOutcome.DECLINED && alert.family?.decision == FamilyDecision.RECOMMEND_UNINSTALL) &&
+                alert.outcome != AlertOutcome.SUSPENDED -> AppDetailUiState.Gone
             else -> AppDetailUiState.Ready(alert, phase)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppDetailUiState.Loading)

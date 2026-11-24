@@ -16,6 +16,7 @@ import io.github.inq_o.phonedoctor.core.database.ScanRunDao
 import io.github.inq_o.phonedoctor.core.datastore.UserPreferences
 import io.github.inq_o.phonedoctor.core.model.AlertOutcome
 import io.github.inq_o.phonedoctor.core.model.AlertStatus
+import io.github.inq_o.phonedoctor.core.model.AppIdentity
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
@@ -36,16 +37,17 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkOutcomeType
 import io.github.inq_o.phonedoctor.core.network.model.NetworkProtectionState
 import io.github.inq_o.phonedoctor.core.network.model.NetworkSymptomEvidence
 import io.github.inq_o.phonedoctor.core.packages.InstalledApps
+import io.github.inq_o.phonedoctor.core.packages.StrongMode
 import io.github.inq_o.phonedoctor.core.usage.UsageAccess
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /** 가족 서버로 보낼 일을 WorkManager에 맡긴다 (sync:work). 가족 연결이 꺼진 빌드는 아무것도 하지 않는다 */
 fun interface FamilySyncScheduler {
@@ -103,6 +105,7 @@ internal class DefaultFamilyAlertSync @Inject constructor(
     private val installedApps: InstalledApps,
     private val protection: ProtectionStatus,
     private val scheduler: FamilySyncScheduler,
+    private val strongMode: StrongMode,
 ) : FamilyAlertSync, FamilyLinkEvents {
     internal var now: () -> Long = System::currentTimeMillis
 
@@ -197,6 +200,8 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                 notice && type == FamilyDecision.RECOMMEND_UNINSTALL -> {
                     allowDao.delete(row.packageName, row.signingCertSha256, row.versionCode)
                     alertDao.reopenForDecision(row.id, now())
+                    // 강력 모드: 허용했던 앱도 지우자고 하면 바로 정지
+                    suspendIfStrong(row)
                     true
                 }
                 notice -> false
@@ -206,12 +211,27 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                     if (row.status == AlertStatus.OPEN.name) alertDao.setOutcome(row.id, AlertStatus.RESOLVED.name, AlertOutcome.ALLOWED.name, now())
                     row.status == AlertStatus.OPEN.name
                 }
-                else -> row.status == AlertStatus.OPEN.name
+                else -> {
+                    if (row.status == AlertStatus.OPEN.name) suspendIfStrong(row)
+                    row.status == AlertStatus.OPEN.name
+                }
             }
             alertDao.setDecision(row.id, SERVER_DECIDED, type.wire, guardianName, messageToSenior)
             val updated = alertDao.get(row.id)?.toModel() ?: return@withLock null
             AppliedDecision(updated, type, guardianName, notify)
         }
+
+    /**
+     * 강력 모드(US8, FR-031): 지우자고 하면 바로 정지하고 "정지함" 결과를 보낼 것으로 표시. 요청을 연 판과 지금 설치된 판이 같을 때만
+     * (답을 기다리는 사이 업데이트되거나 다른 서명으로 바뀐 앱을 옛 근거로 멈추지 않게)
+     */
+    private suspend fun suspendIfStrong(row: AlertLocalEntity) {
+        if (!strongMode.active) return
+        if (installedApps.identity(row.packageName) != AppIdentity(row.packageName, row.signingCertSha256, row.versionCode)) return
+        if (!strongMode.suspend(row.packageName)) return
+        alertDao.setOutcome(row.id, AlertStatus.RESOLVED.name, AlertOutcome.SUSPENDED.name, now())
+        scheduler.schedule()
+    }
 
     override suspend fun onLinkConfirmed() {
         linked = true
@@ -420,6 +440,7 @@ internal fun outcomeToSend(local: AlertOutcome, serverStatus: String?, decision:
             AlertOutcome.UNINSTALLED -> NetworkOutcomeType.UNINSTALLED
             AlertOutcome.DECLINED -> NetworkOutcomeType.DECLINED
             AlertOutcome.ALREADY_REMOVED, AlertOutcome.VERSION_CHANGED -> NetworkOutcomeType.ALREADY_REMOVED
+            AlertOutcome.SUSPENDED -> NetworkOutcomeType.SUSPENDED
             AlertOutcome.FAILED, AlertOutcome.ALLOWED -> null
         }
         FamilyDecision.ALLOW -> when {

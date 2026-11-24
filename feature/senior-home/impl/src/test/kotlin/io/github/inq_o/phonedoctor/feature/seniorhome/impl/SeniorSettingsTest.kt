@@ -1,10 +1,16 @@
 package io.github.inq_o.phonedoctor.feature.seniorhome.impl
 
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.model.AppIdentity
 import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.PairingCode
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.packages.AppDetails
+import io.github.inq_o.phonedoctor.core.packages.InstalledApp
+import io.github.inq_o.phonedoctor.core.packages.InstalledApps
+import io.github.inq_o.phonedoctor.core.packages.StrongMode
+import java.io.IOException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -22,11 +28,38 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Before
 import org.junit.Test
-import java.io.IOException
 
 class SeniorSettingsTest {
     private val dispatcher = StandardTestDispatcher()
     private val family = SettingsFamily()
+    private val strong = SettingsStrongMode()
+    private val apps = LabelApps(mapOf("com.ad" to "초고속 클리너"))
+
+    @Test
+    fun strongModeIsHiddenUnlessDeviceOwner() = runTest(dispatcher) {
+        val vm = SeniorSettingsViewModel(family, strong, apps).also { it.io = dispatcher }
+        vm.refreshStrongMode()
+        advanceUntilIdle()
+        assertNull(vm.uiState.value.strongMode)
+    }
+
+    @Test
+    fun strongModeListsSuspendedAppsAndTogglesInstallBlock() = runTest(dispatcher) {
+        strong.active = true
+        strong.suspended += listOf("com.ad", "com.gone")
+        val vm = SeniorSettingsViewModel(family, strong, apps).also { it.io = dispatcher }
+        vm.refreshStrongMode()
+        advanceUntilIdle()
+        val ui = vm.uiState.value.strongMode!!
+        // 라벨을 못 읽으면 패키지 이름으로
+        assertEquals(listOf(SuspendedApp("com.ad", "초고속 클리너"), SuspendedApp("com.gone", "com.gone")), ui.suspended)
+        assertFalse(ui.unknownSourcesBlocked)
+        vm.setUnknownSourcesBlocked(true)
+        vm.unsuspend("com.ad")
+        advanceUntilIdle()
+        assertEquals(true, vm.uiState.value.strongMode!!.unknownSourcesBlocked)
+        assertEquals(listOf("com.gone"), vm.uiState.value.strongMode!!.suspended.map { it.packageName })
+    }
 
     @Before
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -36,7 +69,7 @@ class SeniorSettingsTest {
 
     @Test
     fun renameTrimsAndRejectsBadLengths() = runTest(dispatcher) {
-        val vm = SeniorSettingsViewModel(family)
+        val vm = SeniorSettingsViewModel(family, strong, apps)
         advanceUntilIdle()
         assertNull(vm.uiState.value.displayName)
         vm.rename("   ")
@@ -51,7 +84,7 @@ class SeniorSettingsTest {
 
     @Test
     fun deleteRunsOnceAndReportsFailures() = runTest(dispatcher) {
-        val vm = SeniorSettingsViewModel(family)
+        val vm = SeniorSettingsViewModel(family, strong, apps)
         val gate = CompletableDeferred<Unit>().also { family.gate = it }
         vm.deleteAll()
         vm.deleteAll()
@@ -77,7 +110,7 @@ class SeniorSettingsTest {
     @Test
     fun releaseBuildHidesFamilySettings() {
         family.available = false
-        assertFalse(SeniorSettingsViewModel(family).uiState.value.familyAvailable)
+        assertFalse(SeniorSettingsViewModel(family, strong, apps).uiState.value.familyAvailable)
     }
 
     private class SettingsFamily : FamilyRepository {
@@ -118,3 +151,27 @@ class SeniorSettingsTest {
         override suspend fun updatePushToken(token: String) = Unit
     }
 }
+
+private class SettingsStrongMode : StrongMode {
+    override var active = false
+    val suspended = mutableListOf<String>()
+    private var blocked = false
+    override fun suspend(packageName: String) = suspended.add(packageName)
+    override fun unsuspend(packageName: String) = suspended.remove(packageName)
+    override fun suspendedPackages(): List<String> = suspended.toList()
+    override val unknownSourcesBlocked: Boolean get() = blocked
+    override fun setUnknownSourcesBlocked(blocked: Boolean) {
+        this.blocked = blocked
+    }
+}
+
+private class LabelApps(private val labels: Map<String, String>) : InstalledApps {
+    override val ownPackageName = "io.github.inq_o.phonedoctor"
+    override fun snapshot(): Map<String, InstalledApp> = emptyMap()
+    override fun identity(packageName: String): AppIdentity? = null
+    override fun label(packageName: String): String? = labels[packageName]
+    override fun exportedActivities(packageName: String): Set<String>? = null
+    override fun isInstalled(packageName: String): Boolean? = null
+    override fun details(packageName: String): AppDetails? = null
+}
+

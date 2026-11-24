@@ -100,7 +100,7 @@
 ## 나중에 (P2·P3)
 
 - [x] T080 [US7] 오탐 익명 신고 — 완료: 서버 `POST /v1/feedback/false-positives`(App Check만, 로그인 토큰을 보내도 보지 않음, 같은 앱·판·판정기별 횟수와 처음·마지막 날짜만 집계, Flyway V6), 앱은 보호자가 [괜찮은 앱이에요]로 답하면 요청·근거마다 한 번 WorkManager로 보냄(로그인 토큰 없이 한 번 쓰는 App Check 토큰, 1~24시간 늦춰서), G4 [틀린 판정 알리기] 스위치(기본 켬). 서버는 본문 4KB(길이를 밝히지 않은 본문 포함)·주소별 시간당 30건 제한(주소는 `X-Forwarded-For` 오른쪽 `PROXY_HOPS`번째, IPv6는 /64, 주소 표 1만 개), 집계는 마지막 신고 1년 뒤 정리(예약 작업). 후속(PR #26): 끄거나 모든 데이터를 지우면 세대를 올려 맡긴 것·응답을 기다리는 중인 것을 모두 무효로(`FalsePositiveGate`, 보내기와 한 줄로), 마감은 서버 응답 시각 + 24시간(앱이 다시 켜져 같은 답을 다시 보낸 경우에도 맡기되 마감은 처음 답 기준)
-- [ ] T081 [US8] 강력 모드 (testdpc 참고)
+- [x] T081 [US8] 강력 모드 (testdpc 참고) — 완료: `core:packages` `StrongMode`(기기 소유자일 때만: setPackagesSuspended, DISALLOW_INSTALL_UNKNOWN_SOURCES(_GLOBALLY)), 관리자 수신기·QR 프로비저닝 화면(GET_PROVISIONING_MODE·ADMIN_POLICY_COMPLIANCE), 보호자가 지우자고 하면 바로 정지하고 `suspended` 결과 보고(FR-031), S7 강력 모드 칸(출처 불명 설치 막기 스위치·멈춘 앱 다시 쓰기, FR-032), 멈춘 요청도 S2에서 지울 수 있음. 출시 빌드는 꺼짐(STRONG_MODE_ENABLED=false, 수신기·화면 제거, verifyReleasePermissions가 확인). 공장 초기화한 기기에서 QR 프로비저닝·정지 확인은 실기기(사용자)
 - [ ] T082 FR-042 AppFunctions — compileSdk 37 필요
 - [ ] T083 [US6] Gemini Nano 문장 다듬기
 - [ ] T084 [US9] 주간 리포트·구독

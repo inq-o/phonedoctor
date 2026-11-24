@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
+import android.net.Uri
 import android.os.Build
 import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,10 +37,17 @@ interface AppUninstaller {
 @Singleton
 class PackageInstallerUninstaller @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val strongMode: StrongMode,
 ) : AppUninstaller {
     override val results: SharedFlow<UninstallResult> get() = UninstallResults.flow
 
     override fun requestUninstall(packageName: String) {
+        if (strongMode.active) {
+            // 기기 소유자면 PackageInstaller.uninstall이 확인창 없이 바로 지운다. 시니어가 직접 확인하게 시스템 삭제 화면을 연다
+            // (결과 방송은 없고, 화면이 다시 보일 때 설치 여부를 조회해 정한다)
+            context.startActivity(Intent(Intent.ACTION_DELETE, Uri.parse("package:$packageName")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            return
+        }
         val intent = Intent(context, UninstallResultReceiver::class.java)
             .setAction(UninstallResultReceiver.ACTION)
             .putExtra(UninstallResultReceiver.EXTRA_PACKAGE, packageName)
