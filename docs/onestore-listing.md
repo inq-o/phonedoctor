@@ -31,7 +31,7 @@
 | 상품설명 | 1,300자 이내 | 4절 |
 | 대표 아이콘 | 512×512 JPG/PNG | `docs/onestore/icon-512.png` (앱 아이콘과 같은 모양) |
 | 그래픽 이미지 | 1024×578 JPG/PNG | `docs/onestore/graphic-1024x578.png` |
-| 스크린샷 | 2~8장, 1MB 이내, 1,300px 이하, 권장 세로 720×1280 | `docs/onestore/screenshot-1~5.png` (606×1280, 출시 빌드를 S10+에서 캡처: 확인 필요 홈, 앱 확인, 지운 뒤, 정상 홈, 검사 기록) |
+| 스크린샷 | 2~8장, 1MB 이내, 1,300px 이하, 권장 세로 720×1280 | `docs/onestore/screenshot-1~4.png` (606×1280, 출시 빌드를 S10+에서 캡처: 확인 필요 홈, 앱 확인, 지운 뒤, 정상 홈) |
 | 키워드 | 1~10개 | 광고 앱, 광고 차단, 시니어, 부모님 폰, 휴대폰 검사, 앱 삭제, 광고 알림 |
 | 권한설명 | 권한과 사용 목적, 설치 전 사용자에게 보임 | 3절 |
 | 연령등급 | IARC 설문 + 비게임은 "ONE store 앱 연령등급" 추가 ([연령등급](https://onestore-dev.gitbook.io/dev/docs/apps/product/common-info/age-rating.md)) | 전체이용가 예상(폭력·성적 내용·결제 없음) |
@@ -73,7 +73,7 @@
 > - [지우기]를 누르면 안드로이드 앱 삭제 화면이 열립니다. 지울지는 직접 정하세요.
 >
 > ■ 쓰기 쉽게 만들었어요
-> - 홈은 큰 칸 네 개(살펴보기·검사 기록·가족·설정)로, 누를 곳을 찾기 쉽습니다.
+> - 홈은 큰 칸 세 개(살펴보기·검사 기록·설정)로, 누를 곳을 찾기 쉽습니다.
 > - 글자는 휴대폰의 글자 크기 설정을 따라 커집니다.
 > - 처음 설정할 때 필요한 권한을 하나씩 안내합니다.
 >
@@ -110,11 +110,13 @@
    ```zsh
    mkdir -p ~/.phonedoctor && chmod 700 ~/.phonedoctor
    keytool -genkeypair -keystore ~/.phonedoctor/phonedoctor-release.jks -alias phonedoctor -keyalg RSA -keysize 4096 -validity 10000
-   read -s "P?방금 정한 키 비밀번호: "; echo; printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=phonedoctor\nkeyPassword=%s\n' ~/.phonedoctor/phonedoctor-release.jks "$P" "$P" > ~/.phonedoctor/release.properties; chmod 600 ~/.phonedoctor/release.properties; unset P
+   read -rs "P?방금 정한 키 비밀번호: "; echo; printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=phonedoctor\nkeyPassword=%s\n' ~/.phonedoctor/phonedoctor-release.jks "$P" "$P" > ~/.phonedoctor/release.properties; chmod 600 ~/.phonedoctor/release.properties; unset P
    ```
    - 이름·조직 질문은 아무 값이나 넣어도 됨(예: 이름에 본인 이름)
+   - 비밀번호에 `\` 문자는 쓰지 않음(설정 파일이 이스케이프로 읽음)
    - **키 파일과 비밀번호를 따로 백업**(비밀번호 관리자 등). 잃으면 앱을 더는 업데이트할 수 없음
-2. **서명된 APK 빌드**: `./gradlew :app:assembleRelease` → `app/build/outputs/apk/release/app-release.apk`
+2. **서명된 APK 빌드**: `./gradlew :app:assembleRelease` → `app/build/outputs/apk/release/app-release.apk` (`app-release-unsigned.apk`가 나오면 1번 설정 파일을 못 찾은 것)
+   - 서명 확인: `~/Library/Android/sdk/build-tools/36.0.0/apksigner verify --print-certs app/build/outputs/apk/release/app-release.apk` → 서명자 이름과 SHA-256(4번에 씀)이 나오면 됨
 3. **ONEconsole**
    - [ ] 2단계 인증 켜기
    - [ ] 신규 상품 등록: 제목 "폰주치의", 패키지 `io.github.inq_o.phonedoctor`
