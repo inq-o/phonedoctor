@@ -3,7 +3,8 @@
 > **초안. 아직 시행하지 않습니다.** 지금 시행 중인 방침은 [privacy-policy.md](privacy-policy.md)(0.1.x, 인터넷 권한 없음)입니다. 가족 연결 판을 출시할 때 이 내용으로 그 파일을 바꿉니다.
 >
 > 출시 전에 할 일 (T057)
-> - `[확인 필요]` 채우기: 시행일·판, Neon 리전·연락처, Firebase·Cloud Logging 처리 위치와 로그 보관 기간, 보호책임자, 비공개 문의처
+> - `[확인 필요]` 채우기: 시행일·판, 보호책임자, 비공개 문의처
+> - 처리 위치·보관 기간은 공식 문서와 실제 설정으로 확인함 (2026-11-24): Firebase 처리 위치는 [Firebase 개인정보 보호와 보안](https://firebase.google.com/support/privacy), 로그 보관은 이 프로젝트의 Cloud Logging `_Default` 버킷(30일, 위치 global), Neon은 [지역 목록](https://neon.com/docs/introduction/regions)과 [Neon 제품 부속서](https://neon.com/dpa)(Databricks, Inc.가 Neon, LLC의 모회사로 계약 당사자). 서비스 설정을 바꾸면 다시 확인
 > - 아직 앱에 없는 동작을 구현한 뒤 다시 코드와 대조: 연결 시작 때 기기 등록, 약 6시간마다 상태 보고, 아이콘 96×96, "모든 데이터 지우기"의 서버 삭제 + Firebase 계정 삭제, 연결·요청 사본과 보낼 대기 요청(휴대전화 안), 설치 시점 판정 전송 여부
 > - 서버 기준(보관·삭제·푸시 내용)은 server/ 코드와 대조함 (2026-11-23)
 
@@ -46,7 +47,7 @@
 | 앱 무결성 확인 토큰(Firebase App Check, Google Play Integrity) | 요청할 때마다 | 변조된 앱이나 자동 프로그램의 요청을 막기 위해 | 서버에 저장하지 않음 |
 | 재전송 확인용 기록: 요청 고유번호, 요청 경로(기기·연결·요청 식별자, 연결 코드가 들어갈 수 있음), 그때 서버가 돌려준 응답 내용(등록한 기기 정보, 연결 정보, 요청 내용 등) | 기기 등록·코드 발급·연결·요청·응답·처리 결과를 보낼 때 | 통신이 끊겨 다시 보낸 요청이 두 번 처리되지 않게 | 24시간이 지나 다음 정리 때. 담긴 요청이 지워지거나, 기기를 지우면 그 기기의 기록은 즉시 삭제. 연결을 끊으면 끊은 보호자의 그 연결 요청 기록을 즉시 삭제 |
 | 연결 코드 입력 시도 시각 | 보호자가 코드를 입력할 때 | 코드를 마구 넣어 보는 시도를 막기 위해(1분에 5회) | 1분이 지나 다음 시도나 다음 정리 때. 기기를 지우면 즉시 |
-| 서버 접속 기록(운영 로그): 요청 시각, 방법·경로(연결 코드와 내부 식별자가 들어갈 수 있음), 응답 상태, IP 주소, 앱 정보(User-Agent), 오류 내용 | 요청할 때마다 | 장애 대응과 보안 | [확인 필요: Cloud Logging 보관 기간] |
+| 서버 접속 기록(운영 로그): 요청 시각, 방법·경로(연결 코드와 내부 식별자가 들어갈 수 있음), 응답 상태, IP 주소, 앱 정보(User-Agent), 오류 내용 | 요청할 때마다 | 장애 대응과 보안 | 30일 |
 
 - 연결을 시작하지 않으면 2절의 정보만 휴대전화 안에서 쓰입니다.
 - 보호자가 보는 정보
@@ -57,20 +58,21 @@
 
 | 받는 곳 | 하는 일 | 처리 위치 |
 |---|---|---|
-| Google LLC (Firebase Authentication, Firebase Cloud Messaging, Firebase App Check) | 익명·Google 로그인, 푸시 알림 전달, 앱 무결성 확인 | [확인 필요] |
+| Google LLC (Firebase Authentication, Firebase Cloud Messaging, Firebase App Check) | 익명·Google 로그인, 푸시 알림 전달, 앱 무결성 확인 | 로그인: 미국. 푸시 알림·앱 무결성 확인: Google이 시설을 둔 여러 나라(특정 국가로 정할 수 없음) |
 | Google LLC (Google Cloud Run, Cloud Scheduler) | 서버 실행, 정리 작업 호출 | 대한민국(서울, asia-northeast3) |
-| Google LLC (Cloud Logging) | 서버 접속 기록 보관 | [확인 필요] |
-| [확인 필요: Neon, Inc.] (Neon Postgres) | 3절 정보 저장 | [확인 필요: Neon 리전] |
+| Google LLC (Cloud Logging) | 서버 접속 기록 보관 | Google이 시설을 둔 여러 나라(저장 위치 global, 특정 국가로 정할 수 없음) |
+| Databricks, Inc. (Neon Postgres, 운영 Neon, LLC) | 3절 정보 저장 | 싱가포르 (Amazon Web Services ap-southeast-1) |
 
 국외 이전 (개인정보 보호법 제28조의8)
 
 - 이전되는 항목
   - Firebase: 사용자 ID, 보호자의 Google 계정 정보(로그인), 푸시 알림 토큰, 푸시 내용
   - 푸시 내용: 알림 종류, 연결·요청 식별자, 시니어·보호자 표시 이름, 앱 이름, 출처(광고 감지·설치 시점), 광고 횟수와 날짜, 보호자 응답 종류와 앱 패키지 이름(시니어에게 가는 응답 알림만), 처리 결과. 앱 아이콘과 근거 상세는 넣지 않음
-  - 그 밖에 국외에서 처리되는 곳이 있으면 그곳에 가는 3절 항목 [확인 필요]
-- 이전 국가: [확인 필요]
+  - Neon(데이터베이스): 3절에서 "서버 보관"이 있는 항목 전부(서버 접속 기록 제외)
+  - Cloud Logging: 3절의 서버 접속 기록
+- 이전 국가: 싱가포르(데이터베이스), 미국(Firebase 로그인), 그 밖에 Google이 시설을 둔 나라(푸시 알림, 앱 무결성 확인, 서버 접속 기록)
 - 시기와 방법: 서비스 이용 시 네트워크로 수시 전송
-- 받는 자와 연락처: Google LLC ([Google 개인정보 문의](https://support.google.com/policies/contact/general_privacy_form)), [확인 필요: Neon 연락처]
+- 받는 자와 연락처: Google LLC ([Google 개인정보 문의](https://support.google.com/policies/contact/general_privacy_form)), Databricks, Inc.(Neon) (privacy@databricks.com)
 - 목적과 보유 기간: 위 표와 3절의 보관 기간
 - 거부 방법과 영향: 가족 연결을 시작하지 않으면 서버 전송이 없습니다. 휴대전화 안 검사는 그대로 쓸 수 있고 보호자 알림만 쓸 수 없습니다.
 
