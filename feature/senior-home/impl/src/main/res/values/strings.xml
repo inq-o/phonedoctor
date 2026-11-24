@@ -43,7 +43,6 @@
     <string name="feature_senior_home_impl_last_scan_today">오늘 %1$s에 살펴봤어요</string>
     <string name="feature_senior_home_impl_last_scan_date">%1$d월 %2$d일 %3$s에 살펴봤어요</string>
     <string name="feature_senior_home_impl_last_scan_none">아직 살펴보지 않았어요</string>
-    <string name="feature_senior_home_impl_scanning">살펴보는 중이에요</string>
     <string name="feature_senior_home_impl_scope">쓰지 않았는데 화면에 뜨는 광고를 찾아요. 다른 화면 위에 겹쳐 뜨는 광고는 찾지 못할 수 있어요.</string>
     <string name="feature_senior_home_impl_notifications_off">알림이 꺼져 있어요. 확인할 앱이 생기면 이 화면에서 볼 수 있어요.</string>
 
@@ -54,10 +53,12 @@
 
     <string name="feature_senior_home_impl_usage_off_title">광고 찾기가 꺼져 있어요</string>
     <string name="feature_senior_home_impl_usage_off_body">사용 기록 보기를 켜야 광고를 띄우는 앱을 찾을 수 있어요. 다음 화면에서 폰주치의를 찾아 스위치를 켜 주세요.</string>
-    <string name="feature_senior_home_impl_usage_open">설정 열기</string>
+    <string name="feature_senior_home_impl_usage_open">켜러 가기</string>
 
-    <string name="feature_senior_home_impl_history">검사 기록 보기</string>
-    <string name="feature_senior_home_impl_scan_now">지금 다시 살펴보기</string>
+    <!-- 홈 메뉴 칸 (ux-flows S1). 반쪽 폭에 22sp로 들어가게 짧게 -->
+    <string name="feature_senior_home_impl_menu_scan">살펴보기</string>
+    <string name="feature_senior_home_impl_scanning_short">살펴보는 중</string>
+    <string name="feature_senior_home_impl_menu_family">가족</string>
 
     <string name="feature_senior_home_impl_history_title">검사 기록</string>
     <string name="feature_senior_home_impl_back">뒤로</string>

@@ -11,7 +11,7 @@ import io.github.inq_o.phonedoctor.feature.seniorhome.impl.SeniorSettingsScreen
 
 /**
  * @param onSettingsClick 홈 [설정] → S7
- * @param onFamilyClick S7 [연결한 가족 보기] → S5
+ * @param onFamilyClick 홈 [가족] 칸, S7 [연결한 가족 보기] → S5
  */
 fun EntryProviderScope<NavKey>.seniorHomeEntries(
     onAlertClick: (Long) -> Unit,
@@ -27,6 +27,7 @@ fun EntryProviderScope<NavKey>.seniorHomeEntries(
             onAlertClick = onAlertClick,
             onHistoryClick = onHistoryClick,
             onSettingsClick = onSettingsClick,
+            onFamilyClick = onFamilyClick,
             onLinkRequestClick = onLinkRequestClick,
         )
     }

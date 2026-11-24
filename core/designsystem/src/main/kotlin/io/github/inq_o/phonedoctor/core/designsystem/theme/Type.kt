@@ -62,6 +62,7 @@ val Typography = Typography(
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
         lineHeight = 28.sp,
+        lineBreak = KoreanLineBreak,
     ),
 )
 

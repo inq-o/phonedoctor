@@ -60,6 +60,8 @@ internal fun ScanHistoryScreen(state: ScanHistoryUiState, onBack: () -> Unit, mo
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp).semantics { heading() },
         )
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 24.dp)) {
+            // 무엇을 찾고 무엇을 못 찾는지. 홈에서 옮겨 왔다 (홈은 상태 문장만, ux-flows S1)
+            item { Text(stringResource(R.string.feature_senior_home_impl_scope), style = MaterialTheme.typography.bodyLarge) }
             item { Section(stringResource(R.string.feature_senior_home_impl_history_apps)) }
             if (state.apps.isEmpty()) {
                 item { Line(stringResource(R.string.feature_senior_home_impl_history_apps_empty)) }

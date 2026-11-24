@@ -21,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
@@ -64,17 +65,25 @@ internal fun PairingCodeScreen(
     SeniorScreen(
         modifier = modifier,
         actions = {
-            PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_later), onBack)
+            // 버튼 쌍 (ux-flows): 왼쪽 [나중에]는 기다리는 화면에서 빠져나가는 길이라 늘 둔다 (원칙 1 예외)
+            val later: @Composable (Modifier) -> Unit = { PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_later), onBack, it) }
             when (state) {
-                is PairingCodeUiState.Failed ->
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onNewCode)
+                is PairingCodeUiState.Failed -> PdButtonPair(
+                    first = later,
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onNewCode, it) },
+                )
                 // 가족 폰에서 "코드 시간이 지났어요"가 뜨면 여기서 바로 새로 받는다 (이 폰 시계로는 아직 안 지났어도)
-                is PairingCodeUiState.Ready -> if (state.expired) {
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode)
-                } else {
-                    PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode)
-                }
-                PairingCodeUiState.Loading -> Unit
+                is PairingCodeUiState.Ready -> PdButtonPair(
+                    first = later,
+                    second = {
+                        if (state.expired) {
+                            PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode, it)
+                        } else {
+                            PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_code_new), onNewCode, it)
+                        }
+                    },
+                )
+                PairingCodeUiState.Loading -> later(Modifier)
             }
         },
     ) {

@@ -29,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
@@ -85,12 +86,18 @@ internal fun FamilyLinksScreen(
             )
         },
         actions = {
-            PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_home), onBack)
+            // 버튼 쌍 (ux-flows): 왼쪽 물러나기, 오른쪽 주요 행동
+            val home: @Composable (Modifier) -> Unit = { PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_home), onBack, it) }
             when {
-                state is FamilyLinksUiState.Failed ->
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onRetry)
-                ready != null && ready.canAdd ->
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_links_add), onAddFamily, enabled = ready.revoking == null)
+                state is FamilyLinksUiState.Failed -> PdButtonPair(
+                    first = home,
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onRetry, it) },
+                )
+                ready != null && ready.canAdd -> PdButtonPair(
+                    first = home,
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_links_add), onAddFamily, it, enabled = ready.revoking == null) },
+                )
+                else -> home(Modifier)
             }
         },
     ) {
@@ -184,8 +191,10 @@ private fun RevokeDialog(name: String, onRevoke: () -> Unit, onKeep: () -> Unit)
                     modifier = Modifier.semantics { heading() },
                 )
                 Text(stringResource(R.string.feature_senior_family_impl_revoke_dialog_body, name), style = MaterialTheme.typography.bodyLarge)
-                PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_revoke_dialog_keep), onKeep)
-                PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_links_revoke), onRevoke, danger = true)
+                PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_revoke_dialog_keep), onKeep, it) },
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_links_revoke), onRevoke, it, danger = true) },
+                )
             }
         }
     }
