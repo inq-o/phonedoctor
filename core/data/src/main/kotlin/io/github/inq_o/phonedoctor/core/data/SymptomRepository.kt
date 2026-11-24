@@ -45,6 +45,11 @@ interface SymptomRepository {
     suspend fun confirmRemoved(id: Long, requested: Boolean): Boolean?
 }
 
+/** 시니어가 삭제 창에서 취소한 요청을 하루 뒤 한 번 다시 알리도록 맡긴다 (spec US5 시나리오 4, data-model `declined`) */
+fun interface DeclineNudgeScheduler {
+    fun schedule(alertId: Long)
+}
+
 class DefaultSymptomRepository @Inject constructor(
     private val alertDao: AlertLocalDao,
     private val scanRunDao: ScanRunDao,
@@ -52,6 +57,7 @@ class DefaultSymptomRepository @Inject constructor(
     private val installedApps: InstalledApps,
     scanner: SymptomScanner,
     private val familySync: FamilySyncScheduler,
+    private val declineNudge: DeclineNudgeScheduler,
 ) : SymptomRepository {
     override val openAlerts: Flow<List<SymptomAlert>> = alertDao.observeOpen().map { list -> list.map { it.toModel() } }
 
@@ -82,6 +88,8 @@ class DefaultSymptomRepository @Inject constructor(
         alertDao.setOutcome(id, status, outcome.name, System.currentTimeMillis())
         // 가족에게 보낸 요청이면 결과를 알린다 (보내지 않은 요청이면 동기화가 표시만 지운다. 읽은 뒤 서버 ID가 생겼을 수 있어 늘 맡긴다)
         familySync.schedule()
+        // 취소(아직 안 지움): 보호자에게는 동기화가 declined로 알리고, 시니어에게는 하루 뒤 한 번 다시 알린다
+        if (outcome == AlertOutcome.DECLINED) declineNudge.schedule(id)
     }
 
     override suspend fun confirmRemoved(id: Long, requested: Boolean): Boolean? = withContext(Dispatchers.IO) {

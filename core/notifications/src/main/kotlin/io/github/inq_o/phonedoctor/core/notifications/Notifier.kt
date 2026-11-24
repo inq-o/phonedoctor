@@ -35,6 +35,12 @@ interface Notifier {
      */
     fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?)
 
+    /**
+     * 시니어가 시스템 삭제 창에서 취소한 지 하루 뒤 한 번 (spec US5 시나리오 4): "민지님이 지우자고 한 ○○이 아직 있어요".
+     * 탭하면 S2가 열려 다시 지울 수 있다
+     */
+    fun notifyStillInstalled(alert: SymptomAlert) = Unit
+
     /** 가족이 연결을 요청함 (푸시 LINK_REQUESTED). 탭하면 연결 확인 화면(S3)이 열린다 */
     fun notifyLinkRequested(linkId: String, guardianName: String?)
 
@@ -150,6 +156,32 @@ class SystemNotifier @Inject constructor(
             manager.notify(alert.id.toInt(), notification)
         } catch (e: SecurityException) {
             // 확인 직후 권한이 꺼진 경우. 앱 상세 화면에는 그대로 보인다
+        }
+    }
+
+    override fun notifyStillInstalled(alert: SymptomAlert) {
+        if (!canNotify()) return
+        ensureChannel()
+        val launch = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        launch.putExtra(EXTRA_ALERT_ID, alert.id)
+        launch.data = notificationUri("nudge", alert.id.toString())
+        val pending = PendingIntent.getActivity(
+            context, alert.id.toInt(), launch, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val text = context.getString(R.string.core_notifications_nudge_text, nameOrFallback(alert.family?.guardianName), Josa.iGa(alert.label))
+        val notification = NotificationCompat.Builder(context, CHANNEL_ALERTS)
+            .setSmallIcon(R.drawable.core_notifications_ic_alert)
+            .setContentTitle(context.getString(R.string.core_notifications_nudge_title))
+            .setContentText(text)
+            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pending)
+            .setAutoCancel(true)
+            .build()
+        try {
+            NotificationManagerCompat.from(context).notify(alert.id.toInt(), notification)
+        } catch (e: SecurityException) {
+            // 확인 직후 권한이 꺼진 경우
         }
     }
 

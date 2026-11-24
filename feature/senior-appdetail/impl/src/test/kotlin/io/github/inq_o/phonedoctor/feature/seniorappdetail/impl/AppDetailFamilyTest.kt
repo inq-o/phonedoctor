@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.feature.seniorappdetail.impl
 
+import androidx.lifecycle.SavedStateHandle
 import io.github.inq_o.phonedoctor.core.data.AppliedDecision
 import io.github.inq_o.phonedoctor.core.data.FamilyAlertSync
 import io.github.inq_o.phonedoctor.core.data.FamilySyncResult
@@ -53,7 +54,65 @@ class AppDetailFamilyTest {
         "2026-11-23", 5, 1, 0, 0, "test", 0, 0, family = family,
     )
 
-    private fun vm() = AppDetailViewModel(1, FakeRepository(alert), FakeUninstaller(), FakeNotifier(), sync)
+    private val repository = FakeRepository(alert)
+    private val uninstaller = FakeUninstaller()
+
+    private fun vm(saved: SavedStateHandle = SavedStateHandle()) = AppDetailViewModel(1, saved, repository, uninstaller, FakeNotifier(), sync)
+
+    @Test
+    fun cancelLostWithTheProcessIsStillDeclinedOnReturn() = runTest(dispatcher) {
+        // 삭제 창이 떠 있는 동안 프로세스가 끝나 결과 방송을 못 받음: 저장된 상태로 돌아와 아직 있으면 취소로 본다
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false))
+        val vm = vm(SavedStateHandle(mapOf("uninstallPhase" to UninstallPhase.REQUESTED.name)))
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.onResume()
+        advanceUntilIdle()
+        assertEquals(listOf(AlertOutcome.DECLINED), repository.outcomes)
+        // 처음 화면을 열 때(삭제 요청 전)는 아니다
+        val fresh = vm()
+        fresh.onResume()
+        advanceUntilIdle()
+        assertEquals(1, repository.outcomes.size)
+    }
+
+    @Test
+    fun cancellingWhatFamilyAskedToRemoveIsDeclinedAndStaysOpenable() = runTest(dispatcher) {
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false))
+        val vm = vm()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uninstall()
+        uninstaller.results.emit(UninstallResult.Cancelled("com.ad"))
+        advanceUntilIdle()
+        assertEquals(listOf(AlertOutcome.DECLINED), repository.outcomes)
+        // 닫혔어도(취소) 화면은 남아 다시 지울 수 있다
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false), outcome = AlertOutcome.DECLINED)
+        assertTrue(vm.uiState.value is AppDetailUiState.Ready)
+        // 연결을 끊어 가족 답이 지워지면 닫힌 요청으로 본다
+        alert.value = alert(null, outcome = AlertOutcome.DECLINED)
+        assertEquals(AppDetailUiState.Gone, vm.uiState.value)
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false), outcome = AlertOutcome.DECLINED)
+        // 이미 취소로 닫힌 요청에서 또 취소해도 다시 적지 않는다
+        vm.uninstall()
+        uninstaller.results.emit(UninstallResult.Cancelled("com.ad"))
+        advanceUntilIdle()
+        assertEquals(1, repository.outcomes.size)
+    }
+
+    @Test
+    fun cancellingBeforeFamilyAnswersKeepsTheRequestOpen() = runTest(dispatcher) {
+        alert.value = alert(AlertFamilyState(null, null, null, closed = false))
+        val vm = vm()
+        backgroundScope.launch { vm.uiState.collect {} }
+        vm.uninstall()
+        uninstaller.results.emit(UninstallResult.Cancelled("com.ad"))
+        advanceUntilIdle()
+        assertTrue(repository.outcomes.isEmpty())
+        // 가족과 연결하지 않은 폰도 그대로
+        alert.value = alert(null)
+        uninstaller.results.emit(UninstallResult.Cancelled("com.ad"))
+        advanceUntilIdle()
+        assertTrue(repository.outcomes.isEmpty())
+    }
 
     @Test
     fun waitsForFamilyThenShowsRecommendation() = runTest(dispatcher) {
@@ -115,12 +174,15 @@ class AppDetailFamilyTest {
         override fun alert(id: Long): Flow<SymptomAlert?> = alert.map { it }
         override fun recentScans(limit: Int): Flow<List<ScanRun>> = flowOf(emptyList())
         override fun dailyCounts(days: Long): Flow<List<DailyAppCount>> = flowOf(emptyList())
-        override suspend fun recordOutcome(id: Long, outcome: AlertOutcome) = Unit
+        val outcomes = mutableListOf<AlertOutcome>()
+        override suspend fun recordOutcome(id: Long, outcome: AlertOutcome) {
+            outcomes += outcome
+        }
         override suspend fun confirmRemoved(id: Long, requested: Boolean): Boolean? = false
     }
 
     private class FakeUninstaller : AppUninstaller {
-        override val results: SharedFlow<UninstallResult> = MutableSharedFlow()
+        override val results = MutableSharedFlow<UninstallResult>()
         override fun requestUninstall(packageName: String) = Unit
     }
 
