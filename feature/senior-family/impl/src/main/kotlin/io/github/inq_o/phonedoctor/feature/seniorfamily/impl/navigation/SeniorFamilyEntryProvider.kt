@@ -14,7 +14,7 @@ import io.github.inq_o.phonedoctor.feature.seniorfamily.impl.PairingCodeScreen
  * @param onAnswer S5의 확인 대기 → S3
  * @param onLinkRequested 연결 코드 화면에서 보호자가 코드를 넣음 → S3 (코드 화면은 닫는다)
  * @param onHome [홈으로] 버튼. 쌓인 화면을 모두 닫고 홈으로
- * @param onBack 연결 코드 화면의 [나중에 할게요]. 연 곳(홈·S5)으로
+ * @param onBack 연결 코드 화면의 [나중에]. 연 곳(홈·S5)으로
  */
 fun EntryProviderScope<NavKey>.seniorFamilyEntries(
     onAddFamily: () -> Unit,

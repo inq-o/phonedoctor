@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.data.MESSAGE_TO_SENIOR_MAX
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianOutlinedButton
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianScreen
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
@@ -77,22 +78,35 @@ internal fun AlertDetailScreen(
         modifier = modifier,
         actions = {
             when {
-                state is AlertDetailUiState.Failed -> {
-                    GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack)
-                    GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry)
-                }
+                // 버튼 쌍 (ux-flows): 왼쪽 물러나기, 오른쪽 주요 행동
+                state is AlertDetailUiState.Failed -> PdButtonPair(
+                    first = { GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack, it) },
+                    second = { GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry, it) },
+                    minHeight = 48.dp,
+                    gap = 8.dp,
+                )
                 answerable -> {
                     val sending = ready!!.sending != null
                     // 알림 전용(이미 허용한 앱)에는 [괜찮은 앱이에요]가 없다
-                    if (!ready.alert.notice) {
-                        GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_decide_allow), { onDecide(FamilyDecision.ALLOW) }, enabled = !sending)
+                    val uninstall: @Composable (Modifier) -> Unit = {
+                        GuardianPrimaryButton(
+                            stringResource(R.string.feature_guardian_impl_decide_uninstall),
+                            { onDecide(FamilyDecision.RECOMMEND_UNINSTALL) },
+                            it,
+                            enabled = !sending,
+                            danger = true,
+                        )
                     }
-                    GuardianPrimaryButton(
-                        stringResource(R.string.feature_guardian_impl_decide_uninstall),
-                        { onDecide(FamilyDecision.RECOMMEND_UNINSTALL) },
-                        enabled = !sending,
-                        danger = true,
-                    )
+                    if (ready.alert.notice) {
+                        uninstall(Modifier)
+                    } else {
+                        PdButtonPair(
+                            first = { GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_decide_allow), { onDecide(FamilyDecision.ALLOW) }, it, enabled = !sending) },
+                            second = uninstall,
+                            minHeight = 48.dp,
+                            gap = 8.dp,
+                        )
+                    }
                 }
                 else -> GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack)
             }

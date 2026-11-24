@@ -43,7 +43,6 @@
     <string name="feature_senior_home_impl_last_scan_today">오늘 %1$s에 살펴봤어요</string>
     <string name="feature_senior_home_impl_last_scan_date">%1$d월 %2$d일 %3$s에 살펴봤어요</string>
     <string name="feature_senior_home_impl_last_scan_none">아직 살펴보지 않았어요</string>
-    <string name="feature_senior_home_impl_scanning">살펴보는 중이에요</string>
     <string name="feature_senior_home_impl_scope">쓰지 않았는데 화면에 뜨는 광고를 찾아요. 다른 화면 위에 겹쳐 뜨는 광고는 찾지 못할 수 있어요.</string>
     <string name="feature_senior_home_impl_notifications_off">알림이 꺼져 있어요. 확인할 앱이 생기면 이 화면에서 볼 수 있어요.</string>
 

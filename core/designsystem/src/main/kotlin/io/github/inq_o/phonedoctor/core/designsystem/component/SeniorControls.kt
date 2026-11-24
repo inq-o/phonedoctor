@@ -21,33 +21,53 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-/** 이 글꼴 배율부터 버튼 쌍을 세로로 쌓는다. 22sp 버튼 글자가 반쪽 폭(약 150dp)에 한 줄로 들어가지 않기 시작하는 크기 */
-const val PAIR_STACK_FONT_SCALE = 1.3f
-
 /**
  * 버튼 쌍 (ux-flows "버튼 쌍"). 왼쪽 [first]는 물러나기, 오른쪽 [second]는 주요 행동.
- * 시스템 삭제 창 [취소 | 확인]과 같은 순서다. 글꼴이 커서 한 줄에 안 들어가면 세로로 쌓고 주요 버튼을 아래에 둔다.
- * 각 버튼은 받은 Modifier를 써야 같은 높이·폭이 된다.
+ * 시스템 삭제 창 [취소 | 확인]과 같은 순서다. 두 버튼의 글자가 반쪽 폭에 한 줄로 들어가지 않으면
+ * (큰 글꼴, 긴 이름) 세로로 쌓고 주요 버튼을 아래에 둔다. 각 버튼은 받은 Modifier를 써야 한다.
+ * 보호자 화면은 [minHeight] 48dp, [gap] 8dp (ux-flows §5)
  */
 @Composable
 fun PdButtonPair(
     first: @Composable (Modifier) -> Unit,
     second: @Composable (Modifier) -> Unit,
     modifier: Modifier = Modifier,
+    minHeight: Dp = 64.dp,
+    gap: Dp = 16.dp,
 ) {
-    if (LocalDensity.current.fontScale >= PAIR_STACK_FONT_SCALE) {
-        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            first(Modifier.heightIn(min = 64.dp))
-            second(Modifier.heightIn(min = 64.dp))
-        }
-    } else {
-        Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            first(Modifier.weight(1f).fillMaxHeight().heightIn(min = 64.dp))
-            second(Modifier.weight(1f).fillMaxHeight().heightIn(min = 64.dp))
+    Layout(
+        contents = listOf({ first(Modifier) }, { second(Modifier) }),
+        modifier = modifier.fillMaxWidth(),
+    ) { (a, b), constraints ->
+        val start = a.first()
+        val end = b.first()
+        val width = constraints.maxWidth
+        val gapPx = gap.roundToPx()
+        val minPx = minHeight.roundToPx()
+        val half = (width - gapPx) / 2
+        val fits = start.maxIntrinsicWidth(Constraints.Infinity) <= half && end.maxIntrinsicWidth(Constraints.Infinity) <= half
+        if (fits) {
+            val height = maxOf(minPx, start.minIntrinsicHeight(half), end.minIntrinsicHeight(half))
+            val left = start.measure(Constraints.fixed(half, height))
+            val right = end.measure(Constraints.fixed(width - half - gapPx, height))
+            layout(width, height) {
+                left.place(0, 0)
+                right.place(half + gapPx, 0)
+            }
+        } else {
+            val each = Constraints(minWidth = width, maxWidth = width, minHeight = minPx)
+            val top = start.measure(each)
+            val bottom = end.measure(each)
+            layout(width, top.height + gapPx + bottom.height) {
+                top.place(0, 0)
+                bottom.place(0, top.height + gapPx)
+            }
         }
     }
 }

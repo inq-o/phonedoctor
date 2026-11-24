@@ -133,11 +133,13 @@ internal fun SeniorHomeScreen(
             if (state is SeniorHomeUiState.UsageAccessOff) {
                 PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
             }
-            if (state !is SeniorHomeUiState.Loading) {
-                // 확인할 앱이 있으면 주요 행동은 위의 앱 카드, 광고 찾기가 꺼져 있으면 [켜러 가기]다 (한 화면에 주요 행동 하나)
+            // 확인할 앱이 있으면 주요 행동은 위의 앱 카드, 광고 찾기가 꺼져 있으면 [켜러 가기]다 (한 화면에 주요 행동 하나).
+            // 광고 찾기가 꺼져 있거나 불러오는 중이면 [살펴보기]는 눌러도 할 일이 없어 끈다 (자리와 이름은 그대로)
+            run {
                 val ready = state as? SeniorHomeUiState.Ready
                 HomeMenu(
                     scanFilled = ready != null && ready.alerts.isEmpty(),
+                    scanEnabled = ready != null && !ready.scanning,
                     scanning = ready?.scanning == true,
                     familyAvailable = family.available,
                     onScanNow = onScanNow,
@@ -196,6 +198,7 @@ private fun Guardians(guardians: List<String>) {
 @Composable
 private fun HomeMenu(
     scanFilled: Boolean,
+    scanEnabled: Boolean,
     scanning: Boolean,
     familyAvailable: Boolean,
     onScanNow: () -> Unit,
@@ -209,7 +212,7 @@ private fun HomeMenu(
             icon = Icons.Filled.Search,
             onClick = onScanNow,
             filled = scanFilled,
-            enabled = !scanning,
+            enabled = scanEnabled,
             modifier = it,
         )
     }
@@ -282,8 +285,8 @@ private fun AlertCard(alert: SymptomAlert, onClick: () -> Unit) {
                 // 카드를 누를 수 있다는 단서 (R1: 시니어는 글자로 된 UI를 누를 수 있다고 인식하지 못함)
                 Text(
                     stringResource(R.string.feature_senior_home_impl_attention_body),
+                    // 주황은 본문 글자색으로 쓰지 않는다 (ux-flows §5, 흰 바탕 5.0:1). 주황은 테두리에만
                     style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                    color = LocalStatusColors.current.caution,
                 )
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
