@@ -50,4 +50,5 @@
 
 ## 8. 문의
 
-[GitHub 이슈](https://github.com/inq-o/phonedoctor/issues)로 문의해 주세요.
+- [GitHub 이슈](https://github.com/inq-o/phonedoctor/issues)로 문의해 주세요. 공개 게시판이므로 개인정보는 적지 마세요.
+- 비공개로 답이 필요하면 개발자 최인규(narutoig0810@gmail.com)에게 메일로 보내 주세요.
