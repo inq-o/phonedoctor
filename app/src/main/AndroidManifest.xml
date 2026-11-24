@@ -72,6 +72,22 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
         </provider>
+        <!-- "휴대폰 검사하기"를 시스템 AI 에이전트에 내놓는다 (FR-042, Android 16+). 서비스와 함수 설명 XML은 appfunctions 컴파일러가 만든다. 출시 빌드에서는 뺀다 -->
+        <service
+            android:name=".appfunctions.PhoneCheckAppFunctionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_APP_FUNCTION_SERVICE"
+            tools:targetApi="36">
+            <property
+                android:name="android.app.appfunctions.schema"
+                android:value="app_functions_schema.xsd" />
+            <property
+                android:name="android.app.appfunctions.v2"
+                android:value="phone_check.xml" />
+            <intent-filter>
+                <action android:name="android.app.appfunctions.AppFunctionService" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

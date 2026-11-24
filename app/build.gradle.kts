@@ -75,6 +75,8 @@ androidComponents {
                 listOf("StrongModeAdminReceiver", "StrongModeProvisioningActivity").forEach { component ->
                     check(component !in text) { "출시 빌드에 강력 모드 컴포넌트가 있음: $component (app/src/release/AndroidManifest.xml 참고)" }
                 }
+                // 휴대폰 검사하기 AppFunction(FR-042)도 출시 빌드에서 뺀다
+                check("PhoneCheckAppFunctionService" !in text) { "출시 빌드에 AppFunction 서비스가 있음 (app/src/release/AndroidManifest.xml 참고)" }
                 // FCM 토큰은 연결을 시작할 때 처음 발급한다 (켜져 있으면 앱 시작 때 발급·전송)
                 val autoInitOff = Regex("""android:name="firebase_messaging_auto_init_enabled"\s+android:value="false"""")
                 check(autoInitOff.containsMatchIn(text)) { "FCM 자동 발급이 꺼져 있지 않음 (app/src/main/AndroidManifest.xml)" }
@@ -127,6 +129,8 @@ dependencies {
     debugImplementation(libs.firebase.appcheck.playintegrity)
 
     ksp(libs.androidx.hilt.compiler)
+    implementation(libs.androidx.appfunctions)
+    ksp(libs.androidx.appfunctions.compiler)
     kspAndroidTest(libs.hilt.compiler)
 
     androidTestImplementation(projects.core.testing)
