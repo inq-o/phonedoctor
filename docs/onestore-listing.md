@@ -29,9 +29,9 @@
 | 패키지 네임 | 등록 뒤 변경 불가 | `io.github.inq_o.phonedoctor` |
 | 한줄설명 | 100자 이내 | 4절 |
 | 상품설명 | 1,300자 이내 | 4절 |
-| 대표 아이콘 | 512×512 JPG/PNG | 만들 것 |
-| 그래픽 이미지 | 1024×578 JPG/PNG | 만들 것 |
-| 스크린샷 | 2~8장, 1MB 이내, 1,300px 이하, 권장 세로 720×1280 | 에뮬레이터에서 찍을 것 |
+| 대표 아이콘 | 512×512 JPG/PNG | `docs/onestore/icon-512.png` (앱 아이콘과 같은 모양) |
+| 그래픽 이미지 | 1024×578 JPG/PNG | `docs/onestore/graphic-1024x578.png` |
+| 스크린샷 | 2~8장, 1MB 이내, 1,300px 이하, 권장 세로 720×1280 | `docs/onestore/screenshot-1~5.png` (606×1280, 출시 빌드를 S10+에서 캡처: 확인 필요 홈, 앱 확인, 지운 뒤, 정상 홈, 검사 기록) |
 | 키워드 | 1~10개 | 광고 앱, 광고 차단, 시니어, 부모님 폰, 휴대폰 검사, 앱 삭제, 광고 알림 |
 | 권한설명 | 권한과 사용 목적, 설치 전 사용자에게 보임 | 3절 |
 | 연령등급 | IARC 설문 + 비게임은 "ONE store 앱 연령등급" 추가 ([연령등급](https://onestore-dev.gitbook.io/dev/docs/apps/product/common-info/age-rating.md)) | 전체이용가 예상(폭력·성적 내용·결제 없음) |
@@ -70,10 +70,10 @@
 > ■ 이렇게 찾아요
 > - 사용자가 휴대폰을 만지지 않았는데 화면에 뜬 앱을 사용 기록으로 찾습니다.
 > - "○○ 오늘 광고를 3번 띄웠어요"처럼 앱 이름과 횟수로 알려 드립니다.
-> - [이 앱 지우기]를 누르면 안드로이드 앱 삭제 화면이 열립니다. 지울지는 직접 정하세요.
+> - [지우기]를 누르면 안드로이드 앱 삭제 화면이 열립니다. 지울지는 직접 정하세요.
 >
 > ■ 쓰기 쉽게 만들었어요
-> - 버튼이 크고, 화면마다 눌러야 할 버튼 하나가 눈에 띕니다.
+> - 홈은 큰 칸 네 개(살펴보기·검사 기록·가족·설정)로, 누를 곳을 찾기 쉽습니다.
 > - 글자는 휴대폰의 글자 크기 설정을 따라 커집니다.
 > - 처음 설정할 때 필요한 권한을 하나씩 안내합니다.
 >
@@ -104,10 +104,23 @@
 - 2027년 한국 시행 전에 정식 배포 계정(25달러, 본인 인증)으로 패키지를 등록한다. 서명을 우리 키로 유지하면(2절) 키 소유권 증명이 간단하다.
 - 시행 날짜가 나오면 이 절을 고친다.
 
-## 6. 사용자가 할 일
+## 6. 사용자가 할 일 (올리기 직전)
 
-- [ ] ONEconsole 2단계 인증 켜기
-- [ ] 릴리스 서명 키 만들기와 보관(분실하면 업데이트·개발자 인증 모두 막힘), SHA-256을 Firebase App Check에 등록
-- [ ] 아이콘 512×512, 그래픽 1024×578 만들기
-- [ ] 연령등급 설문
-- [ ] (2027년 전) Android Developer Console 정식 배포 계정과 패키지 등록
+1. **릴리스 서명 키 만들기** (한 번만, 터미널에서 직접. 비밀번호는 본인만 알고 아무에게도 알려 주지 않음)
+   ```zsh
+   mkdir -p ~/.phonedoctor && chmod 700 ~/.phonedoctor
+   keytool -genkeypair -keystore ~/.phonedoctor/phonedoctor-release.jks -alias phonedoctor -keyalg RSA -keysize 4096 -validity 10000
+   read -s "P?방금 정한 키 비밀번호: "; echo; printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=phonedoctor\nkeyPassword=%s\n' ~/.phonedoctor/phonedoctor-release.jks "$P" "$P" > ~/.phonedoctor/release.properties; chmod 600 ~/.phonedoctor/release.properties; unset P
+   ```
+   - 이름·조직 질문은 아무 값이나 넣어도 됨(예: 이름에 본인 이름)
+   - **키 파일과 비밀번호를 따로 백업**(비밀번호 관리자 등). 잃으면 앱을 더는 업데이트할 수 없음
+2. **서명된 APK 빌드**: `./gradlew :app:assembleRelease` → `app/build/outputs/apk/release/app-release.apk`
+3. **ONEconsole**
+   - [ ] 2단계 인증 켜기
+   - [ ] 신규 상품 등록: 제목 "폰주치의", 패키지 `io.github.inq_o.phonedoctor`
+   - [ ] 앱 서명: **"ONE store 앱 서명 선택해제(서명한 APK 등록)"**
+   - [ ] 판매정보: 4절 한줄설명·상품설명, 3절 권한설명, 키워드, 아이콘·그래픽·스크린샷(`docs/onestore/`)
+   - [ ] 수집정보: 정보 수집·공유 "아니오"(출시 빌드는 인터넷 권한 없음), 개인정보처리방침 URL https://inq-o.github.io/phonedoctor/privacy-policy.html
+   - [ ] 연령등급 설문(전체이용가 예상)
+   - [ ] 바이너리 `app-release.apk` 등록 → 검증 요청
+4. (나중에) 릴리스 키 SHA-256을 Firebase에 등록(가족 연결을 출시 빌드에서 켤 때), 2027년 전 Android Developer Console 정식 배포 계정과 패키지 등록
