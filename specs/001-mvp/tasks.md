@@ -65,7 +65,7 @@
 - [ ] T050 [US1] 모델 개선 + INT8 변환 + LiteRT 이식 `core/classifier/model`
 - [ ] T051 [US1] 기기 지연 측정 Microbenchmark (NFR-01)
 - [ ] T052 [US2] 첫 전체 검사 화면 (O-S3)
-- [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts — 진행: devices·pairing·alerts·예약 작업(PR #12~#14), 설정·삭제(PR #22), 오탐 신고(PR #24). 남은 것: 배포(아래), `/models/latest`(FR-008)는 모델 배포와 함께 T050에서
+- [ ] T053 [P] 서버 구현 — ADR-0001 결과, openapi.yaml 경로 순서: devices → pairing → alerts — 진행: devices·pairing·alerts·예약 작업(PR #12~#14), 설정·삭제(PR #22), 오탐 신고(PR #24), 배포(2026-11-24, Cloud Run 서울 `https://phonedoctor-api-236445024434.asia-northeast3.run.app` + Neon 싱가포르 + 15분 예약 작업, `/health`로 경로 변경 PR #32, 앱 주소 연결). 남은 것: `/models/latest`(FR-008)는 모델 배포와 함께 T050에서
   - [x] devices (`server/`, 인증·Idempotency-Key·오류 형식 공통 포함)
   - [x] pairing (연결 코드·연결, FCM 푸시 전송 공통 포함)
   - [x] alerts (생성·목록·응답·결과, 연결 해제 때 요청 삭제)

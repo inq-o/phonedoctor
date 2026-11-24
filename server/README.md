@@ -55,7 +55,8 @@
    - `gcloud config set project phonedoctor-a33d3`
    - `gcloud services enable secretmanager.googleapis.com run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com fcm.googleapis.com`
 4. Secret Manager에 DB 비밀번호 넣기
-   - `printf '%s' '<Neon 비밀번호>' | gcloud secrets create phonedoctor-db-password --data-file=-`
+   - 비밀번호가 셸 기록에 남지 않게 입력받아 넣는다(zsh): `read -s "P?Neon 비밀번호: "; echo; printf '%s' "$P" | gcloud secrets create phonedoctor-db-password --data-file=-; unset P`
+   - Neon 연결 정보는 풀링을 끈 직접 연결 주소(호스트에 `-pooler` 없음)를 쓴다. 서버가 시작할 때 Flyway가 스키마를 바꾼다
    - Cloud Run 실행 서비스 계정(따로 안 정하면 Compute Engine 기본 서비스 계정 `<프로젝트 번호>-compute@developer.gserviceaccount.com`)에 그 비밀 읽기 권한:
      `gcloud secrets add-iam-policy-binding phonedoctor-db-password --member=serviceAccount:<서비스 계정> --role=roles/secretmanager.secretAccessor`
 5. FCM 전송 권한: Cloud Run 실행 서비스 계정에 `roles/firebasecloudmessaging.admin`
@@ -80,6 +81,24 @@
    - `server/env.yaml`에 `SCHEDULER_AUDIENCE: "https://<서비스 주소>/internal/tick"`, `SCHEDULER_SERVICE_ACCOUNT: "phonedoctor-scheduler@phonedoctor-a33d3.iam.gserviceaccount.com"`을 넣고 8번 배포를 다시
    - 15분마다 호출: `gcloud scheduler jobs create http phonedoctor-tick --location asia-northeast3 --schedule "*/15 * * * *" --http-method POST --uri https://<서비스 주소>/internal/tick --oidc-service-account-email phonedoctor-scheduler@phonedoctor-a33d3.iam.gserviceaccount.com --oidc-token-audience https://<서비스 주소>/internal/tick`
    - 서비스가 인증 없이 열려 있어(`--allow-unauthenticated`) Cloud Run 호출 권한(`roles/run.invoker`)은 따로 필요 없고, 토큰은 서버가 확인한다(`GoogleOidcAuth`)
+
+## 지금 배포된 서버 (2026-11-24)
+
+- 주소: `https://phonedoctor-api-236445024434.asia-northeast3.run.app` (Cloud Run 서울, 서비스 `phonedoctor-api`)
+- DB: Neon 프로젝트 `phonedoctor`, 싱가포르(`aws-ap-southeast-1`)
+- 예약 작업: Cloud Scheduler `phonedoctor-tick`, 15분마다(Asia/Seoul)
+- 상태 확인: `curl https://phonedoctor-api-236445024434.asia-northeast3.run.app/health` → `ok`
+  - Cloud Run은 z로 끝나는 일부 경로(`/healthz` 등)를 앞단에서 막는다([알려진 문제](https://docs.cloud.google.com/run/docs/known-issues))
+- 코드를 바꾼 뒤 다시 배포: 위 8번 명령을 main에서 다시 실행
+
+## 앱에서 배포한 서버 쓰기
+
+- 출시 빌드는 이 주소를 쓴다(`core/network/build.gradle.kts`의 `RELEASE_API_BASE_URL`). 가족 연결은 아직 꺼져 있다
+- 개발 빌드는 기본이 로컬 서버(`http://10.0.2.2:8080/v1/`)다. 배포한 서버로 붙이려면
+  1. `./gradlew :app:installDebug -Pphonedoctor.apiBaseUrl=https://phonedoctor-api-236445024434.asia-northeast3.run.app/v1/`
+  2. 앱을 한 번 실행하고 `adb logcat -d | grep -i "debug secret"`으로 App Check 디버그 토큰을 찾는다
+  3. Firebase 콘솔 → App Check → 앱 → 디버그 토큰 관리에 그 값을 등록한다. 등록 전에는 서버가 `app-check-invalid`(401)로 막는다
+  - 디버그 토큰은 앱 데이터를 지우면 새로 생긴다. 쓰지 않는 토큰은 콘솔에서 지운다
 
 ## 로컬 컨테이너 확인
 
