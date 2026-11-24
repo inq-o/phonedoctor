@@ -70,20 +70,23 @@ object ManifestReader {
         fun names(tag: String): List<String> = tags(tag).mapNotNull { it.value("name") }.map(::format)
 
         val comps = COMPONENTS.associateWith { names(it) }
+        // androguard `get_intent_filters`: android:name을 패키지명으로 푼 값이 컴포넌트 목록에 있는 요소의 intent-filter(모든 깊이) 바로 아래
+        // action·category. 겹쳐 둔 요소도 같은 결과가 되게 "맞는 요소 아래에 있는 intent-filter"를 한 번 훑어 모은다 (깊은 중첩에서 제곱 시간이 되지 않게)
+        val wanted = listOf("activity", "receiver", "service").associateWith { comps.getValue(it).toSet() }
         val intents = sortedSetOf<String>()
-        for (kind in listOf("activity", "receiver", "service")) {
-            val wanted = comps.getValue(kind).toSet()
-            // androguard `get_intent_filters`: android:name을 패키지명으로 푼 값이 같은 요소의 intent-filter(모든 깊이) 바로 아래 action·category
-            for (item in root.descendants(kind)) {
-                val n = item.androidValue("name") ?: continue
-                if (format(n) !in wanted) continue
-                for (filter in item.descendants("intent-filter")) {
-                    for (el in filter.childrenNamed("action") + filter.childrenNamed("category")) {
-                        // PC는 이름 없는 action·category에서 예외를 내고 그 APK를 건너뛴다
-                        intents += el.androidValue("name") ?: throw ManifestException("이름 없는 ${el.tag}")
-                    }
+        val walk = ArrayDeque<Pair<XmlElement, Boolean>>()
+        root.children.asReversed().forEach { walk.addLast(it to false) }
+        while (walk.isNotEmpty()) {
+            val (e, insideMatch) = walk.removeLast()
+            val matches = e.ns.isEmpty() && wanted[e.tag]?.let { set -> e.androidValue("name")?.let { format(it) in set } } == true
+            val inside = insideMatch || matches
+            if (inside && e.ns.isEmpty() && e.tag == "intent-filter") {
+                for (el in e.childrenNamed("action") + e.childrenNamed("category")) {
+                    // PC는 이름 없는 action·category에서 예외를 내고 그 APK를 건너뛴다
+                    intents += el.androidValue("name") ?: throw ManifestException("이름 없는 ${el.tag}")
                 }
             }
+            e.children.asReversed().forEach { walk.addLast(it to inside) }
         }
         // uses-sdk가 여럿이면 문서 순서로 처음 값이 있는 것 (extract.py `_uses_sdk`와 같음)
         val usesSdk = tags("uses-sdk")
@@ -108,21 +111,43 @@ object ManifestReader {
 
     /** androguard `get_main_activities`: 꺼지지 않은 activity·activity-alias 중 MAIN 액션을 가진 이름과 LAUNCHER 분류를 가진 이름이 겹치면 */
     private fun hasLauncher(root: XmlElement): Boolean {
+        // 요소마다 "자기 아래(모든 깊이)에 MAIN 액션·LAUNCHER 분류가 있는지"를 뒤에서부터 한 번에 계산한다 (중첩에서 제곱 시간이 되지 않게)
+        val order = mutableListOf<XmlElement>()
+        val stack = ArrayDeque<XmlElement>().apply { add(root) }
+        while (stack.isNotEmpty()) {
+            val e = stack.removeLast()
+            order += e
+            e.children.forEach(stack::addLast)
+        }
+        val hasMain = java.util.IdentityHashMap<XmlElement, Boolean>()
+        val hasLauncherCat = java.util.IdentityHashMap<XmlElement, Boolean>()
+        for (e in order.asReversed()) {
+            var m = false
+            var l = false
+            for (c in e.children) {
+                val bare = c.ns.isEmpty()
+                if (hasMain.getValue(c) || (bare && c.tag == "action" && c.androidValue("name") == "android.intent.action.MAIN")) m = true
+                if (hasLauncherCat.getValue(c) || (bare && c.tag == "category" && c.androidValue("name") == "android.intent.category.LAUNCHER")) l = true
+            }
+            hasMain[e] = m
+            hasLauncherCat[e] = l
+        }
         val main = mutableSetOf<String>()
         val launcher = mutableSetOf<String>()
         for (item in root.descendants("activity") + root.descendants("activity-alias")) {
             if (item.androidValue("enabled") == "false") continue
             // Python `a or b`: android 쪽이 비었으면 네임스페이스 없는 쪽 (그것은 ""여도 이름으로 씀)
-            val name = item.androidValue("name")?.takeIf { it.isNotEmpty() } ?: item.attrs["name"]
-            if (item.descendants("action").any { it.androidValue("name") == "android.intent.action.MAIN" }) name?.let { main += it }
-            if (item.descendants("category").any { it.androidValue("name") == "android.intent.category.LAUNCHER" }) name?.let { launcher += it }
+            val name = item.androidValue("name")?.takeIf { it.isNotEmpty() } ?: item.attrs["name"] ?: continue
+            if (hasMain.getValue(item)) main += name
+            if (hasLauncherCat.getValue(item)) launcher += name
         }
         return (main intersect launcher).isNotEmpty()
     }
 
     /** Python `int(str)`: 앞뒤 공백, 부호, 숫자 사이 밑줄 하나, 유니코드 십진 숫자를 받는다 */
     internal fun pyInt(s: String): Int? {
-        val t = s.trim { it.isWhitespace() || it == '\u001c' || it == '\u001d' || it == '\u001e' || it == '\u001f' || it == '\u0085' }
+        // Python str.strip()의 공백 (\x1c~\x1f는 int()가 받지 않으므로 빼지 않는다)
+        val t = s.trim { (it.isWhitespace() && it.code !in 0x1c..0x1f) || it == '\u0085' }
         if (t.isEmpty()) return null
         var i = 0
         var negative = false
@@ -134,17 +159,18 @@ object ManifestReader {
         var value = 0L
         var lastWasDigit = false
         while (i < t.length) {
-            val c = t[i]
-            if (c == '_') {
+            // 코드 포인트 단위 (보조 평면의 십진 숫자도 Python은 받는다)
+            val cp = t.codePointAt(i)
+            if (cp == '_'.code) {
                 if (!lastWasDigit || i + 1 >= t.length) return null
                 lastWasDigit = false
             } else {
-                if (Character.getType(c) != Character.DECIMAL_DIGIT_NUMBER.toInt()) return null
-                value = value * 10 + Character.digit(c, 10)
+                if (Character.getType(cp) != Character.DECIMAL_DIGIT_NUMBER.toInt()) return null
+                value = value * 10 + Character.digit(cp, 10)
                 if (value > Int.MAX_VALUE.toLong() + 1) return null
                 lastWasDigit = true
             }
-            i++
+            i += Character.charCount(cp)
         }
         if (!lastWasDigit) return null
         val signed = if (negative) -value else value

@@ -183,6 +183,10 @@ VARIANTS = {
     "no_package": lambda: build(el("manifest", [], [el("application", [], [launcher(), receiver()])])),
     # 빈 이름은 패키지명을 붙이지 않는다: 붙이면 "com.applovin.demo."이 되어 광고 SDK 접두어에 걸림
     "empty_name_ad_package": lambda: build(manifest([launcher(), receiver(), el("activity", [at("name", "", ns=None, rid=None)])], pkg="com.applovin.demo")),
+    # 100만 글자 문자열 하나를 300개 요소의 속성이 가리킴: 속성마다 사본을 만들면 기기 메모리가 바닥남
+    "big_shared_value": lambda: build(manifest([launcher(), receiver()] + [el("x", [at("a", "y" * 1_000_000, ns=None, rid=None)]) for _ in range(300)])),
+    # 앞에 정상 uses-sdk, application 안에 숫자가 아닌 targetSdk: 문서 순서로 앞의 것을 쓴다(PC도 실행마다 같게)
+    "nested_bad_uses_sdk": lambda: build(manifest([launcher(), receiver(), el("uses-sdk", [at("targetSdkVersion", "abc")])])),
 }
 
 
@@ -200,12 +204,44 @@ def apk(path, manifest, method=None):
         open(path, 'wb').write(bytes(b))
 
 
+def data_descriptor(path, manifest, deflate):
+    """일반 비트 3(데이터 디스크립터)을 켜고 로컬 헤더 크기를 엉터리 큰 값으로. 중앙 디렉터리 크기는 맞게 둔다
+    (설치기는 비트 3이면 로컬 크기를 보지 않는다. PC는 파일 끝까지 읽고 매니페스트 머리의 크기로 자른다)"""
+    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_DEFLATED if deflate else zipfile.ZIP_STORED) as z:
+        z.writestr('AndroidManifest.xml', manifest)
+    b = bytearray(open(path, 'rb').read())
+    flags = struct.unpack('<H', b[6:8])[0] | 0x08
+    b[6:8] = struct.pack('<H', flags)
+    b[18:26] = struct.pack('<II', 0x7FFFFFF0, 0x7FFFFFF0)
+    open(path, 'wb').write(bytes(b))
+
+
+def shadowed_local(path, manifest):
+    """다른 항목(이름 길이 같음)의 로컬 헤더 이름을 AndroidManifest.xml로 바꾸고 추가 필드 길이를 다르게.
+    apkInspector는 로컬 헤더를 로컬 이름으로(뒤엣것) 찾아 그 추가 길이로 데이터 위치를 잡는다 → 4바이트 어긋나 PC는 거절"""
+    decoy = 'zzzzzzzzzzzzzzz.bin'  # AndroidManifest.xml과 같은 19자
+    with zipfile.ZipFile(path, 'w', compression=zipfile.ZIP_STORED) as z:
+        z.writestr('AndroidManifest.xml', manifest)
+        info = zipfile.ZipInfo(decoy)
+        info.extra = struct.pack('<HH', 0xCAFE, 0)
+        z.writestr(info, b'decoy')
+    b = bytearray(open(path, 'rb').read())
+    at_ = b.find(b'PK\x03\x04', 1)  # 첫 로컬 헤더(0)는 진짜 매니페스트
+    while at_ != -1 and b[at_ + 30:at_ + 49] != decoy.encode():
+        at_ = b.find(b'PK\x03\x04', at_ + 1)
+    b[at_ + 30:at_ + 49] = b'AndroidManifest.xml'
+    open(path, 'wb').write(bytes(b))
+
+
 def main(out):
     os.makedirs(out, exist_ok=True)
     for name, make in VARIANTS.items():
         apk(os.path.join(out, name + ".apk"), make())
     apk(os.path.join(out, "zip_method_99.apk"), VARIANTS["base"](), method=99)
-    print(f"{len(VARIANTS) + 1}개 -> {out}")
+    data_descriptor(os.path.join(out, "zip_descriptor_stored.apk"), VARIANTS["base"](), deflate=False)
+    data_descriptor(os.path.join(out, "zip_descriptor_deflate.apk"), VARIANTS["base"](), deflate=True)
+    shadowed_local(os.path.join(out, "zip_shadowed_local.apk"), VARIANTS["base"]())
+    print(f"{len(VARIANTS) + 4}개 -> {out}")
 
 
 if __name__ == "__main__":

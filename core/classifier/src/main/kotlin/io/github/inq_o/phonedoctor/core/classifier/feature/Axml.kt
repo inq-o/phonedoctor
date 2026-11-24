@@ -215,6 +215,8 @@ object Axml {
     /** androguard `_fix_value`: 첫 NUL에서 자르고(aapt와 같음), XML에 못 쓰는 문자는 `_`로 */
     private fun fixValue(value: String): String {
         val cut = value.substringBefore('\u0000')
+        // 고칠 것이 없으면 같은 문자열을 그대로 (같은 큰 값을 여러 속성이 가리켜도 사본을 만들지 않게)
+        if (cut.none { it.code < 0x20 && it != '\t' && it != '\n' && it != '\r' || it == '\uFFFE' || it == '\uFFFF' || it.isSurrogate() }) return cut
         val sb = StringBuilder(cut.length)
         var i = 0
         while (i < cut.length) {
@@ -293,6 +295,7 @@ object Axml {
         private val count: Int
         private val utf8: Boolean
         private val chars: ByteArray
+        /** 위치(문자열 데이터 안 오프셋)마다 한 번만 푼다: 여러 번호가 같은 위치를 가리켜도 사본이 하나 */
         private val cache = HashMap<Int, String>()
 
         init {
@@ -320,8 +323,8 @@ object Axml {
         operator fun get(idx: Long): String {
             if (idx < 0 || idx >= count) return ""
             val i = idx.toInt()
-            return cache.getOrPut(i) {
-                val off = u32(buf, start + 28 + i * 4).toInt()
+            val off = u32(buf, start + 28 + i * 4).toInt()
+            return cache.getOrPut(off) {
                 try {
                     if (utf8) decode8(off) else decode16(off)
                 } catch (e: AxmlException) {

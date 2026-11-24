@@ -6,6 +6,7 @@ import java.util.zip.ZipFile
 import kotlin.random.Random
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 /** 기기에서 남의 앱 매니페스트를 읽으므로, 깨진 파일은 앱을 죽이지 않고 ManifestException으로만 끝나야 한다 */
 class AxmlRobustnessTest {
@@ -41,6 +42,18 @@ class AxmlRobustnessTest {
             repeat(1 + rnd.nextInt(8)) { b[rnd.nextInt(b.size)] = rnd.nextInt(256).toByte() }
             readOrRejected(b)
         }
+    }
+
+    /** 같은 큰 값을 여러 속성이 가리켜도 사본을 만들지 않는다 (기기 메모리: 100만 글자 × 300개) */
+    @Test
+    fun sharedValuesAreNotCopied() {
+        val apk = generateSequence(File("").absoluteFile) { it.parentFile }
+            .map { File(it, "core/classifier/src/test/resources/parity/crafted/big_shared_value.apk") }.first { it.isFile }
+        val root = Axml.parse(ApkZip.read(apk, "AndroidManifest.xml"))
+        val values = root.descendants("x").map { it.attrs.getValue("a") }
+        assertEquals(300, values.size)
+        assertEquals(1_000_000, values.first().length)
+        assertTrue(values.all { it === values.first() })
     }
 
     @Test

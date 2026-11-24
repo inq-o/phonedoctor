@@ -36,7 +36,7 @@ class ParityTest {
     fun craftedManifestsMatchPcExtractor() {
         val dir = File(repo, "core/classifier/src/test/resources/parity/crafted")
         val checked = check(File(dir, "expected.jsonl"), dir)
-        assertEquals(27, checked)
+        assertEquals(32, checked)
     }
 
     /** 받은 APK (ml/data, 레포 밖). 기대값 파일이 있을 때만 — 만드는 법은 parity_expected.py */

@@ -31,7 +31,11 @@ class AppFeatureExtractor @Inject constructor(
         }
         val label = pm.getApplicationLabel(info).toString()
         return try {
-            ManifestReader.read(File(info.sourceDir), label)
+            ManifestReader.read(File(info.sourceDir), label).takeIf {
+                // 매니페스트의 package가 설치된 이름과 다르면(ZIP에 미끼 매니페스트를 넣은 경우 등) 판정하지 않는다:
+                // 설치기가 읽은 것과 다른 매니페스트로 만든 벡터는 믿을 수 없다
+                it.packageName == packageName
+            }
         } catch (_: ManifestException) {
             null
         } catch (_: IOException) {

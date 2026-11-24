@@ -17,6 +17,7 @@ import sys
 from multiprocessing import Pool
 from pathlib import Path
 
+from androguard.core import androconf
 from androguard.core.apk import APK
 from loguru import logger
 
@@ -58,6 +59,21 @@ def _uses_sdk(a, attr):
     return None
 
 
+_load_resource = androconf.load_api_specific_resource_module
+
+
+def _load_resource_lenient(name, api=None):
+    """androguard는 APK를 열 때 권한 표를 고르려고 min·targetSdk를 int()로 읽는데, uses-sdk가 여럿이면 집합 순서로 골라
+    실행마다 거절 여부가 달라진다. 권한 표는 쓰지 않으므로 여기서는 받지 않고, 거절은 parse()에서 문서 순서로 정한다"""
+    try:
+        return _load_resource(name, api)
+    except ValueError:
+        return {}
+
+
+androconf.load_api_specific_resource_module = _load_resource_lenient
+
+
 def _effective_target(target, minimum):
     """androguard get_effective_target_sdk_version과 같은 규칙 (targetSdk가 없으면 minSdk, 숫자가 아니면 1)"""
     try:
@@ -71,6 +87,11 @@ def parse(data):
     a = APK(data, raw=True)
     if not a.is_valid_APK():  # 받는 중이거나 깨진 파일은 예외 없이 빈 값이 나온다
         raise ValueError("AndroidManifest.xml 없음")
+    # 숫자가 아닌 min·targetSdk는 거절 (androguard가 하던 int() 검사를 문서 순서로, 기기 Manifest.kt와 같게)
+    min_raw, target_raw = _uses_sdk(a, "minSdkVersion"), _uses_sdk(a, "targetSdkVersion")
+    if target_raw:
+        int(target_raw)
+    min_sdk = int(min_raw or 1)
     pkg = a.get_package()
     resolve = lambda n: pkg + n if n.startswith(".") else n
     comps = {
@@ -88,8 +109,8 @@ def parse(data):
         "permissions": sorted(a.get_permissions()),
         "intents": sorted(intents),
         "components": {k: sorted(resolve(n) for n in v) for k, v in comps.items()},
-        "min_sdk": int(_uses_sdk(a, "minSdkVersion") or 1),
-        "target_sdk": _effective_target(_uses_sdk(a, "targetSdkVersion"), _uses_sdk(a, "minSdkVersion")),
+        "min_sdk": min_sdk,
+        "target_sdk": _effective_target(target_raw, min_raw),
         "has_launcher": bool(a.get_main_activities()),
         "size_bytes": len(data),
     }
