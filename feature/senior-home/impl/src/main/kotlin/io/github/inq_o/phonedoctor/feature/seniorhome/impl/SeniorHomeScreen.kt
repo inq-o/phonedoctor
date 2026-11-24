@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -36,8 +37,10 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.designsystem.component.AppIcon
-import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdMenuGrid
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdMenuTile
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
+import io.github.inq_o.phonedoctor.core.designsystem.theme.LocalStatusColors
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusCircle
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusKind
@@ -48,10 +51,10 @@ import io.github.inq_o.phonedoctor.core.model.ScanRun
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
 import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.OutlinedButton
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import java.time.Instant
@@ -61,6 +64,7 @@ fun SeniorHomeScreen(
     onAlertClick: (Long) -> Unit,
     onHistoryClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    onFamilyClick: () -> Unit,
     onLinkRequestClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     viewModel: SeniorHomeViewModel = hiltViewModel(),
@@ -80,6 +84,7 @@ fun SeniorHomeScreen(
         onOpenUsageSettings = { context.startFirst(viewModel.usageAccessSettingsIntents) },
         family = family,
         onSettingsClick = onSettingsClick,
+        onFamilyClick = onFamilyClick,
         onLinkRequestClick = onLinkRequestClick,
         modifier = modifier,
     )
@@ -106,9 +111,9 @@ internal fun SeniorHomeScreen(
     modifier: Modifier = Modifier,
     family: HomeFamily = HomeFamily(available = false),
     onSettingsClick: () -> Unit = {},
+    onFamilyClick: () -> Unit = {},
     onLinkRequestClick: (String) -> Unit = {},
 ) {
-    val history = stringResource(R.string.feature_senior_home_impl_history)
     SeniorScreen(
         modifier = modifier,
         topBar = {
@@ -121,39 +126,25 @@ internal fun SeniorHomeScreen(
                     style = MaterialTheme.typography.titleLarge,
                     modifier = Modifier.weight(1f).padding(vertical = 8.dp),
                 )
-                // 설정(S7)으로. 가족 관리(S5)는 설정 안에 (ux-flows S1 상단바 "⚙ 설정", 아이콘과 글자를 함께)
-                OutlinedButton(
-                    onClick = onSettingsClick,
-                    border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
-                    modifier = Modifier.heightIn(min = 56.dp),
-                ) {
-                    Icon(Icons.Filled.Settings, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.feature_senior_home_impl_settings), style = MaterialTheme.typography.labelLarge)
-                }
             }
         },
         actions = {
-            when (state) {
-                SeniorHomeUiState.Loading -> Unit
-                is SeniorHomeUiState.UsageAccessOff -> {
-                    PdOutlinedButton(history, onHistoryClick)
-                    PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
-                }
-                is SeniorHomeUiState.Ready -> {
-                    PdOutlinedButton(history, onHistoryClick)
-                    // 확인할 앱이 있으면 주요 행동은 위의 앱 카드다 (한 화면에 주요 행동 하나)
-                    if (state.alerts.isEmpty()) {
-                        PdPrimaryButton(
-                            text = stringResource(
-                                if (state.scanning) R.string.feature_senior_home_impl_scanning else R.string.feature_senior_home_impl_scan_now,
-                            ),
-                            onClick = onScanNow,
-                            enabled = !state.scanning,
-                        )
-                    }
-                }
+            // 누르는 건 아래 (원칙 8): 메뉴 칸 2×2. 상태가 바뀌어도 칸의 자리와 이름은 그대로, 채움만 바뀐다 (원칙 2)
+            if (state is SeniorHomeUiState.UsageAccessOff) {
+                PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
+            }
+            if (state !is SeniorHomeUiState.Loading) {
+                // 확인할 앱이 있으면 주요 행동은 위의 앱 카드, 광고 찾기가 꺼져 있으면 [켜러 가기]다 (한 화면에 주요 행동 하나)
+                val ready = state as? SeniorHomeUiState.Ready
+                HomeMenu(
+                    scanFilled = ready != null && ready.alerts.isEmpty(),
+                    scanning = ready?.scanning == true,
+                    familyAvailable = family.available,
+                    onScanNow = onScanNow,
+                    onHistoryClick = onHistoryClick,
+                    onFamilyClick = onFamilyClick,
+                    onSettingsClick = onSettingsClick,
+                )
             }
         },
     ) {
@@ -181,21 +172,59 @@ internal fun SeniorHomeScreen(
                     StatusCircle(StatusKind.OK)
                     Headline(stringResource(R.string.feature_senior_home_impl_ok_title))
                     Body(lastScanSentence(state.lastScan))
-                    if (family.guardians.isNotEmpty()) {
-                        val fallback = stringResource(R.string.feature_senior_home_impl_family)
-                        val names = family.guardians.joinToString(", ") { it.trim().ifEmpty { fallback } }
-                        Body(stringResource(R.string.feature_senior_home_impl_guardians, names))
-                    }
-                    Body(stringResource(R.string.feature_senior_home_impl_scope))
+                    Guardians(family.guardians)
                     if (!state.notificationsOn) Body(stringResource(R.string.feature_senior_home_impl_notifications_off))
                 } else {
                     StatusCircle(StatusKind.ATTENTION)
                     Headline(stringResource(R.string.feature_senior_home_impl_attention_title, state.alerts.size))
-                    Body(stringResource(R.string.feature_senior_home_impl_attention_body))
+                    Guardians(family.guardians)
                     AlertCards(state.alerts, onAlertClick)
                 }
         }
     }
+}
+
+@Composable
+private fun Guardians(guardians: List<String>) {
+    if (guardians.isEmpty()) return
+    val fallback = stringResource(R.string.feature_senior_home_impl_family)
+    val names = guardians.joinToString(", ") { it.trim().ifEmpty { fallback } }
+    Body(stringResource(R.string.feature_senior_home_impl_guardians, names))
+}
+
+/** 홈 메뉴 칸 (ux-flows S1·S1′). 가족 연결이 없는 빌드에서는 [가족] 자리에 [설정]이 한 줄을 다 쓴다 */
+@Composable
+private fun HomeMenu(
+    scanFilled: Boolean,
+    scanning: Boolean,
+    familyAvailable: Boolean,
+    onScanNow: () -> Unit,
+    onHistoryClick: () -> Unit,
+    onFamilyClick: () -> Unit,
+    onSettingsClick: () -> Unit,
+) {
+    val scan: @Composable (Modifier) -> Unit = {
+        PdMenuTile(
+            text = stringResource(if (scanning) R.string.feature_senior_home_impl_scanning_short else R.string.feature_senior_home_impl_menu_scan),
+            icon = Icons.Filled.Search,
+            onClick = onScanNow,
+            filled = scanFilled,
+            enabled = !scanning,
+            modifier = it,
+        )
+    }
+    val history: @Composable (Modifier) -> Unit = {
+        PdMenuTile(stringResource(R.string.feature_senior_home_impl_history_title), Icons.AutoMirrored.Filled.List, onHistoryClick, it)
+    }
+    val familyTile: @Composable (Modifier) -> Unit = {
+        PdMenuTile(stringResource(R.string.feature_senior_home_impl_menu_family), Icons.Filled.Person, onFamilyClick, it)
+    }
+    val settings: @Composable (Modifier) -> Unit = {
+        PdMenuTile(stringResource(R.string.feature_senior_home_impl_settings), Icons.Filled.Settings, onSettingsClick, it)
+    }
+    PdMenuGrid(
+        rows = if (familyAvailable) listOf(listOf(scan, history), listOf(familyTile, settings)) else listOf(listOf(scan, history), listOf(settings)),
+    )
 }
 
 @Composable
@@ -241,15 +270,21 @@ private fun AlertCard(alert: SymptomAlert, onClick: () -> Unit) {
     OutlinedCard(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
+        border = BorderStroke(3.dp, LocalStatusColors.current.caution),
         modifier = Modifier.fillMaxWidth().heightIn(min = 80.dp).semantics { role = Role.Button },
     ) {
         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            AppIcon(alert.app.packageName, size = 56.dp)
+            AppIcon(alert.app.packageName, size = 48.dp)
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
                 Text(alert.label, style = MaterialTheme.typography.titleLarge)
                 Text(symptomSentence(alert), style = MaterialTheme.typography.bodyLarge)
+                // 카드를 누를 수 있다는 단서 (R1: 시니어는 글자로 된 UI를 누를 수 있다고 인식하지 못함)
+                Text(
+                    stringResource(R.string.feature_senior_home_impl_attention_body),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                    color = LocalStatusColors.current.caution,
+                )
             }
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null)
         }

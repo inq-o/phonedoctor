@@ -54,10 +54,12 @@
 
     <string name="feature_senior_home_impl_usage_off_title">광고 찾기가 꺼져 있어요</string>
     <string name="feature_senior_home_impl_usage_off_body">사용 기록 보기를 켜야 광고를 띄우는 앱을 찾을 수 있어요. 다음 화면에서 폰주치의를 찾아 스위치를 켜 주세요.</string>
-    <string name="feature_senior_home_impl_usage_open">설정 열기</string>
+    <string name="feature_senior_home_impl_usage_open">켜러 가기</string>
 
-    <string name="feature_senior_home_impl_history">검사 기록 보기</string>
-    <string name="feature_senior_home_impl_scan_now">지금 다시 살펴보기</string>
+    <!-- 홈 메뉴 칸 (ux-flows S1). 반쪽 폭에 22sp로 들어가게 짧게 -->
+    <string name="feature_senior_home_impl_menu_scan">살펴보기</string>
+    <string name="feature_senior_home_impl_scanning_short">살펴보는 중</string>
+    <string name="feature_senior_home_impl_menu_family">가족</string>
 
     <string name="feature_senior_home_impl_history_title">검사 기록</string>
     <string name="feature_senior_home_impl_back">뒤로</string>

@@ -14,8 +14,8 @@
     <string name="feature_senior_appdetail_impl_allowed_title">가족이 괜찮다고 했어요</string>
     <string name="feature_senior_appdetail_impl_allowed_body">%1$s님이 이 앱은 그대로 써도 된다고 했어요. 더 하실 일은 없어요.</string>
 
-    <string name="feature_senior_appdetail_impl_later">나중에 할게요</string>
-    <string name="feature_senior_appdetail_impl_uninstall">이 앱 지우기</string>
+    <string name="feature_senior_appdetail_impl_later">나중에</string>
+    <string name="feature_senior_appdetail_impl_uninstall">지우기</string>
     <string name="feature_senior_appdetail_impl_retry">다시 지우기</string>
     <string name="feature_senior_appdetail_impl_home">처음 화면으로</string>
 

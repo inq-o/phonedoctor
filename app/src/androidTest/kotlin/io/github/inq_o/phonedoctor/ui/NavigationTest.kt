@@ -22,9 +22,9 @@ class NavigationTest {
 
     @Test
     fun home_opensScanHistory_andReturns() {
-        composeTestRule.onNodeWithText("검사 기록 보기").performClick()
+        composeTestRule.onNodeWithText("검사 기록").performClick()
         composeTestRule.onNodeWithText("살펴본 기록").assertExists()
         composeTestRule.onNodeWithText("뒤로").performClick()
-        composeTestRule.onNodeWithText("검사 기록 보기").assertExists()
+        composeTestRule.onNodeWithText("살펴보기").assertExists()
     }
 }

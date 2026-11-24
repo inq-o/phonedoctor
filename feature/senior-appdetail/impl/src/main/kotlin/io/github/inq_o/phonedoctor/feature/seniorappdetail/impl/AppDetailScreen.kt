@@ -22,6 +22,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.designsystem.component.AppIcon
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
@@ -71,25 +72,29 @@ internal fun AppDetailScreen(
                 state is AppDetailUiState.Gone || state is AppDetailUiState.Allowed || removed ->
                     PdPrimaryButton(stringResource(R.string.feature_senior_appdetail_impl_home), onBack)
                 // 가족 답을 기다리는 동안은 빨간 버튼 대신 테두리 버튼으로 (지우라고 재촉하지 않되, 본인이 정할 수 있게)
-                state is AppDetailUiState.Ready && state.waitingForFamily -> {
-                    PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack)
-                    PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_uninstall_now), onUninstall)
-                }
-                state is AppDetailUiState.Ready -> {
-                    PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack)
-                    PdPrimaryButton(
-                        text = stringResource(
-                            if (state.phase == UninstallPhase.IDLE || state.phase == UninstallPhase.REQUESTED) {
-                                R.string.feature_senior_appdetail_impl_uninstall
-                            } else {
-                                R.string.feature_senior_appdetail_impl_retry
-                            },
-                        ),
-                        onClick = onUninstall,
-                        danger = true,
-                        icon = Icons.Filled.Delete,
-                    )
-                }
+                state is AppDetailUiState.Ready && state.waitingForFamily -> PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack, it) },
+                    second = { PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_uninstall_now), onUninstall, it) },
+                )
+                // 버튼 쌍: 왼쪽 물러나기, 오른쪽 지우기. 바로 뒤에 뜨는 시스템 삭제 창 [취소 | 확인]과 같은 순서
+                state is AppDetailUiState.Ready -> PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_appdetail_impl_later), onBack, it) },
+                    second = {
+                        PdPrimaryButton(
+                            text = stringResource(
+                                if (state.phase == UninstallPhase.IDLE || state.phase == UninstallPhase.REQUESTED) {
+                                    R.string.feature_senior_appdetail_impl_uninstall
+                                } else {
+                                    R.string.feature_senior_appdetail_impl_retry
+                                },
+                            ),
+                            onClick = onUninstall,
+                            danger = true,
+                            icon = Icons.Filled.Delete,
+                            modifier = it,
+                        )
+                    },
+                )
             }
         },
     ) {
@@ -153,9 +158,12 @@ internal fun AppDetailScreen(
                         modifier = Modifier.fillMaxWidth().semantics { heading() },
                     )
                     Spacer(Modifier.height(8.dp))
-                    Body("• " + reasonSentence(state.alert))
+                    // 근거가 하나면 글머리표 없이 문장으로 (ux-flows S2)
                     if (state.alert.days >= 2) {
+                        Body("• " + reasonSentence(state.alert))
                         Body("• " + stringResource(R.string.feature_senior_appdetail_impl_reason_days, state.alert.days))
+                    } else {
+                        Body(reasonSentence(state.alert))
                     }
                     Body(stringResource(R.string.feature_senior_appdetail_impl_reason_explain))
                 }

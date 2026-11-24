@@ -44,6 +44,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.inq_o.phonedoctor.core.data.DISPLAY_NAME_MAX
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
@@ -270,8 +271,10 @@ private fun DeleteDialog(onDelete: () -> Unit, onKeep: () -> Unit) {
                     modifier = Modifier.semantics { heading() },
                 )
                 Text(stringResource(R.string.feature_senior_home_impl_settings_delete_dialog_body), style = MaterialTheme.typography.bodyLarge)
-                PdOutlinedButton(stringResource(R.string.feature_senior_home_impl_settings_keep), onKeep)
-                PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_settings_delete), onDelete, danger = true)
+                PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_home_impl_settings_keep), onKeep, it) },
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_settings_delete), onDelete, it, danger = true) },
+                )
             }
         }
     }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="feature_senior_family_impl_home">홈으로</string>
-    <string name="feature_senior_family_impl_later">나중에 할게요</string>
+    <string name="feature_senior_family_impl_later">나중에</string>
     <string name="feature_senior_family_impl_retry">다시 해 볼게요</string>
     <string name="feature_senior_family_impl_fallback_name">가족</string>
 
@@ -13,10 +13,10 @@
 
     <!-- O-S4 연결 코드 -->
     <string name="feature_senior_family_impl_code_title">가족 폰에서 이 코드를 넣어 주세요</string>
-    <string name="feature_senior_family_impl_code_how">가족 폰에서 폰주치의를 열고 [가족 폰을 지켜요]를 고른 뒤, 아래 그림을 찍거나 숫자를 넣으면 돼요.</string>
+    <string name="feature_senior_family_impl_code_how">가족 폰의 폰주치의에서 이 그림을 찍어도 돼요.</string>
     <string name="feature_senior_family_impl_code_loading">코드를 받고 있어요</string>
     <string name="feature_senior_family_impl_code_qr_description">연결용 QR 그림</string>
-    <string name="feature_senior_family_impl_code_valid">코드는 10분 동안 쓸 수 있어요. 가족 폰에서 시간이 지났다고 나오면 [새 코드 받기]를 눌러 주세요.</string>
+    <string name="feature_senior_family_impl_code_valid">가족 폰에서 시간이 지났다고 나오면 [새 코드 받기]를 눌러 주세요.</string>
     <string name="feature_senior_family_impl_code_waiting">가족이 코드를 넣으면 이 폰에서 연결할지 물어볼게요.</string>
     <string name="feature_senior_family_impl_code_failed_title">코드를 받지 못했어요</string>
     <string name="feature_senior_family_impl_code_expired_title">코드 시간이 지났어요</string>

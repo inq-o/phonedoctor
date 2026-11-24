@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 private val ButtonShape = RoundedCornerShape(16.dp)
 private val ButtonPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp)
 
-/** 채운 버튼. 시니어 화면에는 한 화면에 하나만 둔다 (ux-flows.md 원칙 1). 높이 64dp 이상 */
+/** 채운 버튼. 시니어 화면에는 한 화면에 하나만 둔다 (ux-flows.md 원칙 1). 높이 64dp 이상. 버튼이 둘이면 [PdButtonPair] */
 @Composable
 fun PdPrimaryButton(
     text: String,
@@ -67,7 +67,10 @@ fun PdOutlinedButton(
         shape = ButtonShape,
         contentPadding = ButtonPadding,
         border = BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onBackground),
+        colors = ButtonDefaults.outlinedButtonColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onBackground,
+        ),
         modifier = modifier.fillMaxWidth().heightIn(min = 56.dp),
     ) {
         Text(text, style = MaterialTheme.typography.labelLarge, textAlign = TextAlign.Center)

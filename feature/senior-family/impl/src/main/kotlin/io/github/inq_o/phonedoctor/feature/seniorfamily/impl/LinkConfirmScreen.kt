@@ -11,6 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.PdPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.SeniorScreen
@@ -57,18 +58,21 @@ internal fun LinkConfirmScreen(
         actions = {
             when (state) {
                 LinkConfirmUiState.Loading -> Unit
-                is LinkConfirmUiState.LoadFailed -> {
-                    PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_home), onDone)
-                    PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onRetry)
-                }
-                is LinkConfirmUiState.Ready -> {
-                    PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_confirm_no), onDecline, enabled = !state.busy)
-                    if (state.limitReached) {
-                        PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_home), onDone, enabled = !state.busy)
-                    } else {
-                        PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_confirm_yes), onConfirm, enabled = !state.busy)
-                    }
-                }
+                // 버튼 쌍 (ux-flows): 왼쪽 물러나기, 오른쪽 주요 행동
+                is LinkConfirmUiState.LoadFailed -> PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_home), onDone, it) },
+                    second = { PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_retry), onRetry, it) },
+                )
+                is LinkConfirmUiState.Ready -> PdButtonPair(
+                    first = { PdOutlinedButton(stringResource(R.string.feature_senior_family_impl_confirm_no), onDecline, it, enabled = !state.busy) },
+                    second = {
+                        if (state.limitReached) {
+                            PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_home), onDone, it, enabled = !state.busy)
+                        } else {
+                            PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_confirm_yes), onConfirm, it, enabled = !state.busy)
+                        }
+                    },
+                )
                 else -> PdPrimaryButton(stringResource(R.string.feature_senior_family_impl_home), onDone)
             }
         },
