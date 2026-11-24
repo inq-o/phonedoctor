@@ -34,7 +34,7 @@ internal class SiteNotificationFilter {
     }
 
     companion object {
-        /** Chrome만 (삼성 인터넷은 채널 구조 확인 전, spec Q7) */
+        /** Chrome만. 삼성 인터넷은 사이트별 채널이 없어(spec Q7) 그 사이트만 끄는 채널 설정을 열 수 없다 */
         val BROWSERS = setOf("com.android.chrome", "com.chrome.beta", "com.chrome.dev", "com.chrome.canary")
     }
 }
