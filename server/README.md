@@ -9,7 +9,7 @@
 
 ## 구현 상태
 
-모든 API 경로는 `/v1` 아래에 있다 (예: `POST /v1/devices`). 상태 확인용 `GET /healthz`만 인증 없이 열려 있고, 예약 작업 `POST /internal/tick`은 앱 토큰 대신 Cloud Scheduler의 OIDC 토큰으로 인증한다.
+모든 API 경로는 `/v1` 아래에 있다 (예: `POST /v1/devices`). 상태 확인용 `GET /health`만(Cloud Run이 z로 끝나는 일부 경로를 예약해 `/healthz`는 쓰지 않는다) 인증 없이 열려 있고, 예약 작업 `POST /internal/tick`은 앱 토큰 대신 Cloud Scheduler의 OIDC 토큰으로 인증한다.
 
 | 묶음 | 경로 | 상태 |
 |---|---|---|

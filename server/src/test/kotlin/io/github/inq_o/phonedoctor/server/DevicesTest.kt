@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.server
 
+import io.ktor.client.request.get
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.HttpMethod.Companion.Delete
@@ -37,6 +38,13 @@ private suspend fun io.ktor.server.testing.ApplicationTestBuilder.register(token
 private const val STATUS_OK = """{"checkedAt":"2026-11-21T02:00:00Z","protection":{"notifications":true,"usageAccess":true,"notificationListener":false}}"""
 
 class AuthTest {
+    @Test
+    fun `상태 확인은 토큰 없이 열림`() = serverTest {
+        val r = client.get("/health")
+        assertEquals(HttpStatusCode.OK, r.status)
+        assertEquals("ok", r.bodyAsText())
+    }
+
     @Test
     fun `토큰이 없거나 틀리면 401`() = serverTest {
         for ((token, appCheck, slug) in listOf(
