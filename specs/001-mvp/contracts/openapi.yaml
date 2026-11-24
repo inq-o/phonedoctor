@@ -19,8 +19,8 @@ info:
   license:
     name: Proprietary
 servers:
-  - url: https://api.phonedoctor.example/v1
-    description: 운영 (도메인 미정)
+  - url: https://phonedoctor-api-236445024434.asia-northeast3.run.app/v1
+    description: 운영 (Cloud Run 서울)
   - url: http://10.0.2.2:8080/v1
     description: 에뮬레이터 → 로컬 개발 서버
 
