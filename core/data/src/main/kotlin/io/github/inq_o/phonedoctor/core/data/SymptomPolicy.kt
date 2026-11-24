@@ -7,7 +7,15 @@ import io.github.inq_o.phonedoctor.core.model.AlertStatus
 data class DayEvidence(val date: String, val count: Int, val firstAt: Long, val lastAt: Long)
 
 /** 이미 있는 확인 요청의 판단에 필요한 부분 */
-data class ExistingAlert(val status: AlertStatus, val outcome: AlertOutcome?, val date: String, val openedDate: String, val updatedAt: Long)
+/** [closedDate]: 닫힌 요청이면 닫힌(결과를 적은) 현지 날짜 */
+data class ExistingAlert(
+    val status: AlertStatus,
+    val outcome: AlertOutcome?,
+    val date: String,
+    val openedDate: String,
+    val updatedAt: Long,
+    val closedDate: String? = null,
+)
 
 sealed interface AlertDecision {
     /** 기준을 넘지 않았거나 다시 알릴 조건이 아님 */
@@ -46,7 +54,8 @@ object SymptomPolicy {
             return AlertDecision.Update(latest, over.count { it.date >= existing.openedDate })
         }
         val newEvidence = latest.lastAt > existing.updatedAt
-        val anotherDay = latest.date > existing.date
+        // 취소한 요청은 취소한 날 다음 날부터 (근거 날짜가 아니라: 전날 근거로 열린 요청을 오늘 취소하고 오늘 또 넘어도 오늘은 다시 열지 않음)
+        val anotherDay = latest.date > (existing.closedDate ?: existing.date)
         return if (newEvidence && (existing.outcome != AlertOutcome.DECLINED || anotherDay)) {
             AlertDecision.Open(latest, 1)
         } else {

@@ -7,6 +7,8 @@
     <string name="core_notifications_alert_text_date">%1$s %2$d월 %3$d일에 광고를 %4$d번 띄웠어요</string>
     <string name="core_notifications_decision_uninstall_title">가족이 이 앱을 지우자고 했어요</string>
     <string name="core_notifications_decision_uninstall_text">%1$s님이 %2$s 지우자고 했어요. 눌러서 지워 주세요</string>
+    <string name="core_notifications_nudge_title">아직 지우지 않은 앱이 있어요</string>
+    <string name="core_notifications_nudge_text">%1$s님이 지우자고 한 %2$s 아직 있어요. 눌러서 지울 수 있어요</string>
     <string name="core_notifications_decision_allow_title">가족이 괜찮다고 했어요</string>
     <string name="core_notifications_decision_allow_text">%1$s님이 %2$s 괜찮다고 했어요. 그대로 쓰셔도 돼요</string>
     <string name="core_notifications_app_fallback">앱</string>

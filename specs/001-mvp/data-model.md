@@ -95,7 +95,8 @@ stateDiagram-v2
     expired --> [*]
 ```
 
-- `declined`(시니어가 시스템 창에서 취소)도 resolved로 닫고, 시니어 기기 로컬에서 하루 뒤 재안내 (서버 상태는 그대로)
+- `declined`(보호자가 지우자고 한 앱을 시니어가 시스템 창에서 취소)도 resolved로 닫는다(서버에 보고). 시니어 기기에서는 하루 뒤 한 번 다시 알린다(T056: 기기의 예약 작업, 그때도 취소 상태·앱 있음·가족 답이 남아 있을 때만). 보호자 답 전 취소는 보고하지 않고 요청을 연 채로 둔다
+  - 한계: 취소 뒤 시니어가 지워도 서버는 resolved 뒤 결과를 바꾸지 않아(409) 보호자 화면은 "지우지 않았어요"로 남는다. 기기 사본만 지움으로 바뀐다
 
 ## 3. 로컬 DB (Room) — 시니어 기기
 
@@ -106,7 +107,7 @@ stateDiagram-v2
 | `symptom_event` | id PK, packageName, signingCertSha256, versionCode, className, resumedAt, rule, detectorVersion. **고유 (packageName, className, resumedAt)** | 광고로 센 포그라운드 전환 (FR-009·010). 서명·버전은 분류할 때의 `installed_app` 값으로 채움(조회 시점에 이미 지워진 앱이면 버림). 하루 횟수·허용 목록·Alert 식별은 (packageName, signingCertSha256, versionCode)로 묶음. 정상으로 본 전환은 저장하지 않음. 30일 보관 |
 | `usage_cursor` | id=1, lastEventTime | `queryEvents` 다음 조회 시작 시각. 시작 시각이 포함되므로 `lastEventTime`부터 다시 읽고(+1 안 함), 겹쳐 읽은 이벤트는 `symptom_event` 고유 제약으로 무시 (같은 시각 이벤트의 중복·누락 둘 다 막음) |
 | `allow_entry` | (packageName, signingCertSha256, versionCode) PK, allowedBy, createdAt | 보호자가 허용한 앱. 같은 버전은 다시 안 물음 |
-| `alert_local` | alertId PK, packageName, signingCertSha256, versionCode, source, kind, status, decision, guardianName, messageToSenior, outcome, nextNudgeAt | 서버 요청의 로컬 사본 + 재안내 일정. `kind = notice`는 재안내가 없어 `nextNudgeAt`를 비워 둠. 허용 앱의 notice를 같은 조합에 1번만 보내는 판단도 여기서 |
+| `alert_local` | alertId PK, packageName, signingCertSha256, versionCode, source, kind, status, decision, guardianName, messageToSenior, outcome | 서버 요청의 로컬 사본. 취소(declined) 재안내 일정은 열 대신 WorkManager 예약 작업(요청마다 하나)으로 둔다. 허용 앱의 notice를 같은 조합에 1번만 보내는 판단도 여기서 |
 | `outbox` | id PK, method, path, bodyJson, idempotencyKey, attempts, nextAttemptAt | 오프라인 중 쌓인 서버 호출 (WorkManager가 재전송) |
 | `package_change_cursor` | id=1, sequenceNumber, bootCount | `getChangedPackages` 순번 |
 

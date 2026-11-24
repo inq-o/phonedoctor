@@ -41,6 +41,15 @@ class SymptomPolicyTest {
     }
 
     @Test
+    fun declined_evidenceFromAnEarlierDay_doesNotReopenOnTheDeclineDay() {
+        // 11일 근거로 열린 요청을 12일에 취소: 12일에 또 넘어도 다시 열지 않고, 13일에 넘으면 연다
+        val declined = ExistingAlert(AlertStatus.RESOLVED, AlertOutcome.DECLINED, "2026-11-11", "2026-11-11", 2_000, closedDate = "2026-11-12")
+        assertEquals(AlertDecision.None, SymptomPolicy.decide(declined, listOf(day("2026-11-12", 9, lastAt = 3_000)), threshold = 3))
+        val next = day("2026-11-13", 3, lastAt = 9_000)
+        assertEquals(AlertDecision.Open(next, 1), SymptomPolicy.decide(declined, listOf(next), threshold = 3))
+    }
+
+    @Test
     fun declined_anotherDay_reopens() {
         val declined = ExistingAlert(AlertStatus.RESOLVED, AlertOutcome.DECLINED, "2026-11-11", "2026-11-11", 2_000)
         val d = day("2026-11-12", 3, lastAt = 9_000)

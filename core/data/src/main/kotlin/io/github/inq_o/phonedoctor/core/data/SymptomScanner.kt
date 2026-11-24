@@ -192,7 +192,8 @@ class SymptomScanner @Inject constructor(
         val days = symptomDao.dailyCounts(app.packageName, app.signingCertSha256, app.versionCode, since)
             .map { DayEvidence(it.localDate, it.count, it.firstAt, it.lastAt) }
         val known = existing?.let {
-            ExistingAlert(AlertStatus.valueOf(it.status), it.outcome?.let(AlertOutcome::valueOf), it.date, it.openedDate, it.updatedAt)
+            val closedDate = if (it.status == AlertStatus.OPEN.name) null else Instant.ofEpochMilli(it.updatedAt).atZone(ZoneId.systemDefault()).toLocalDate().toString()
+            ExistingAlert(AlertStatus.valueOf(it.status), it.outcome?.let(AlertOutcome::valueOf), it.date, it.openedDate, it.updatedAt, closedDate)
         }
         // 닫힌 요청의 처리 결과를 아직 가족 서버에 못 보냈으면 다시 열지 않는다(다시 열면 서버 요청 사본을 비워 결과를 영영 못 보냄).
         // 보내고 나면 다음 검사가 연다 (근거는 그대로 남아 있다)
