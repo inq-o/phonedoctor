@@ -31,6 +31,10 @@
         <activity
             android:name="io.github.inq_o.phonedoctor.core.packages.StrongModeProvisioningActivity"
             tools:node="remove" />
+        <!-- 휴대폰 검사하기 AppFunction(FR-042). 개인정보처리방침에 AI 에이전트 호출을 적기 전까지 출시 빌드에서 뺀다 -->
+        <service
+            android:name="io.github.inq_o.phonedoctor.appfunctions.PhoneCheckAppFunctionService"
+            tools:node="remove" />
         <provider
             android:name="com.google.mlkit.common.internal.MlKitInitProvider"
             android:authorities="${applicationId}.mlkitinitprovider"

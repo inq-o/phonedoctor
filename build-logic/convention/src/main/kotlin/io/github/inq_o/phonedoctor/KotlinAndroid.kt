@@ -37,7 +37,8 @@ internal fun Project.configureKotlinAndroid(
     commonExtension: CommonExtension,
 ) {
     commonExtension.apply {
-        compileSdk = 36
+        // 37: AppFunctions(FR-042, androidx.appfunctions 1.0.0이 compileSdk 37을 요구). targetSdk는 36 그대로
+        compileSdk = 37
 
         defaultConfig.apply {
             // spec NFR-10: getChangedPackages 등 API 26 이상
