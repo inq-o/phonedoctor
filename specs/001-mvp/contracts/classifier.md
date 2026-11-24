@@ -104,7 +104,8 @@ data class Reason(val code: ReasonCode, val weight: Float, val evidence: Map<Str
 ## 5. 일치 테스트 (Parity test)
 
 - 같은 APK 20개를 (1) 에뮬레이터에 설치해 기기 추출기로, (2) PC에서 androguard로 특징 추출 → **층 1 특징 벡터가 비트 단위로 같아야 통과**
-  - 구현(T024): 기기 추출기는 매니페스트 해석이 순수 Kotlin이라 JVM 시험 `core:classifier` `ParityTest`로 대조한다. 라벨만 기기(PackageManager)가 주므로 기대값의 라벨을 입력으로 쓴다
+  - 구현(T024)은 이 중 **매니페스트 해석·벡터화(JVM)** 까지다: 기기 추출기의 해석이 순수 Kotlin이라 JVM 시험 `core:classifier` `ParityTest`로 대조하고, 라벨만 기기(PackageManager)가 주므로 기대값의 라벨을 입력으로 쓴다. 에뮬레이터에 설치해 `AppFeatureExtractor`(라벨 포함)까지 대조하는 계측 시험은 아직 없다
+  - 라벨: 기기도 PC처럼 ko 설정으로 그 앱의 라벨 리소스를 읽는다(기기 언어와 상관없이)
   - CI: 우리가 쓴 매니페스트로 만든 작은 APK — aapt2로 만든 2개(`ml/extract/parity_fixture/a·b`, build-tools 36.0.0 고정)와 바이너리 XML·ZIP을 직접 쓴 32개(`craft.py`: 네임스페이스 태그, 박힌 접두어, NUL·BOM 값, 빈 이름, 여러 uses-sdk, 값 종류, 속성 ID 빈 칸, 조각 크기 조작, ZIP 압축 방식 조작·데이터 디스크립터·로컬 헤더 가림, 깊이 2만 중첩, 같은 큰 문자열 여러 번 참조 등). 기대값 `expected.jsonl`이 androguard 결과와 같은지는 `ml/extract/parity_expected.py`의 `_check`가 CI 파이썬 단계에서 확인
   - 로컬: 받은 APK 150개 (`ml/data/apk`, 레포 밖) — 2026-11-24 150/150 일치
   - 확인하지 못한 것: JVM 시험이라 ART(기기 런타임)에서 돌린 것이 아니다. 문자열 해석은 Python 코덱을 직접 옮겨 런타임 디코더에 기대지 않지만, `BigDecimal`·`ln1p`·파일 읽기는 ART에서 따로 확인해야 한다. 실기기 라벨(PackageManager)이 PC의 ko 라벨과 같은지도 기기에서 확인 필요
