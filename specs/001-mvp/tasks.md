@@ -36,8 +36,8 @@
   - ⚠️ 계약 변경: 기기 인텐트 추출을 receiver 조회 → **매니페스트 직접 파싱**으로 (classifier.md §2)
 - [x] T021 [P] 광고 SDK 태그 `ml/rules/ad_sdk_tags.csv` — 플래그 12종 + 개수용 11종, 접두어 대조, 최신 AAR 18종 매니페스트로 확인 (2026-10-06)
 - [x] T022 [P] PC 특징 추출기 `ml/extract/extract.py` (androguard 4.1.4 고정) — 스키마 v1 특징 234개, 받는 중·깨진 APK는 건너뜀 (2026-10-07)
-- [ ] T023 [P] 기기 특징 추출기 `core/packages` + `core/classifier/feature` — PackageManager 래퍼 + **base.apk 매니페스트(바이너리 XML) 파서**
-- [ ] T024 일치 테스트 (APK 20개, 비트 단위) — T022·T023 이후
+- [x] T023 [P] 기기 특징 추출기 `core/packages` + `core/classifier/feature` — PackageManager 래퍼 + **base.apk 매니페스트(바이너리 XML) 파서** — 완료: `core:classifier` 한 모듈에 둠(`core/packages`는 그대로) — ZIP 읽기(압축 방식 조작도 PC처럼), 바이너리 XML 파서(androguard 처리 따름), 매니페스트 원시 값·벡터화(PC `extract.py`와 같은 규칙), Python 코덱과 같은 문자열 해석, `AppFeatureExtractor`(sourceDir·라벨만 PackageManager), 스키마는 빌드 때 `ml/schema`에서 asset으로 복사. 시험한 깨진·조작된 매니페스트에서 앱이 죽지 않음(재귀 없음·지연 해석·같은 값 사본 없음·8MB 상한·한 번 훑기, 잘림·바이트 변조·큰 공유 문자열 시험). 권한·컴포넌트도 매니페스트에서 읽게 계약 변경(classifier.md §2)
+- [x] T024 일치 테스트 (APK 20개, 비트 단위) — T022·T023 이후 — 완료: `ParityTest` — CI는 aapt2로 만든 2개와 손으로 만든 패커·깨진 모양 32개(그중 PC가 거절하는 것은 기기도 거절), 로컬은 받은 APK 150/150 비트 단위 일치(2026-11-24). ART에서 돌린 확인과 PackageManager 라벨이 PC ko 라벨과 같은지는 실기기 확인 남음
 - [ ] T025 [P] 직접 수집: 광고·회색지대 앱 + 시니어 정상 앱 (원스토어·Play 인기 "클리너·부스터·와이파이" 장르)
   - Play 후보 497개 `ml/collect/` (검색어 20개, 로그인 없이 공개 검색), apkeep + 익명 공용 계정으로 다운로드 진행 중 (2026-10-07). 라벨링·원스토어 전용 앱은 남음
 - [ ] T026 **평가용 테스트셋 분리·동결** `ml/label/` — 이후 학습에 절대 사용 안 함 (constitution VII)
