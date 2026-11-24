@@ -15,6 +15,11 @@
     <string name="feature_senior_home_impl_settings_sites_title">사이트 광고 알림</string>
     <string name="feature_senior_home_impl_settings_sites_body">인터넷 사이트가 보내는 광고 알림을 찾아 끌 수 있어요.</string>
     <string name="feature_senior_home_impl_settings_sites_open">사이트 광고 알림 보기</string>
+    <string name="feature_senior_home_impl_settings_strong_title">강력 모드</string>
+    <string name="feature_senior_home_impl_settings_strong_unknown">출처를 알 수 없는 앱 설치 막기</string>
+    <string name="feature_senior_home_impl_settings_strong_none">가족이 지우자고 한 앱은 바로 멈춰요. 지금 멈춘 앱은 없어요.</string>
+    <string name="feature_senior_home_impl_settings_strong_suspended">가족이 지우자고 해서 멈춘 앱이에요. 다시 쓰려면 눌러 주세요.</string>
+    <string name="feature_senior_home_impl_settings_strong_unsuspend">%1$s 다시 쓰기</string>
     <string name="feature_senior_home_impl_settings_text_title">글자 크기</string>
     <string name="feature_senior_home_impl_settings_text_sample">글자가 작으면 폰 설정에서 키울 수 있어요. 폰주치의도 그 크기를 따라가요.</string>
     <string name="feature_senior_home_impl_settings_text_open">글자 크기 설정 열기</string>

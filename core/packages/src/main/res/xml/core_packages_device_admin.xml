@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 강력 모드(US8) 기기 소유자. 기기 소유자 API(앱 정지·설치 제한)는 따로 정책 선언이 필요 없다 -->
+<device-admin>
+    <uses-policies />
+</device-admin>

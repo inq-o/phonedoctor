@@ -39,6 +39,7 @@ import io.github.inq_o.phonedoctor.core.network.model.NetworkPairingCode
 import io.github.inq_o.phonedoctor.core.packages.AppDetails
 import io.github.inq_o.phonedoctor.core.packages.InstalledApp
 import io.github.inq_o.phonedoctor.core.packages.InstalledApps
+import io.github.inq_o.phonedoctor.core.packages.StrongMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -46,6 +47,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -78,7 +80,72 @@ class FamilyAlertSyncTest {
             available, server, prefs, alerts, allow, scans, FakeApps,
             { ProtectionState(notifications = true, usageAccess = false, notificationListener = false) },
             { scheduled++ },
+            strong,
         ).also { it.now = { clock } }
+    }
+
+    private val strong = FakeStrongMode()
+
+    @Test
+    fun `강력 모드면 지우자고 할 때 바로 정지하고 정지함 결과를 보낸다`() = runTest {
+        strong.active = true
+        FakeApps.identities["com.ad.cleaner"] = AppIdentity("com.ad.cleaner", "ab".repeat(32), 7)
+        openAlert()
+        val s = sync()
+        s.sync()
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        assertEquals(listOf("com.ad.cleaner"), strong.suspended)
+        assertEquals(AlertOutcome.SUSPENDED.name, alerts.rows.getValue(1).outcome)
+        assertEquals(AlertStatus.RESOLVED.name, alerts.rows.getValue(1).status)
+        assertEquals(NetworkOutcomeType.SUSPENDED, outcomeToSend(AlertOutcome.SUSPENDED, SERVER_DECIDED, FamilyDecision.RECOMMEND_UNINSTALL))
+    }
+
+    @Test
+    fun `강력 모드는 허용했던 앱도 지우자고 하면 정지하고, 판이 바뀐 앱은 멈추지 않는다`() = runTest {
+        strong.active = true
+        FakeApps.identities["com.ad.cleaner"] = AppIdentity("com.ad.cleaner", "ab".repeat(32), 7)
+        openAlert().also {
+            alerts.rows[1] = it.copy(kind = "notice", status = AlertStatus.RESOLVED.name, outcome = AlertOutcome.ALLOWED.name, outcomeSent = true)
+        }
+        val s = sync()
+        s.sync()
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        assertEquals(listOf("com.ad.cleaner"), strong.suspended)
+        assertEquals(AlertOutcome.SUSPENDED.name, alerts.rows.getValue(1).outcome)
+        // 답을 기다리는 사이 업데이트된 앱(판이 다름)은 옛 근거로 멈추지 않는다
+        strong.suspended.clear()
+        FakeApps.identities["com.ad.other"] = AppIdentity("com.ad.other", "ab".repeat(32), 8)
+        openAlert(id = 2)
+        alerts.rows[2] = alerts.rows.getValue(2).copy(packageName = "com.ad.other")
+        s.sync()
+        server.decide("srv-2", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        assertTrue(strong.suspended.isEmpty())
+        assertEquals(AlertStatus.OPEN.name, alerts.rows.getValue(2).status)
+    }
+
+    @After
+    fun forgetIdentities() = FakeApps.identities.clear()
+
+    @Test
+    fun `강력 모드가 아니거나 정지에 실패하면 요청을 연 채로 둔다`() = runTest {
+        openAlert()
+        val s = sync()
+        s.sync()
+        server.decide("srv-1", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        assertTrue(strong.suspended.isEmpty())
+        assertEquals(AlertStatus.OPEN.name, alerts.rows.getValue(1).status)
+        strong.active = true
+        strong.refuse = true
+        openAlert(id = 2)
+        alerts.rows[2] = alerts.rows.getValue(2).copy(packageName = "com.ad.other")
+        s.sync()
+        server.decide("srv-2", NetworkDecisionType.RECOMMEND_UNINSTALL)
+        s.sync()
+        assertEquals(AlertStatus.OPEN.name, alerts.rows.getValue(2).status)
     }
 
     private fun openAlert(id: Long = 1, date: String = "2026-11-23", count: Int = 5) = AlertLocalEntity(
@@ -426,9 +493,11 @@ class FamilyAlertSyncTest {
 }
 
 private object FakeApps : InstalledApps {
+    /** 강력 모드 시험용: 지금 설치된 판 */
+    val identities = mutableMapOf<String, AppIdentity>()
     override val ownPackageName = "io.github.inq_o.phonedoctor"
     override fun snapshot(): Map<String, InstalledApp> = emptyMap()
-    override fun identity(packageName: String): AppIdentity? = null
+    override fun identity(packageName: String): AppIdentity? = identities[packageName]
     override fun label(packageName: String): String? = null
     override fun exportedActivities(packageName: String): Set<String>? = null
     override fun isInstalled(packageName: String): Boolean? = true
@@ -629,4 +698,22 @@ private class FakeServer : PhoneDoctorNetworkDataSource {
     override suspend fun revokeLink(linkId: String) = TODO()
     override suspend fun decideAlert(key: String, alertId: String, body: NetworkDecisionCreate): NetworkAlert = TODO()
     override suspend fun reportFalsePositive(body: io.github.inq_o.phonedoctor.core.network.model.NetworkFalsePositiveReport) = Unit
+}
+
+private class FakeStrongMode : StrongMode {
+    override var active = false
+    var refuse = false
+    val suspended = mutableListOf<String>()
+    override fun suspend(packageName: String): Boolean {
+        if (refuse) return false
+        suspended += packageName
+        return true
+    }
+    override fun unsuspend(packageName: String) = suspended.remove(packageName)
+    override fun suspendedPackages(): List<String> = suspended.toList()
+    private var blocked = false
+    override val unknownSourcesBlocked: Boolean get() = blocked
+    override fun setUnknownSourcesBlocked(blocked: Boolean) {
+        this.blocked = blocked
+    }
 }

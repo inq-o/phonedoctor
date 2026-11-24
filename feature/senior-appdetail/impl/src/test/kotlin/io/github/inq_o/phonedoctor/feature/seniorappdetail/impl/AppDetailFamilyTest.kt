@@ -139,6 +139,17 @@ class AppDetailFamilyTest {
     }
 
     @Test
+    fun suspendedByStrongModeStaysOpenable() = runTest(dispatcher) {
+        // 강력 모드로 멈춘 앱은 닫힌 요청이어도 S2에서 지울 수 있다
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false), outcome = AlertOutcome.SUSPENDED)
+        val vm = vm()
+        backgroundScope.launch { vm.uiState.collect {} }
+        assertTrue(vm.uiState.value is AppDetailUiState.Ready)
+        alert.value = alert(AlertFamilyState(FamilyDecision.RECOMMEND_UNINSTALL, "민지", null, closed = false), outcome = AlertOutcome.UNINSTALLED)
+        assertEquals(AppDetailUiState.Gone, vm.uiState.value)
+    }
+
+    @Test
     fun allowedByFamilyClosesTheRequest() = runTest(dispatcher) {
         alert.value = alert(AlertFamilyState(FamilyDecision.ALLOW, "민지", null, closed = false), outcome = AlertOutcome.ALLOWED)
         val vm = vm()

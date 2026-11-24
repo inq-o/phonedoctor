@@ -24,6 +24,13 @@
         <service
             android:name="io.github.inq_o.phonedoctor.feature.seniorsites.impl.SiteNotificationListener"
             tools:node="remove" />
+        <!-- 강력 모드(US8)의 기기 관리자 수신기·QR 프로비저닝 화면. 시연용 기기 전용이라 출시 빌드에서 뺀다 -->
+        <receiver
+            android:name="io.github.inq_o.phonedoctor.core.packages.StrongModeAdminReceiver"
+            tools:node="remove" />
+        <activity
+            android:name="io.github.inq_o.phonedoctor.core.packages.StrongModeProvisioningActivity"
+            tools:node="remove" />
         <provider
             android:name="com.google.mlkit.common.internal.MlKitInitProvider"
             android:authorities="${applicationId}.mlkitinitprovider"

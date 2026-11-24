@@ -83,6 +83,8 @@ class DefaultSymptomRepository @Inject constructor(
 
     override suspend fun recordOutcome(id: Long, outcome: AlertOutcome) {
         val alert = alertDao.get(id) ?: return
+        // 이미 닫힌 요청(예: 강력 모드로 멈춤)의 삭제 실패는 결과를 덮지 않는다 (멈춤 결과와 S2를 지키게)
+        if (outcome == AlertOutcome.FAILED && alert.status != AlertStatus.OPEN.name) return
         val status = if (outcome == AlertOutcome.FAILED) alert.status else AlertStatus.RESOLVED.name
         // 열 단위로: 그사이 가족 동기화가 서버 ID·보호자 응답을 썼을 수 있다
         alertDao.setOutcome(id, status, outcome.name, System.currentTimeMillis())

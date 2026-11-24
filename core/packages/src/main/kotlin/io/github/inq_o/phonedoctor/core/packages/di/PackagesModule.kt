@@ -6,8 +6,10 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import io.github.inq_o.phonedoctor.core.packages.AndroidInstalledApps
 import io.github.inq_o.phonedoctor.core.packages.AppUninstaller
+import io.github.inq_o.phonedoctor.core.packages.DevicePolicyStrongMode
 import io.github.inq_o.phonedoctor.core.packages.InstalledApps
 import io.github.inq_o.phonedoctor.core.packages.PackageInstallerUninstaller
+import io.github.inq_o.phonedoctor.core.packages.StrongMode
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -17,4 +19,7 @@ interface PackagesModule {
 
     @Binds
     fun bindsAppUninstaller(impl: PackageInstallerUninstaller): AppUninstaller
+
+    @Binds
+    fun bindsStrongMode(impl: DevicePolicyStrongMode): StrongMode
 }
