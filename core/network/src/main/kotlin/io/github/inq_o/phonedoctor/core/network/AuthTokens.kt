@@ -27,6 +27,18 @@ interface AuthTokens {
  */
 class NotSignedInException : IOException("Firebase 로그인 전")
 
+/**
+ * App Check 토큰을 받지 못함: 망 문제가 아니라 이 폰이 확인을 통과하지 못한 것
+ * (등록하지 않은 디버그 토큰, Play Integrity 실패, 너무 잦은 시도). 화면은 "인터넷 없음"과 다르게 안내한다.
+ * IOException인 이유는 [NotSignedInException]과 같다
+ */
+class AppCheckException(cause: Throwable) : IOException("App Check 토큰을 받지 못함", cause)
+
+/** App Check를 통과하지 못해 실패했는지 (토큰을 못 받았거나, 서버가 토큰을 거절함 401 app-check-invalid) */
+fun Throwable.isAppCheckFailure(): Boolean = generateSequence(this) { it.cause }.any {
+    it is AppCheckException || (it is ApiException && it.status == 401 && it.slug == "app-check-invalid")
+}
+
 internal class FirebaseAuthTokens @Inject constructor() : AuthTokens {
     override suspend fun idToken(forceRefresh: Boolean): String {
         val user = FirebaseAuth.getInstance().currentUser ?: throw NotSignedInException()

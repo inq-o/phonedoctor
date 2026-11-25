@@ -10,19 +10,20 @@ import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.NotSignedInException
+import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
+import java.io.IOException
+import java.net.URI
+import java.net.URISyntaxException
+import javax.inject.Inject
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.io.IOException
-import java.net.URI
-import java.net.URISyntaxException
-import javax.inject.Inject
 
 /** 코드 입력이 실패한 까닭 (openapi acceptPairingCode) */
-enum class CodeError { NOT_FOUND, EXPIRED, USED, ALREADY_LINKED, LIMIT, TOO_MANY, NOT_PAIRING_QR, SCAN_FAILED, NETWORK, BUSY, WRONG_ROLE, UNKNOWN }
+enum class CodeError { NOT_FOUND, EXPIRED, USED, ALREADY_LINKED, LIMIT, TOO_MANY, NOT_PAIRING_QR, SCAN_FAILED, NETWORK, APP_CHECK, BUSY, WRONG_ROLE, UNKNOWN }
 
 data class EnterCodeUiState(
     val code: String = "",
@@ -114,7 +115,7 @@ class EnterCodeViewModel @Inject constructor(
     }
 }
 
-internal fun Throwable.toCodeError(): CodeError = when (this) {
+internal fun Throwable.toCodeError(): CodeError = if (isAppCheckFailure()) CodeError.APP_CHECK else when (this) {
     is ApiException -> when {
         status == 404 -> CodeError.NOT_FOUND
         status == 410 && slug == "pairing-code-used" -> CodeError.USED

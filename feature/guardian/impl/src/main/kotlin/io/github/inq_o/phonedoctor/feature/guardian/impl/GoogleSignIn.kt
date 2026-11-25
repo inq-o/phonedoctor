@@ -12,6 +12,7 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
+import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
 import java.io.IOException
 
 /** 이 빌드에 Google 로그인 설정(웹 클라이언트 ID)이 없거나, 받은 자격 증명이 Google ID 토큰이 아님 */
@@ -40,10 +41,10 @@ private fun webClientId(context: Context): String? {
     return if (id == 0) null else context.getString(id)
 }
 
-enum class SignInError { NO_ACCOUNT, UNAVAILABLE, NETWORK, WRONG_ROLE, UNKNOWN }
+enum class SignInError { NO_ACCOUNT, UNAVAILABLE, NETWORK, APP_CHECK, WRONG_ROLE, UNKNOWN }
 
 /** 사용자가 계정 고르기를 닫았으면 null (안내 없이 처음 화면으로) */
-internal fun Throwable.toSignInError(): SignInError? = when (this) {
+internal fun Throwable.toSignInError(): SignInError? = if (isAppCheckFailure()) SignInError.APP_CHECK else when (this) {
     is GetCredentialCancellationException -> null
     is NoCredentialException -> SignInError.NO_ACCOUNT
     is GetCredentialProviderConfigurationException, is GetCredentialUnsupportedException, is GoogleSignInUnavailableException -> SignInError.UNAVAILABLE

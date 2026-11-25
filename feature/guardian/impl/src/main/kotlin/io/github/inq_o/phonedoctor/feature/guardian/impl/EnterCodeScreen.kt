@@ -134,6 +134,7 @@ private fun CodeError.message(retryAfterSeconds: Long?): String = when (this) {
     CodeError.NOT_PAIRING_QR -> stringResource(R.string.feature_guardian_impl_code_not_pairing_qr)
     CodeError.SCAN_FAILED -> stringResource(R.string.feature_guardian_impl_code_scan_failed)
     CodeError.NETWORK -> GuardianError.NETWORK.message()
+    CodeError.APP_CHECK -> GuardianError.APP_CHECK.message()
     CodeError.BUSY -> GuardianError.BUSY.message()
     CodeError.WRONG_ROLE -> GuardianError.WRONG_ROLE.message()
     CodeError.UNKNOWN -> GuardianError.UNKNOWN.message()

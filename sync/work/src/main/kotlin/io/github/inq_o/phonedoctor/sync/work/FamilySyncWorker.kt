@@ -8,6 +8,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
@@ -59,8 +60,15 @@ class WorkManagerFamilySyncScheduler @Inject constructor(
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
             .build()
-        // 이미 기다리는 작업이 있으면 그것 하나로 (망이 없는 동안 검사마다 쌓이지 않게). 도는 중에 생긴 일은 다음 검사 뒤 작업이 보낸다
-        WorkManager.getInstance(context).enqueueUniqueWork(UNIQUE, ExistingWorkPolicy.KEEP, request)
+        // 기다리는 작업은 새 작업으로 바꾼다(REPLACE): 서버 오류로 재시도 대기가 길어져도(최대 5시간) 새 확인 요청이나
+        // 15분마다 검사가 부르면 바로 다시 보내므로, 보호자 알림이 검사 주기 넘게 묶이지 않는다. 작업은 하나뿐이라 쌓이지 않는다.
+        // 도는 중이면 끊지 않고 뒤에 붙인다(APPEND_OR_REPLACE): 보내던 요청이 중간에 끊겨 다시 보내지 않게
+        val workManager = WorkManager.getInstance(context)
+        val current = workManager.getWorkInfosForUniqueWork(UNIQUE)
+        current.addListener({
+            val running = runCatching { current.get() }.getOrNull().orEmpty().any { it.state == WorkInfo.State.RUNNING }
+            workManager.enqueueUniqueWork(UNIQUE, if (running) ExistingWorkPolicy.APPEND_OR_REPLACE else ExistingWorkPolicy.REPLACE, request)
+        }, Runnable::run)
     }
 
     private companion object {
