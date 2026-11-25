@@ -94,7 +94,8 @@ class CreateAlertTest {
         assertEquals("install_scan", a.s("source"))
         assertEquals("approval", a.s("kind"))
         assertEquals(listOf(link), a.ids())
-        assertEquals("부모님", a.o("protectedDevice").s("displayName"))
+        // 시니어는 기본 이름이 없다 (보호자 화면이 표시 이름이나 "연결한 폰"으로)
+        assertEquals("", a.o("protectedDevice").s("displayName"))
         assertEquals("AdMob", a.o("verdict")["reasons"]!!.jsonArray[0].jsonObject.o("evidence")["sdks"]!!.jsonArray[0].jsonPrimitive.content)
         assertEquals(clock.instant.toString(), a.s("createdAt"))
         assertEquals(clock.instant.toString(), a.s("updatedAt"))
@@ -102,7 +103,7 @@ class CreateAlertTest {
         val push = FakePusher.sent.single()
         assertEquals("fcm-guardian1", push.token)
         assertEquals(
-            mapOf("v" to "1", "type" to "ALERT_CREATED", "alertId" to a.id, "protectedName" to "부모님", "appLabel" to "초고속 클리너", "source" to "install_scan"),
+            mapOf("v" to "1", "type" to "ALERT_CREATED", "alertId" to a.id, "linkId" to link, "protectedName" to "", "appLabel" to "초고속 클리너", "source" to "install_scan"),
             push.data,
         )
         assertTrue(push.high)
@@ -353,7 +354,7 @@ class DecisionTest {
 class OutcomeTest {
     @Test
     fun `응답 뒤 결과 보고 → resolved, 보호자에게 ALERT_RESOLVED`() = serverTest {
-        family()
+        val (link) = family()
         val a = created()
         decide(a.id)
         FakePusher.sent.clear()
@@ -364,7 +365,7 @@ class OutcomeTest {
         assertEquals("uninstalled", body.o("outcome").s("outcome"))
         assertEquals("2026-11-21T02:30:00Z", body.o("outcome").s("occurredAt"))
         assertEquals(
-            mapOf("v" to "1", "type" to "ALERT_RESOLVED", "alertId" to a.id, "outcome" to "uninstalled", "protectedName" to "부모님", "appLabel" to "초고속 클리너"),
+            mapOf("v" to "1", "type" to "ALERT_RESOLVED", "alertId" to a.id, "linkId" to link, "outcome" to "uninstalled", "protectedName" to "", "appLabel" to "초고속 클리너"),
             FakePusher.sent.single().data,
         )
         // 같은 결과 재전송은 200, 푸시 없음. 다른 결과는 409

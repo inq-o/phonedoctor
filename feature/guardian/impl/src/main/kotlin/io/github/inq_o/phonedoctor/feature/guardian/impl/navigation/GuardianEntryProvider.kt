@@ -16,12 +16,13 @@ import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianHomeScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianSettingsScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.GuardianSignInScreen
 import io.github.inq_o.phonedoctor.feature.guardian.impl.LinkWaitingScreen
+import io.github.inq_o.phonedoctor.feature.guardian.impl.ProvidePhoneNames
 
 /**
  * @param onSignedIn O-G1을 마침 → 홈 위에 코드 입력
  * @param canLeaveSignIn O-G1에 [돌아가기]를 보일지 (밑에 화면이 있을 때만)
  * @param onSignInBack O-G1 [돌아가기]
- * @param onAddFamily G1 [가족 연결하기] → O-G2
+ * @param onAddFamily G1 [폰 연결] → O-G2
  * @param onRequested O-G2에서 연결 요청을 보냄 → O-G3 (코드 입력은 닫는다)
  * @param onSignInRequired O-G2에서 로그인이 풀린 것을 알게 됨 → O-G1
  * @param onHome 쌓인 화면을 닫고 G1으로
@@ -48,24 +49,38 @@ fun EntryProviderScope<NavKey>.guardianEntries(
     onDataDeleted: () -> Unit,
 ) {
     entry<GuardianSignInNavKey> {
-        GuardianSignInScreen(onSignedIn = onSignedIn, onBack = onSignInBack.takeIf { canLeaveSignIn() })
+        ProvidePhoneNames {
+            GuardianSignInScreen(onSignedIn = onSignedIn, onBack = onSignInBack.takeIf { canLeaveSignIn() })
+        }
     }
     entry<GuardianHomeNavKey> {
-        GuardianHomeScreen(onAddFamily = onAddFamily, onOpenRequest = onOpenRequest, onHistory = onHistory, onSettings = onSettings)
+        ProvidePhoneNames {
+            GuardianHomeScreen(onAddFamily = onAddFamily, onOpenRequest = onOpenRequest, onHistory = onHistory, onSettings = onSettings)
+        }
     }
     entry<EnterCodeNavKey> {
-        EnterCodeScreen(onRequested = onRequested, onSignInRequired = onSignInRequired, onHome = onHome)
+        ProvidePhoneNames {
+            EnterCodeScreen(onRequested = onRequested, onSignInRequired = onSignInRequired, onHome = onHome)
+        }
     }
     entry<AlertDetailNavKey> { key ->
-        AlertDetailScreen(alertId = key.alertId, onBack = onBack)
+        ProvidePhoneNames {
+            AlertDetailScreen(alertId = key.alertId, onBack = onBack)
+        }
     }
     entry<GuardianSettingsNavKey> {
-        GuardianSettingsScreen(onBack = onBack, onDeleted = onDataDeleted)
+        ProvidePhoneNames {
+            GuardianSettingsScreen(onBack = onBack, onDeleted = onDataDeleted)
+        }
     }
     entry<AlertHistoryNavKey> {
-        AlertHistoryScreen(onOpen = onOpenRequest, onBack = onBack)
+        ProvidePhoneNames {
+            AlertHistoryScreen(onOpen = onOpenRequest, onBack = onBack)
+        }
     }
     entry<LinkWaitingNavKey> { key ->
-        LinkWaitingScreen(linkId = key.linkId, seniorName = key.seniorName, onHome = onHome, onRetry = onRetry)
+        ProvidePhoneNames {
+            LinkWaitingScreen(linkId = key.linkId, seniorName = key.seniorName, onHome = onHome, onRetry = onRetry)
+        }
     }
 }

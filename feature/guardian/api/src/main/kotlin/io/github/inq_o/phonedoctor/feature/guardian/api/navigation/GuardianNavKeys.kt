@@ -7,7 +7,7 @@ import kotlinx.serialization.Serializable
 @Serializable
 data object GuardianSignInNavKey : NavKey
 
-/** G1 보호자 홈: 연결한 부모님 폰 목록 */
+/** G1 보호자 홈: 지켜보는 폰 목록과 답변할 요청 */
 @Serializable
 data object GuardianHomeNavKey : NavKey
 
@@ -15,7 +15,7 @@ data object GuardianHomeNavKey : NavKey
 @Serializable
 data object EnterCodeNavKey : NavKey
 
-/** O-G3 "부모님 폰에서 [연결할게요]를 눌러 주세요" 대기. [seniorName]은 코드를 넣었을 때 서버가 알려 준 이름 */
+/** O-G3 연결 요청 대기, 연결되면 O-G4 표시 이름 고르기. [seniorName]은 코드를 넣었을 때 서버가 알려 준 상대가 정한 이름(없으면 빈 값) */
 @Serializable
 data class LinkWaitingNavKey(val linkId: String, val seniorName: String) : NavKey
 
@@ -23,7 +23,7 @@ data class LinkWaitingNavKey(val linkId: String, val seniorName: String) : NavKe
 @Serializable
 data class AlertDetailNavKey(val alertId: String) : NavKey
 
-/** G3 지난 요청 (알림 전용 요청은 '경고 앱'으로 표시) */
+/** G3 지난 요청 (알림 전용 요청은 '허용한 앱 광고'로 표시) */
 @Serializable
 data object AlertHistoryNavKey : NavKey
 

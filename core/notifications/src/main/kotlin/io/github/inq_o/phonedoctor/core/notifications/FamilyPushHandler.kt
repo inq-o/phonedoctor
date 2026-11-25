@@ -1,5 +1,7 @@
 package io.github.inq_o.phonedoctor.core.notifications
 
+import io.github.inq_o.phonedoctor.core.model.PhoneName
+import io.github.inq_o.phonedoctor.core.model.PhoneNameLookup
 import java.time.LocalDate
 import javax.inject.Inject
 
@@ -10,7 +12,12 @@ import javax.inject.Inject
 class FamilyPushHandler @Inject constructor(
     private val notifier: Notifier,
     private val requestChanges: RequestChanges,
+    private val phoneNames: PhoneNameLookup,
 ) {
+    /** 보호자가 이 폰에 저장한 표시 이름이 있으면 그것, 없으면 상대가 정한 이름 (ux-flows §2) */
+    private fun phone(linkId: String?, protectedName: String?): PhoneName =
+        PhoneName.of(linkId?.let(phoneNames::chosenName), protectedName)
+
     /** 처리했으면 true. 모르는 종류·형식 버전은 무시한다 */
     fun handle(data: Map<String, String>): Boolean {
         if (data["v"] != VERSION) return false
@@ -23,17 +30,21 @@ class FamilyPushHandler @Inject constructor(
                 true
             }
             "LINK_ACTIVATED" -> {
-                notifier.notifyLinkActivated(linkId, data["protectedName"])
+                notifier.notifyLinkActivated(linkId, phone(linkId, data["protectedName"]))
                 true
             }
             // 이름 키는 보낸 쪽 역할을 따른다: 보호자가 끊으면 guardianName, 시니어가 끊으면 protectedName
             "LINK_REVOKED" -> {
-                notifier.notifyLinkRevoked(linkId, data["guardianName"], data["protectedName"])
+                notifier.notifyLinkRevoked(
+                    linkId,
+                    data["guardianName"],
+                    data["protectedName"]?.let { phone(linkId, it) },
+                )
                 true
             }
             // 시니어 폰의 검사 보고가 48시간 없음 (F6)
             "CONTACT_LOST" -> {
-                notifier.notifyContactLost(linkId, data["protectedName"])
+                notifier.notifyContactLost(linkId, phone(linkId, data["protectedName"]))
                 true
             }
             else -> false
@@ -42,6 +53,8 @@ class FamilyPushHandler @Inject constructor(
 
     private fun handleAlert(type: String, data: Map<String, String>): Boolean {
         val alertId = data["alertId"]?.takeIf { it.isNotBlank() } ?: return false
+        // 받는 보호자의 연결 (push-messages.md). 옛 서버는 보내지 않아 상대가 정한 이름만 쓴다
+        val linkId = data["linkId"]?.takeIf { it.isNotBlank() }
         if (type !in KNOWN_ALERT_TYPES) return false
         // 열려 있는 요청 화면이 다시 읽게 (다른 보호자가 먼저 답함·결과·근거 갱신)
         requestChanges.changed(alertId)
@@ -50,7 +63,7 @@ class FamilyPushHandler @Inject constructor(
             "ALERT_REMINDER" -> GuardianAlertKind.REMINDER
             "ALERT_NOTICE" -> GuardianAlertKind.NOTICE
             "ALERT_RESOLVED" -> {
-                notifier.notifyAlertResolved(alertId, data["outcome"], data["protectedName"], data["appLabel"])
+                notifier.notifyAlertResolved(alertId, data["outcome"], phone(linkId, data["protectedName"]), data["appLabel"])
                 return true
             }
             // 다른 보호자가 먼저 답함·근거 갱신: 알림 없이 목록만 바뀐다 (화면이 다시 불러옴)
@@ -61,7 +74,7 @@ class FamilyPushHandler @Inject constructor(
             GuardianAlertMessage(
                 alertId = alertId,
                 kind = kind,
-                seniorName = data["protectedName"],
+                phone = phone(linkId, data["protectedName"]),
                 appLabel = data["appLabel"],
                 installScan = data["source"] == "install_scan",
                 symptomCount = data["symptomCount"]?.toIntOrNull(),

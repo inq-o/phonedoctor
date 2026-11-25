@@ -40,6 +40,7 @@ class GuardianViewModelTest {
 
     private val family = FakeFamily()
     private val notifier = FakeNotifier()
+    private val phoneNames = FakePhoneNames()
     private val requests = FakeAlerts()
     private val changes = RequestChanges()
 
@@ -230,8 +231,8 @@ class GuardianViewModelTest {
     @Test
     fun waitingWatchesUntilSeniorConfirms() = runTest(main.dispatcher) {
         family.links += link("l1", LinkStatus.PENDING, senior = "엄마")
-        val vm = LinkWaitingViewModel("l1", "부모님", family, notifier)
-        assertEquals(LinkWaitingUiState.Waiting("부모님"), vm.uiState.value)
+        val vm = LinkWaitingViewModel("l1", "", family, notifier, phoneNames)
+        assertEquals(LinkWaitingUiState.Waiting(""), vm.uiState.value)
         vm.startWatching()
         vm.startWatching()
         runCurrent()
@@ -254,14 +255,29 @@ class GuardianViewModelTest {
     }
 
     @Test
+    fun connectedSavesChosenNameOnlyOnThisPhone() = runTest(main.dispatcher) {
+        val vm = LinkWaitingViewModel("l1", "김영희", family, notifier, phoneNames)
+        var done = 0
+        vm.saveName("엄마") { done++ }
+        advanceUntilIdle()
+        assertEquals(mapOf("l1" to "엄마"), phoneNames.names.value)
+        // 건너뛰면 아무것도 저장하지 않는다 (서버로도 보내지 않음)
+        vm.saveName(null) { done++ }
+        advanceUntilIdle()
+        assertEquals(mapOf("l1" to "엄마"), phoneNames.names.value)
+        assertEquals(2, done)
+        assertTrue(family.calls.isEmpty())
+    }
+
+    @Test
     fun declinedOrMissingLinkEndsWaiting() = runTest(main.dispatcher) {
         family.links += link("l1", LinkStatus.REVOKED)
-        val declined = LinkWaitingViewModel("l1", "엄마", family, notifier)
+        val declined = LinkWaitingViewModel("l1", "엄마", family, notifier, phoneNames)
         declined.startWatching()
         runCurrent()
         assertEquals(LinkWaitingUiState.Declined("엄마"), declined.uiState.value)
 
-        val missing = LinkWaitingViewModel("gone", "아빠", family, notifier)
+        val missing = LinkWaitingViewModel("gone", "아빠", family, notifier, phoneNames)
         missing.startWatching()
         runCurrent()
         assertEquals(LinkWaitingUiState.Declined("아빠"), missing.uiState.value)
@@ -271,7 +287,7 @@ class GuardianViewModelTest {
     @Test
     fun waitingStopsWhenScreenLeaves() = runTest(main.dispatcher) {
         family.links += link("l1", LinkStatus.PENDING)
-        val vm = LinkWaitingViewModel("l1", "엄마", family, notifier)
+        val vm = LinkWaitingViewModel("l1", "엄마", family, notifier, phoneNames)
         vm.startWatching()
         runCurrent()
         vm.stopWatching()
@@ -340,7 +356,7 @@ class GuardianViewModelTest {
         vm.revoke(family.links[1]) // 끊는 중에는 다른 연결을 끊지 않는다
         advanceUntilIdle()
         var ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertEquals(GuardianMessage.Revoked("엄마", wasPending = false), ready.message)
+        assertEquals(GuardianMessage.Revoked("a", "엄마", wasPending = false), ready.message)
         assertEquals(listOf("g", "p"), ready.links.map { it.link.linkId })
         assertEquals(1, family.calls.count { it == "revoke" })
 
@@ -348,7 +364,7 @@ class GuardianViewModelTest {
         vm.revoke(ready.links[1].link)
         advanceUntilIdle()
         ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertEquals(GuardianMessage.Revoked("아빠", wasPending = true), ready.message)
+        assertEquals(GuardianMessage.Revoked("p", "아빠", wasPending = true), ready.message)
 
         family.fail["revoke"] = apiError(503)
         vm.revoke(ready.links[0].link)

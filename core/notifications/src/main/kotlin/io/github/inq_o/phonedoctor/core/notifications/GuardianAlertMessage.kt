@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.core.notifications
 
+import io.github.inq_o.phonedoctor.core.model.PhoneName
 import java.time.LocalDate
 
 /** 보호자에게 오는 요청 알림 종류 (push-messages.md §2) */
@@ -21,7 +22,8 @@ enum class GuardianAlertKind {
 data class GuardianAlertMessage(
     val alertId: String,
     val kind: GuardianAlertKind,
-    val seniorName: String?,
+    /** 상대 폰 이름 (보호자가 고른 표시 이름 → 상대가 정한 이름 → 이름 없음, ux-flows §2) */
+    val phone: PhoneName,
     val appLabel: String?,
     val installScan: Boolean,
     val symptomCount: Int?,

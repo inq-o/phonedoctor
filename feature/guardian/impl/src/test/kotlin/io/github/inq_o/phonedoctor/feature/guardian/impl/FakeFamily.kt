@@ -110,14 +110,14 @@ internal class FakeNotifier : Notifier {
     override fun cancelAlert(alertId: Long) = Unit
     override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
     override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
-    override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
-    override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
+    override fun notifyLinkActivated(linkId: String, phone: io.github.inq_o.phonedoctor.core.model.PhoneName) = Unit
+    override fun notifyLinkRevoked(linkId: String, guardianName: String?, phone: io.github.inq_o.phonedoctor.core.model.PhoneName?) = Unit
     override fun cancelLink(linkId: String) {
         cancelled += linkId
     }
-    override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
+    override fun notifyContactLost(linkId: String, phone: io.github.inq_o.phonedoctor.core.model.PhoneName) = Unit
     override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
-    override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
+    override fun notifyAlertResolved(alertId: String, outcome: String?, phone: io.github.inq_o.phonedoctor.core.model.PhoneName, appLabel: String?) = Unit
     override fun cancelGuardianAlert(alertId: String) {
         cancelled += "request:$alertId"
     }
@@ -175,4 +175,13 @@ internal class FakeAlerts : GuardianAlertRepository {
         alerts.replaceAll { if (it.alertId == alertId) answered else it }
         return answered
     }
+}
+
+internal class FakePhoneNames : io.github.inq_o.phonedoctor.core.data.PhoneNameRepository {
+    val names = kotlinx.coroutines.flow.MutableStateFlow<Map<String, String>>(emptyMap())
+    override val chosenNames: kotlinx.coroutines.flow.Flow<Map<String, String>> = names
+    override suspend fun setChosenName(linkId: String, name: String?) {
+        names.value = if (name.isNullOrBlank()) names.value - linkId else names.value + (linkId to name)
+    }
+    override fun chosenName(linkId: String): String? = names.value[linkId]
 }

@@ -293,13 +293,34 @@ class FamilyRepositoryTest {
         repo.setDisplayName("큰딸")
         repo.setNotifyCaution(true)
         repo.acceptPairingCode("482913")
+        val names = DefaultPhoneNameRepository(prefs)
+        names.setChosenName("l1", "엄마")
         repo.deleteAllData()
+        // 보호자가 고른 상대 폰 표시 이름도 지운다 (이 폰의 데이터)
+        assertTrue(names.chosenNames.first().isEmpty())
         assertNull(repo.displayName.first())
         assertFalse(repo.notifyCaution.first())
         network.updates.clear()
         repo.createPairingCode()
         assertNull(network.registrations.last().displayName)
         assertTrue(network.updates.isEmpty())
+    }
+
+    @Test
+    fun `표시 이름은 연결별로 저장하고, 비우면 지우고, 길면 자른다`() = runTest {
+        repo()
+        val names = DefaultPhoneNameRepository(prefs)
+        names.setChosenName("l1", " 엄마 ")
+        names.setChosenName("l2", "아주아주아주긴이름입니다")
+        assertEquals(mapOf("l1" to "엄마", "l2" to "아주아주아주긴이름입"), names.chosenNames.first())
+        assertEquals("엄마", names.chosenName("l1"))
+        names.setChosenName("l1", " ")
+        assertNull(names.chosenName("l1"))
+        // 이름을 모두 지워도 다른 설정은 그대로
+        prefs.setNotifyCaution(true)
+        prefs.clearPhoneNames()
+        assertTrue(names.chosenNames.first().isEmpty())
+        assertTrue(prefs.notifyCaution.first())
     }
 
     @Test

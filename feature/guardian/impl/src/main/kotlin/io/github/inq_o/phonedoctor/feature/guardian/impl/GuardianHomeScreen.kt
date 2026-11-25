@@ -81,7 +81,7 @@ private fun Context.openNotificationSettings() {
     startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))
 }
 
-/** G1. 답을 기다리는 요청(누르면 G2), 연결한 부모님 폰, 지난 요청(G3) */
+/** G1. 답을 기다리는 요청(누르면 G2), 지켜보는 폰, 지난 요청(G3) */
 @Composable
 internal fun GuardianHomeScreen(
     state: GuardianHomeUiState,
@@ -118,7 +118,7 @@ internal fun GuardianHomeScreen(
                     is GuardianMessage.Revoked -> Headline(
                         stringResource(
                             if (message.wasPending) R.string.feature_guardian_impl_home_cancelled else R.string.feature_guardian_impl_home_revoked,
-                            seniorName(message.seniorName),
+                            phoneName(message.linkId, message.seniorName),
                         ),
                         announce = true,
                     )
@@ -188,7 +188,7 @@ private fun NotificationsOffCard(onOpenSettings: () -> Unit) {
 @Composable
 private fun LinkCard(item: GuardianLink, enabled: Boolean, onRevoke: () -> Unit) {
     val link = item.link
-    val name = seniorName(link.seniorName)
+    val name = phoneName(link.linkId, link.seniorName)
     OutlinedCard(shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             Text(stringResource(R.string.feature_guardian_impl_home_phone, name), style = MaterialTheme.typography.titleLarge)
@@ -245,7 +245,7 @@ private fun formatTime(at: Instant): String {
 /** 끊기 확인. 바깥을 누르거나 뒤로 가면 그대로 둔다 */
 @Composable
 private fun RevokeDialog(link: FamilyLink, onRevoke: () -> Unit, onKeep: () -> Unit) {
-    val name = seniorName(link.seniorName)
+    val name = phoneName(link.linkId, link.seniorName)
     val pending = link.status == LinkStatus.PENDING
     GuardianTheme {
         AlertDialog(
@@ -262,7 +262,6 @@ private fun RevokeDialog(link: FamilyLink, onRevoke: () -> Unit, onKeep: () -> U
                 Text(
                     stringResource(
                         if (pending) R.string.feature_guardian_impl_cancel_dialog_body else R.string.feature_guardian_impl_revoke_dialog_body,
-                        name,
                     ),
                 )
             },

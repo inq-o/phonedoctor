@@ -61,7 +61,7 @@ fun AlertDetailScreen(
     )
 }
 
-/** G2 요청 상세·응답. 오른쪽(아래)이 주요 행동 [지우자고 하기] */
+/** G2 요청 상세·응답. 오른쪽(아래)이 주요 행동 [삭제 요청] */
 @Composable
 internal fun AlertDetailScreen(
     state: AlertDetailUiState,
@@ -74,7 +74,7 @@ internal fun AlertDetailScreen(
     val ready = state as? AlertDetailUiState.Ready
     val answerable = ready != null && ready.canAnswer
     GuardianScreen(
-        title = ready?.let { stringResource(R.string.feature_guardian_impl_home_phone, seniorName(it.alert.seniorName)) },
+        title = ready?.let { phoneName(it.alert.linkIds, it.alert.seniorName) },
         modifier = modifier,
         actions = {
             when {
@@ -87,7 +87,7 @@ internal fun AlertDetailScreen(
                 )
                 answerable -> {
                     val sending = ready!!.sending != null
-                    // 알림 전용(이미 허용한 앱)에는 [괜찮은 앱이에요]가 없다
+                    // 알림 전용(이미 허용한 앱)에는 [허용]가 없다
                     val uninstall: @Composable (Modifier) -> Unit = {
                         GuardianPrimaryButton(
                             stringResource(R.string.feature_guardian_impl_decide_uninstall),
@@ -153,7 +153,7 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
             if (alert.answer?.decision == FamilyDecision.ALLOW) {
                 stringResource(R.string.feature_guardian_impl_answer_sent_allow)
             } else {
-                stringResource(R.string.feature_guardian_impl_answer_sent, seniorName(alert.seniorName))
+                stringResource(R.string.feature_guardian_impl_answer_sent, phoneName(alert.linkIds, alert.seniorName))
             },
             announce = true,
         )
@@ -177,7 +177,7 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
         OutlinedTextField(
             value = state.message,
             onValueChange = onMessageChange,
-            label = { Text(stringResource(R.string.feature_guardian_impl_detail_message_label, seniorName(alert.seniorName))) },
+            label = { Text(stringResource(R.string.feature_guardian_impl_detail_message_label)) },
             placeholder = { Text(stringResource(R.string.feature_guardian_impl_detail_message_hint)) },
             supportingText = { Text("${state.message.length}/$MESSAGE_TO_SENIOR_MAX") },
             singleLine = true,
@@ -185,7 +185,8 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        Body(stringResource(R.string.feature_guardian_impl_detail_explain, seniorName(alert.seniorName)))
+        // 알림 전용(이미 허용한 앱)에는 [허용]이 없다
+        if (!alert.notice) Body(stringResource(R.string.feature_guardian_impl_detail_explain))
         if (state.sending != null) CircularProgressIndicator()
     }
 }

@@ -308,7 +308,7 @@ fun fcmToken(deviceId: String) =
  * 보호자에게 요청을 알리는 푸시 (ALERT_CREATED·ALERT_NOTICE, 재알림은 ALERT_REMINDER).
  * 문구 고르는 값만 담는다 (push-messages.md §2)
  */
-fun alertPush(alert: Alert, guardianId: String, reminder: Boolean = false): Push {
+fun alertPush(alert: Alert, linkId: String, guardianId: String, reminder: Boolean = false): Push {
     val type = when {
         reminder -> PushType.ALERT_REMINDER
         alert.kind == AlertKind.NOTICE -> PushType.ALERT_NOTICE
@@ -316,6 +316,8 @@ fun alertPush(alert: Alert, guardianId: String, reminder: Boolean = false): Push
     }
     val data = buildList {
         add("alertId" to alert.alertId)
+        // 받는 보호자의 연결: 보호자 폰에만 저장한 표시 이름으로 알림 제목을 만든다 (push-messages.md)
+        add("linkId" to linkId)
         add("protectedName" to alert.protectedDevice.displayName)
         add("appLabel" to alert.app.appLabel)
         add("source" to alert.source.db)
@@ -415,7 +417,7 @@ fun Route.alertRoutes(deps: Deps) {
                         this[AlertLinks.linkId] = linkId
                     }
                     val view = alertView(alertId)
-                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (_, g) -> alertPush(view, g) }, alertId)
+                    return@idempotent reply(HttpStatusCode.Created, view, eligible.map { (l, g) -> alertPush(view, l, g) }, alertId)
                 }
 
                 // 열린 요청에 합치기: 없던 근거는 붙이고, 증상 근거는 더 최신일 때만, 판정은 단계가 올라갈 때만 바꾼다. source·kind는 처음 값
@@ -442,7 +444,7 @@ fun Route.alertRoutes(deps: Deps) {
                 }
                 val view = alertView(alertId)
                 val addedGuardians = added.map { it.second }.toSet()
-                val pushes = added.map { (_, g) -> alertPush(view, g) } +
+                val pushes = added.map { (l, g) -> alertPush(view, l, g) } +
                     if (evidenceChanged) {
                         activeRecipients(alertId).filter { it.second !in addedGuardians }
                             .map { (_, g) -> PushType.ALERT_UPDATED.to(fcmToken(g), "alertId" to alertId) }
@@ -603,10 +605,11 @@ fun Route.alertRoutes(deps: Deps) {
                         it[remindAt] = null
                     }
                     val view = alertView(alertId)
-                    val pushes = activeRecipients(alertId).map { (_, g) ->
+                    val pushes = activeRecipients(alertId).map { (l, g) ->
                         PushType.ALERT_RESOLVED.to(
                             fcmToken(g),
                             "alertId" to alertId,
+                            "linkId" to l,
                             "outcome" to body.outcome.db,
                             "protectedName" to me[Devices.displayName],
                             "appLabel" to view.app.appLabel,

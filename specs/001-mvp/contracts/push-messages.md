@@ -37,7 +37,7 @@
 
 - 연결 메시지(`LINK_*`)는 `linkId`와 보낸 쪽 표시 이름을 담음. 키 이름은 보낸 쪽 역할: 보호자가 보내면 `guardianName`(`LINK_REQUESTED`, 보호자가 끊은 `LINK_REVOKED`), 시니어가 보내면 `protectedName`(`LINK_ACTIVATED`, 시니어가 끊은 `LINK_REVOKED`). 기기 삭제로 끊긴 연결도 `LINK_REVOKED`
 - `ALERT_REMINDER`는 `ALERT_CREATED`와 같은 값(24시간 무응답 1번). `CONTACT_LOST`는 `linkId`·`protectedName` — 시니어 기기의 검사 보고가 48시간 없을 때 끊김 한 번에 1번 (새 보고가 온 뒤 다시 끊기면 또)
-- `ALERT_UPDATED`는 `alertId`만. `ALERT_RESOLVED`는 `alertId`·`outcome`·`protectedName`·`appLabel`. `DECISION_MADE`는 아래 예시와 같음(`messageToSenior`는 넣지 않음 — 잠금화면 노출 최소화, 상세 화면에서 `GET /alerts/{id}`)
+- `ALERT_UPDATED`는 `alertId`만. `ALERT_RESOLVED`는 `alertId`·`linkId`·`outcome`·`protectedName`·`appLabel`. `DECISION_MADE`는 아래 예시와 같음(`messageToSenior`는 넣지 않음 — 잠금화면 노출 최소화, 상세 화면에서 `GET /alerts/{id}`)
 - 서버는 DB 반영이 끝난 뒤 응답 전에 보냄. 전송이 실패해도 요청은 성공 (위 "누락 대비"로 당겨 옴)
 - 같은 일로 두 번 보내지 않되, 보낸다는 보장도 없음(최대 1번): 커밋 직후 서버가 죽거나 FCM이 실패하면 그 푸시는 다시 가지 않는다. 재알림(`ALERT_REMINDER`)·연락 끊김(`CONTACT_LOST`)도 같음. 앱은 목록 당겨오기로 상태를 맞춘다
 

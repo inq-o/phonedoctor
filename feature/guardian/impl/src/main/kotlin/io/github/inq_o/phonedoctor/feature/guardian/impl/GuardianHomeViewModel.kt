@@ -28,7 +28,7 @@ data class GuardianLink(val link: FamilyLink, val contactLost: Boolean = false)
 
 /** 연결 끊기·요청 취소 결과 안내 */
 sealed interface GuardianMessage {
-    data class Revoked(val seniorName: String, val wasPending: Boolean) : GuardianMessage
+    data class Revoked(val linkId: String, val seniorName: String, val wasPending: Boolean) : GuardianMessage
     data class Failed(val error: GuardianError) : GuardianMessage
 }
 
@@ -124,7 +124,7 @@ class GuardianHomeViewModel @Inject constructor(
                 now.copy(
                     links = if (deviceGone) emptyList() else now.links.filterNot { it.link.linkId == link.linkId },
                     revoking = null,
-                    message = GuardianMessage.Revoked(link.seniorName, wasPending = link.status == LinkStatus.PENDING),
+                    message = GuardianMessage.Revoked(link.linkId, link.seniorName, wasPending = link.status == LinkStatus.PENDING),
                 )
             } else {
                 now.copy(revoking = null, message = GuardianMessage.Failed(error))

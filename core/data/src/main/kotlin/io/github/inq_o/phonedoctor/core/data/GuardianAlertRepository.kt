@@ -31,7 +31,7 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** (보호자) 연결한 부모님 폰들의 요청 (US4: G1 목록, G2 상세·응답, G3 기록). 서버에서 바로 읽는다 */
+/** (보호자) 연결한 폰들의 요청 (US4: G1 목록, G2 상세·응답, G3 기록). 서버에서 바로 읽는다 */
 interface GuardianAlertRepository {
     /**
      * 볼 수 있는 요청(지금 연결로 받은 것, 90일 안), 최근에 바뀐 것부터. [status]면 그 상태만 (G1은 열린 요청만).
@@ -241,6 +241,7 @@ internal fun NetworkDecision.toAnswer(): FamilyAnswer? {
 
 internal fun NetworkAlert.toModel() = FamilyAlert(
     alertId = alertId,
+    linkIds = linkIds,
     seniorName = protectedDevice?.displayName.orEmpty(),
     status = when (status) {
         NetworkAlertStatus.OPEN -> FamilyAlertStatus.OPEN
