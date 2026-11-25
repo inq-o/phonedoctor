@@ -112,7 +112,7 @@ private fun WaitingPreview() {
 }
 
 /** 화면을 돌려도 고른 것이 남게 */
-private val PhoneNameChoiceSaver = listSaver<PhoneNameChoice, Any?>(
+internal val PhoneNameChoiceSaver = listSaver<PhoneNameChoice, Any?>(
     save = { listOf(it.preset, it.custom, it.text) },
     restore = { PhoneNameChoice(it[0] as String?, it[1] as Boolean, it[2] as String) },
 )

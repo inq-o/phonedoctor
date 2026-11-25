@@ -87,7 +87,7 @@ class AlertDetailViewModel @AssistedInject constructor(
             if (state.value is AlertDetailUiState.Failed) state.value = AlertDetailUiState.Loading
             try {
                 val alert = repository.alert(alertId)
-                state.update { (it as? AlertDetailUiState.Ready)?.copy(alert = alert) ?: AlertDetailUiState.Ready(alert) }
+                state.update { (it as? AlertDetailUiState.Ready)?.copy(alert = alert, error = null) ?: AlertDetailUiState.Ready(alert) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ApiException) {
@@ -111,8 +111,9 @@ class AlertDetailViewModel @AssistedInject constructor(
         state.value = ready.copy(sending = decision, error = null)
         viewModelScope.launch {
             val next = try {
-                // 한마디는 두 답 모두 함께 보낸다 (시니어 S2에 보인다)
-                val alert = repository.decide(alertId, decision, ready.message.ifBlank { null })
+                // 같이 보낼 메시지는 삭제 요청 때만 보낸다 (시니어 S2에 보인다, ux-flows §4 G2. 허용이면 시니어 알림이 없다)
+                val message = ready.message.ifBlank { null }.takeIf { decision == FamilyDecision.RECOMMEND_UNINSTALL }
+                val alert = repository.decide(alertId, decision, message)
                 ready.copy(alert = alert, sending = null, answered = true)
             } catch (e: CancellationException) {
                 throw e
