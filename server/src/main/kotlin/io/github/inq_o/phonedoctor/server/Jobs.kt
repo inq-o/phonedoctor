@@ -106,7 +106,7 @@ fun runTick(deps: Deps): TickResult {
         for (id in due) {
             Alerts.update({ Alerts.alertId eq id }) { it[remindAt] = null }
             val view = alertView(id)
-            activeRecipients(id).forEach { (_, g) -> pushes += alertPush(view, g, reminder = true) }
+            activeRecipients(id).forEach { (l, g) -> pushes += alertPush(view, l, g, reminder = true) }
         }
         due.size
     }

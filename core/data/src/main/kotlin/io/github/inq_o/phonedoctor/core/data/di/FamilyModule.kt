@@ -23,6 +23,9 @@ import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.FirebaseFamilyAccount
 import io.github.inq_o.phonedoctor.core.data.FirebasePushTokens
 import io.github.inq_o.phonedoctor.core.data.PushTokens
+import io.github.inq_o.phonedoctor.core.data.DefaultPhoneNameRepository
+import io.github.inq_o.phonedoctor.core.data.PhoneNameRepository
+import io.github.inq_o.phonedoctor.core.model.PhoneNameLookup
 import io.github.inq_o.phonedoctor.core.network.FamilyFeature
 import javax.inject.Singleton
 
@@ -53,6 +56,12 @@ internal interface FamilyModule {
 
     @Binds
     fun bindsGuardianAlertRepository(impl: DefaultGuardianAlertRepository): GuardianAlertRepository
+
+    @Binds
+    fun bindsPhoneNameRepository(impl: DefaultPhoneNameRepository): PhoneNameRepository
+
+    @Binds
+    fun bindsPhoneNameLookup(impl: DefaultPhoneNameRepository): PhoneNameLookup
 
     companion object {
         @Provides

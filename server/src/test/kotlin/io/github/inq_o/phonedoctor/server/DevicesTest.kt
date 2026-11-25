@@ -78,12 +78,12 @@ class AuthTest {
 
 class RegisterDeviceTest {
     @Test
-    fun `시니어 등록 기본 이름은 부모님`() = serverTest {
+    fun `시니어 등록 기본 이름은 비어 있음 (역할 이름을 넣지 않음)`() = serverTest {
         val r = client.api(Post, "/devices", SENIOR, registration())
         assertEquals(HttpStatusCode.Created, r.status)
         val d = r.contract("Device")
         assertEquals("protected", d["role"]!!.jsonPrimitive.content)
-        assertEquals("부모님", d["displayName"]!!.jsonPrimitive.content)
+        assertEquals("", d["displayName"]!!.jsonPrimitive.content)
         assertEquals("false", d["notifyCaution"]!!.jsonPrimitive.content)
         assertEquals("2026-11-21T03:00:00Z", d["createdAt"]!!.jsonPrimitive.content)
     }
@@ -142,7 +142,7 @@ class IdempotencyTest {
         assertEquals(HttpStatusCode.Created, second.status)
         assertEquals(first.bodyAsText(), second.bodyAsText())
         assertEquals("true", second.headers["Idempotent-Replayed"])
-        assertEquals("부모님", deviceRow(first.json()["deviceId"]!!.jsonPrimitive.content)[Devices.displayName])
+        assertEquals("", deviceRow(first.json()["deviceId"]!!.jsonPrimitive.content)[Devices.displayName])
     }
 
     @Test

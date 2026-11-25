@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.Josa
+import io.github.inq_o.phonedoctor.core.model.PhoneName
 import io.github.inq_o.phonedoctor.core.model.SiteAlert
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import java.time.LocalDate
@@ -45,24 +46,24 @@ interface Notifier {
     fun notifyLinkRequested(linkId: String, guardianName: String?)
 
     /** (보호자) 시니어가 연결을 받아들임 (푸시 LINK_ACTIVATED). 탭하면 보호자 홈(G1)이 열린다 */
-    fun notifyLinkActivated(linkId: String, seniorName: String?)
+    fun notifyLinkActivated(linkId: String, phone: PhoneName)
 
     /**
      * 상대가 연결을 끊음 (푸시 LINK_REVOKED). 탭하면 연결 목록(시니어 S5, 보호자 G1)이 열린다.
-     * 보호자가 끊었으면 [guardianName], 시니어가 끊었으면 [seniorName]. 기기 삭제로 끊겼으면 둘 다 null일 수 있다
+     * 보호자가 끊었으면 [guardianName](시니어가 받음), 시니어가 끊었으면 [phone](보호자가 받음). 기기 삭제로 끊겼으면 둘 다 null일 수 있다
      */
-    fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?)
+    fun notifyLinkRevoked(linkId: String, guardianName: String?, phone: PhoneName?)
 
     fun cancelLink(linkId: String)
 
     /** (보호자) 시니어 폰의 검사 보고가 이틀째 없음 (푸시 CONTACT_LOST, ux-flows F6). 탭하면 보호자 홈(G1)이 열린다 */
-    fun notifyContactLost(linkId: String, seniorName: String?)
+    fun notifyContactLost(linkId: String, phone: PhoneName)
 
     /** (보호자) 요청 알림 (ALERT_CREATED·REMINDER·NOTICE). 탭하면 요청 상세(G2)가 열린다 */
     fun notifyGuardianAlert(message: GuardianAlertMessage)
 
     /** (보호자) 시니어 폰에서 처리가 끝남 (ALERT_RESOLVED, [outcome]은 openapi OutcomeType). 탭하면 G2 */
-    fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?)
+    fun notifyAlertResolved(alertId: String, outcome: String?, phone: PhoneName, appLabel: String?)
 
     /** (보호자) 요청을 화면으로 봤거나 답함 */
     fun cancelGuardianAlert(alertId: String)
@@ -197,77 +198,83 @@ class SystemNotifier @Inject constructor(
         notifyLink(linkId, context.getString(R.string.core_notifications_link_requested_title), text, launch)
     }
 
-    override fun notifyLinkActivated(linkId: String, seniorName: String?) {
+    override fun notifyLinkActivated(linkId: String, phone: PhoneName) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
         launch.data = notificationUri("link-activated", linkId)
-        val name = seniorNameOrFallback(seniorName)
         notifyLink(
             linkId,
-            context.getString(R.string.core_notifications_link_activated_title, name),
-            context.getString(R.string.core_notifications_link_activated_text, name),
+            context.getString(R.string.core_notifications_link_activated_title, phoneLabel(phone)),
+            context.getString(R.string.core_notifications_link_activated_text),
             launch,
         )
     }
 
-    override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) {
+    override fun notifyLinkRevoked(linkId: String, guardianName: String?, phone: PhoneName?) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
         launch.data = notificationUri("link-revoked", linkId)
         val guardian = guardianName?.trim()?.ifEmpty { null }
-        val senior = seniorName?.trim()?.ifEmpty { null }
-        val text = when {
-            guardian != null -> context.getString(R.string.core_notifications_link_revoked_text, guardian)
-            // 시니어 이름 뒤에는 "님"을 붙이지 않는다 (기본 이름이 "부모님").
-            // 시니어의 [안 할래요](요청 거절)도 같은 푸시라 "끊겼어요" 대신 지금 상태를 말한다
-            senior != null -> context.getString(R.string.core_notifications_link_revoked_by_senior_text, senior)
-            else -> context.getString(R.string.core_notifications_link_revoked_unknown_text)
+        when {
+            // (시니어가 받음) 보호자가 끊음
+            guardian != null -> notifyLink(
+                linkId,
+                context.getString(R.string.core_notifications_link_revoked_title),
+                context.getString(R.string.core_notifications_link_revoked_text, guardian),
+                launch,
+            )
+            // (보호자가 받음) 시니어가 끊었거나 요청을 거절함: 같은 푸시라 "끊겼어요" 대신 지금 상태를 말한다
+            phone != null -> notifyLink(
+                linkId,
+                context.getString(R.string.core_notifications_link_revoked_by_senior_title, phoneLabel(phone)),
+                context.getString(R.string.core_notifications_link_revoked_by_senior_text),
+                launch,
+            )
+            else -> notifyLink(
+                linkId,
+                context.getString(R.string.core_notifications_link_revoked_title),
+                context.getString(R.string.core_notifications_link_revoked_unknown_text),
+                launch,
+            )
         }
-        val title = if (guardian == null && senior != null) R.string.core_notifications_link_revoked_by_senior_title else R.string.core_notifications_link_revoked_title
-        notifyLink(linkId, context.getString(title), text, launch)
     }
 
-    override fun notifyContactLost(linkId: String, seniorName: String?) {
+    override fun notifyContactLost(linkId: String, phone: PhoneName) {
         val launch = launchIntent() ?: return
         launch.putExtra(EXTRA_OPEN_FAMILY, true)
         launch.data = notificationUri("contact-lost", linkId)
-        val name = seniorNameOrFallback(seniorName)
         notifyLink(
             linkId,
-            context.getString(R.string.core_notifications_contact_lost_title, name),
-            context.getString(R.string.core_notifications_contact_lost_text, name),
+            context.getString(R.string.core_notifications_contact_lost_title, phoneLabel(phone)),
+            context.getString(R.string.core_notifications_contact_lost_text),
             launch,
         )
     }
 
+    // 보호자 문구는 공공·기업 앱처럼 짧게: 제목 "{폰} 확인 필요", 본문 "{앱}, 오늘 광고 12회" (ux-flows §6). 조사가 붙지 않는다
     override fun notifyGuardianAlert(message: GuardianAlertMessage) {
-        val senior = seniorNameOrFallback(message.seniorName)
+        val phone = phoneLabel(message.phone)
         val app = message.appLabel?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_app_fallback)
-        val dayCount = message.symptomCount
         val title: String
         val text: String
         when (message.kind) {
             GuardianAlertKind.REMINDER -> {
                 title = context.getString(R.string.core_notifications_guardian_reminder_title)
-                text = context.getString(R.string.core_notifications_guardian_reminder_text, app, senior)
+                text = context.getString(R.string.core_notifications_guardian_reminder_text, phone, app)
             }
             GuardianAlertKind.CREATED, GuardianAlertKind.NOTICE -> {
                 val allowed = message.kind == GuardianAlertKind.NOTICE
-                title = context.getString(if (allowed) R.string.core_notifications_guardian_notice_title else R.string.core_notifications_alert_title)
+                title = context.getString(
+                    if (allowed) R.string.core_notifications_guardian_notice_title else R.string.core_notifications_guardian_alert_title,
+                    phone,
+                )
+                val count = message.symptomCount
+                val date = message.symptomDate
                 text = when {
                     // 설치 시점 판정만 있으면 횟수가 없다
-                    dayCount == null ->
-                        context.getString(R.string.core_notifications_guardian_installed_text, senior, app)
-                    else -> {
-                        val subject = Josa.iGa(app)
-                        val date = message.symptomDate
-                        val base = if (date == null || date == LocalDate.now()) {
-                            context.getString(R.string.core_notifications_guardian_symptom_today, senior, subject, dayCount)
-                        } else {
-                            context.getString(R.string.core_notifications_guardian_symptom_date, senior, subject, date.monthValue, date.dayOfMonth, dayCount)
-                        }
-                        if (allowed) context.getString(R.string.core_notifications_guardian_notice_prefix, base) else base
-                    }
+                    count == null -> context.getString(R.string.core_notifications_guardian_installed_text, app)
+                    date == null || date == LocalDate.now() -> context.getString(R.string.core_notifications_guardian_symptom_today, app, count)
+                    else -> context.getString(R.string.core_notifications_guardian_symptom_date, app, date.monthValue, date.dayOfMonth, count)
                 }
             }
         }
@@ -275,18 +282,23 @@ class SystemNotifier @Inject constructor(
         notifyRequest(message.alertId, "request-${message.kind.name.lowercase()}", channel, title, text, high = message.kind != GuardianAlertKind.NOTICE)
     }
 
-    override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) {
-        val senior = seniorNameOrFallback(seniorName)
+    override fun notifyAlertResolved(alertId: String, outcome: String?, phone: PhoneName, appLabel: String?) {
         val app = appLabel?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_app_fallback)
-        val text = when (outcome) {
-            "uninstalled" -> context.getString(R.string.core_notifications_resolved_uninstalled, senior, Josa.eulReul(app))
-            "declined" -> context.getString(R.string.core_notifications_resolved_declined, senior, Josa.eulReul(app))
-            "already_removed" -> context.getString(R.string.core_notifications_resolved_already_removed, Josa.eunNeun(app))
-            "allowed" -> context.getString(R.string.core_notifications_resolved_allowed, Josa.eunNeun(app))
-            "suspended" -> context.getString(R.string.core_notifications_resolved_suspended, senior, Josa.eulReul(app))
-            else -> context.getString(R.string.core_notifications_resolved_other, Josa.eunNeun(app))
-        }
-        notifyRequest(alertId, "request-resolved", CHANNEL_RESULT, context.getString(R.string.core_notifications_resolved_title), text, high = false)
+        val text = context.getString(
+            when (outcome) {
+                "uninstalled" -> R.string.core_notifications_resolved_uninstalled
+                "declined" -> R.string.core_notifications_resolved_declined
+                "already_removed" -> R.string.core_notifications_resolved_already_removed
+                "allowed" -> R.string.core_notifications_resolved_allowed
+                "suspended" -> R.string.core_notifications_resolved_suspended
+                else -> R.string.core_notifications_resolved_other
+            },
+            app,
+        )
+        notifyRequest(
+            alertId, "request-resolved", CHANNEL_RESULT,
+            context.getString(R.string.core_notifications_resolved_title, phoneLabel(phone)), text, high = false,
+        )
     }
 
     override fun cancelGuardianAlert(alertId: String) {
@@ -388,8 +400,12 @@ class SystemNotifier @Inject constructor(
     private fun nameOrFallback(name: String?): String =
         name?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_family_fallback)
 
-    private fun seniorNameOrFallback(name: String?): String =
-        name?.trim()?.ifEmpty { null } ?: context.getString(R.string.core_notifications_senior_fallback)
+    /** 상대 폰 이름 (ux-flows §2): "엄마 폰" / "김영희님 폰" / "연결한 폰". 역할 이름을 대신 넣지 않는다 */
+    private fun phoneLabel(phone: PhoneName): String = when (phone) {
+        is PhoneName.Chosen -> context.getString(R.string.core_notifications_phone_chosen, phone.name)
+        is PhoneName.Own -> context.getString(R.string.core_notifications_phone_own, phone.name)
+        PhoneName.Unnamed -> context.getString(R.string.core_notifications_phone_unnamed)
+    }
 
     /** 연결 알림은 연결마다 하나. 같은 연결의 새 알림(요청 → 끊김)은 앞 알림을 바꾼다 */
     private fun notifyLink(linkId: String, title: String, text: String, launch: Intent) {

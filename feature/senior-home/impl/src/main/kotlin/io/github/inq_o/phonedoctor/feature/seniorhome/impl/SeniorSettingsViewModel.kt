@@ -29,7 +29,7 @@ data class SeniorSettingsUiState(
     val familyAvailable: Boolean,
     /** 사이트 광고 알림(US10)을 쓰는 빌드 */
     val siteAlertsAvailable: Boolean = SiteAlertsFeature.ENABLED,
-    /** 가족에게 보이는 이름. 정하지 않았으면 null ("부모님") */
+    /** 가족에게 보이는 이름. 정하지 않았으면 null (가족 폰에는 가족이 정한 이름이나 "연결한 폰") */
     val displayName: String? = null,
     val working: Boolean = false,
     val result: SettingsResult? = null,

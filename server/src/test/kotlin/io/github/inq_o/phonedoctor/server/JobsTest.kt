@@ -163,7 +163,7 @@ class ContactLostTest {
         val push = FakePusher.sent.single()
         assertEquals("fcm-guardian1", push.token)
         assertEquals("CONTACT_LOST", push.data["type"])
-        assertEquals("부모님", push.data["protectedName"])
+        assertEquals("", push.data["protectedName"])
         clock.instant = clock.instant.plus(Duration.ofHours(12))
         assertEquals(0, ticked().n("contactLost"))
 

@@ -7,6 +7,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
+import io.github.inq_o.phonedoctor.core.data.PhoneNameRepository
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.notifications.Notifier
 import kotlinx.coroutines.CancellationException
@@ -40,6 +41,7 @@ class LinkWaitingViewModel @AssistedInject constructor(
     @Assisted("seniorName") seniorName: String,
     private val family: FamilyRepository,
     private val notifier: Notifier,
+    private val phoneNames: PhoneNameRepository,
 ) : ViewModel() {
     private val state = MutableStateFlow<LinkWaitingUiState>(LinkWaitingUiState.Waiting(seniorName))
     val uiState: StateFlow<LinkWaitingUiState> = state.asStateFlow()
@@ -54,6 +56,14 @@ class LinkWaitingViewModel @AssistedInject constructor(
                 if (state.value !is LinkWaitingUiState.Waiting) break
                 delay(POLL_INTERVAL_MS)
             }
+        }
+    }
+
+    /** O-G4: 연결된 뒤 고른 표시 이름을 이 폰에 저장 (null이면 건너뜀). 저장한 뒤 [onDone] */
+    fun saveName(name: String?, onDone: () -> Unit) {
+        viewModelScope.launch {
+            if (name != null) phoneNames.setChosenName(linkId, name)
+            onDone()
         }
     }
 

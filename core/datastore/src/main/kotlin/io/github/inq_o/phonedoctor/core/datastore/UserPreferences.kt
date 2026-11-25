@@ -72,7 +72,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         store.edit { if (version == null) it.remove(REPORTED_APP_VERSION) else it[REPORTED_APP_VERSION] = version }
     }
 
-    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어 "부모님", 보호자 Google 이름) */
+    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어는 빈 값, 보호자는 Google 이름) */
     val displayName: Flow<String?> = store.data.map { it[DISPLAY_NAME] }
 
     suspend fun setDisplayName(name: String?) {
@@ -142,6 +142,30 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
         return added
     }
 
+    /**
+     * (보호자) 상대 폰 표시 이름: 연결 ID → 보호자가 고른 이름 (ux-flows §2). 이 폰에만 두고 서버로 보내지 않는다.
+     * 키마다 하나: "phoneName." + 연결 ID
+     */
+    val phoneNames: Flow<Map<String, String>> = store.data.map { prefs ->
+        prefs.asMap().mapNotNull { (key, value) ->
+            val linkId = key.name.removePrefix(PHONE_NAME_PREFIX).takeIf { key.name.startsWith(PHONE_NAME_PREFIX) }
+            (value as? String)?.let { name -> linkId?.let { it to name } }
+        }.toMap()
+    }
+
+    /** [name]이 null이거나 비었으면 지운다 */
+    suspend fun setPhoneName(linkId: String, name: String?) {
+        val key = stringPreferencesKey(PHONE_NAME_PREFIX + linkId)
+        store.edit { if (name.isNullOrBlank()) it.remove(key) else it[key] = name.trim() }
+    }
+
+    /** 모든 데이터 지우기: 표시 이름도 이 폰의 데이터다 */
+    suspend fun clearPhoneNames() {
+        store.edit { prefs ->
+            prefs.asMap().keys.filter { it.name.startsWith(PHONE_NAME_PREFIX) }.forEach { prefs.remove(it) }
+        }
+    }
+
     suspend fun clearChosenRole() {
         store.edit { it.remove(CHOSEN_ROLE) }
     }
@@ -155,6 +179,7 @@ class UserPreferences @Inject constructor(private val store: DataStore<Preferenc
     }
 
     private companion object {
+        const val PHONE_NAME_PREFIX = "phoneName."
         val ONBOARDING_DONE = booleanPreferencesKey("onboardingDone")
         val DISCLOSURE_VERSION = intPreferencesKey("disclosureAcceptedVersion")
         val DEVICE_ID = stringPreferencesKey("deviceId")

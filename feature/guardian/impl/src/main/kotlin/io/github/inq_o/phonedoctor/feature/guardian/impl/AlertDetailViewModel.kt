@@ -105,7 +105,7 @@ class AlertDetailViewModel @AssistedInject constructor(
     fun decide(decision: FamilyDecision) {
         val ready = state.value as? AlertDetailUiState.Ready ?: return
         if (ready.sending != null || !ready.canAnswer) return
-        // 알림 전용(이미 허용한 앱)에는 [괜찮은 앱이에요]가 없다 (서버도 400)
+        // 알림 전용(이미 허용한 앱)에는 [허용]가 없다 (서버도 400)
         if (ready.alert.notice && decision == FamilyDecision.ALLOW) return
         loading?.cancel()
         state.value = ready.copy(sending = decision, error = null)

@@ -21,7 +21,6 @@ import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.FamilyOutcome
 import io.github.inq_o.phonedoctor.core.model.FamilySymptom
-import io.github.inq_o.phonedoctor.core.model.Josa
 import java.time.LocalDate
 
 /** 증상 근거 한 줄: "오늘 광고 12번" / "10월 23일 광고 12번". 근거 날짜가 오늘일 때만 "오늘" (ux-flows "오늘" 표기 규칙) */
@@ -40,17 +39,18 @@ internal fun evidenceLine(symptom: FamilySymptom?): String {
 @Composable
 internal fun statusLine(alert: FamilyAlert): String {
     val answer = alert.answer
-    val senior = seniorName(alert.seniorName)
-    val app = alert.appLabel
+    // 결과는 짧은 명사 (ux-flows §6 보호자 문구). 앱 이름과 폰은 같은 줄·화면에 이미 있다
     return when {
-        alert.outcome != null -> when (alert.outcome) {
-            FamilyOutcome.UNINSTALLED -> stringResource(R.string.feature_guardian_impl_outcome_uninstalled, senior, Josa.eulReul(app))
-            FamilyOutcome.DECLINED -> stringResource(R.string.feature_guardian_impl_outcome_declined, senior, Josa.eulReul(app))
-            FamilyOutcome.ALREADY_REMOVED -> stringResource(R.string.feature_guardian_impl_outcome_already_removed, Josa.eunNeun(app))
-            FamilyOutcome.ALLOWED -> stringResource(R.string.feature_guardian_impl_outcome_allowed, Josa.eunNeun(app))
-            FamilyOutcome.SUSPENDED -> stringResource(R.string.feature_guardian_impl_outcome_suspended, senior, Josa.eulReul(app))
-            else -> stringResource(R.string.feature_guardian_impl_outcome_other)
-        }
+        alert.outcome != null -> stringResource(
+            when (alert.outcome) {
+                FamilyOutcome.UNINSTALLED -> R.string.feature_guardian_impl_outcome_uninstalled
+                FamilyOutcome.DECLINED -> R.string.feature_guardian_impl_outcome_declined
+                FamilyOutcome.ALREADY_REMOVED -> R.string.feature_guardian_impl_outcome_already_removed
+                FamilyOutcome.ALLOWED -> R.string.feature_guardian_impl_outcome_allowed
+                FamilyOutcome.SUSPENDED -> R.string.feature_guardian_impl_outcome_suspended
+                else -> R.string.feature_guardian_impl_outcome_other
+            },
+        )
         answer != null -> stringResource(
             if (answer.decision == FamilyDecision.RECOMMEND_UNINSTALL) {
                 R.string.feature_guardian_impl_answer_uninstall
@@ -76,12 +76,12 @@ internal fun AlertCard(alert: FamilyAlert, onClick: () -> Unit) {
             Text(alert.appLabel, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                stringResource(R.string.feature_guardian_impl_alert_where, seniorName(alert.seniorName), evidenceLine(alert.symptom)),
+                stringResource(R.string.feature_guardian_impl_alert_where, phoneName(alert.linkIds.firstOrNull(), alert.seniorName), evidenceLine(alert.symptom)),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                if (alert.notice) stringResource(R.string.feature_guardian_impl_alert_warning_app) + " · " + statusLine(alert) else statusLine(alert),
+                if (alert.notice) stringResource(R.string.feature_guardian_impl_alert_warning_app) + ", " + statusLine(alert) else statusLine(alert),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
             )

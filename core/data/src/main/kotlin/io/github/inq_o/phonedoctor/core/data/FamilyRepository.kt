@@ -62,7 +62,7 @@ interface FamilyRepository {
     /** 연결 끊기 (F4). 시니어·보호자 모두 */
     suspend fun revokeLink(linkId: String)
 
-    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어 "부모님", 보호자 Google 이름) */
+    /** 가족에게 보이는 이 폰의 이름. 정하지 않았으면 null (서버 기본: 시니어는 빈 값, 보호자는 Google 이름) */
     val displayName: Flow<String?>
 
     /** 이름을 바꾼다 (1~20자). 등록한 폰이면 서버에도 바로 보낸다. 등록 전이면 등록할 때 함께 보낸다 */
@@ -311,6 +311,8 @@ internal class DefaultFamilyRepository @Inject constructor(
         preferences.setDisplayName(null)
         preferences.setNotifyCaution(false)
         preferences.clearFalsePositiveState()
+        // 보호자가 고른 상대 폰 표시 이름도 이 폰의 데이터다
+        preferences.clearPhoneNames()
         if (!touchedServer) return
         pushTokens.setAutoRefresh(false)
         pushTokens.delete()

@@ -88,14 +88,14 @@ internal class FakeNotifier : Notifier {
     override fun cancelAlert(alertId: Long) = Unit
     override fun notifyDecision(alert: SymptomAlert, decision: FamilyDecision, guardianName: String?) = Unit
     override fun notifyLinkRequested(linkId: String, guardianName: String?) = Unit
-    override fun notifyLinkRevoked(linkId: String, guardianName: String?, seniorName: String?) = Unit
-    override fun notifyLinkActivated(linkId: String, seniorName: String?) = Unit
+    override fun notifyLinkRevoked(linkId: String, guardianName: String?, phone: io.github.inq_o.phonedoctor.core.model.PhoneName?) = Unit
+    override fun notifyLinkActivated(linkId: String, phone: io.github.inq_o.phonedoctor.core.model.PhoneName) = Unit
     override fun cancelLink(linkId: String) {
         cancelledLinks += linkId
     }
-    override fun notifyContactLost(linkId: String, seniorName: String?) = Unit
+    override fun notifyContactLost(linkId: String, phone: io.github.inq_o.phonedoctor.core.model.PhoneName) = Unit
     override fun notifyGuardianAlert(message: GuardianAlertMessage) = Unit
-    override fun notifyAlertResolved(alertId: String, outcome: String?, seniorName: String?, appLabel: String?) = Unit
+    override fun notifyAlertResolved(alertId: String, outcome: String?, phone: io.github.inq_o.phonedoctor.core.model.PhoneName, appLabel: String?) = Unit
     override fun cancelGuardianAlert(alertId: String) = Unit
     override fun notifySiteAds(alert: io.github.inq_o.phonedoctor.core.model.SiteAlert, stillOn: Boolean) = Unit
     override fun cancelSite(site: String) = Unit

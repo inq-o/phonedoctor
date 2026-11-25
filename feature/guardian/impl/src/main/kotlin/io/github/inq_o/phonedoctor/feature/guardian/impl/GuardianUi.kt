@@ -1,11 +1,15 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -13,11 +17,22 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.lifecycle.HiltViewModel
+import io.github.inq_o.phonedoctor.core.data.PhoneNameRepository
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
+import io.github.inq_o.phonedoctor.core.model.PhoneName
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.network.NotSignedInException
 import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
 import java.io.IOException
+import javax.inject.Inject
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.stateIn
 
 /** 화면이 안내할 실패 종류 (목록·연결 끊기) */
 enum class GuardianError { NETWORK, APP_CHECK, BUSY, WRONG_ROLE, SIGNED_OUT, UNKNOWN }
@@ -51,13 +66,33 @@ internal fun GuardianError.message(): String = stringResource(
     },
 )
 
+/** 보호자가 이 폰에 정해 둔 상대 폰 표시 이름 (연결 ID → 이름). 보호자 화면 묶음([ProvidePhoneNames])이 채운다 */
+internal val LocalChosenPhoneNames = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
+
 /**
- * 시니어 표시 이름. 비었으면 "부모님". 문장에서는 "님"을 붙이지 않고 "엄마 폰"처럼 쓴다
- * (서버의 기본 이름이 "부모님"이라 "부모님님"이 되지 않게)
+ * 상대 폰 이름 (ux-flows §2): "엄마 폰"(보호자가 고른 이름) / "김영희님 폰"(상대가 정한 이름) / "연결한 폰".
+ * 역할 이름을 대신 넣지 않는다. 연결 전처럼 이름을 모를 때는 [unnamed]("상대 폰")
  */
 @Composable
-internal fun seniorName(name: String): String =
-    name.trim().ifEmpty { stringResource(R.string.feature_guardian_impl_senior_fallback) }
+internal fun phoneName(linkId: String?, own: String, @StringRes unnamed: Int = R.string.feature_guardian_impl_phone_unnamed): String =
+    when (val name = PhoneName.of(linkId?.let { LocalChosenPhoneNames.current[it] }, own)) {
+        is PhoneName.Chosen -> stringResource(R.string.feature_guardian_impl_phone_chosen, name.name)
+        is PhoneName.Own -> stringResource(R.string.feature_guardian_impl_phone_own, name.name)
+        PhoneName.Unnamed -> stringResource(unnamed)
+    }
+
+/** 보호자 화면마다 감싸 표시 이름을 내려 준다 */
+@Composable
+fun ProvidePhoneNames(viewModel: PhoneNamesViewModel = hiltViewModel(), content: @Composable () -> Unit) {
+    val names by viewModel.names.collectAsStateWithLifecycle()
+    CompositionLocalProvider(LocalChosenPhoneNames provides names, content = content)
+}
+
+@HiltViewModel
+class PhoneNamesViewModel @Inject constructor(repository: PhoneNameRepository) : ViewModel() {
+    val names: StateFlow<Map<String, String>> =
+        repository.chosenNames.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+}
 
 /** 상태 문장 (22sp). [announce]면 바뀔 때 화면 낭독이 읽어 준다 */
 @Composable

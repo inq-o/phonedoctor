@@ -80,7 +80,8 @@ data class Device(
 )
 
 private const val NAME_MAX = 20
-private const val SENIOR_DEFAULT_NAME = "부모님"
+/** 시니어는 기본 이름 없음: 보호자 화면이 보호자가 고른 표시 이름이나 "연결한 폰"으로 보인다 (ux-flows §2) */
+private const val SENIOR_DEFAULT_NAME = ""
 private const val GUARDIAN_DEFAULT_NAME = "보호자"
 
 fun ResultRow.toDevice() = Device(

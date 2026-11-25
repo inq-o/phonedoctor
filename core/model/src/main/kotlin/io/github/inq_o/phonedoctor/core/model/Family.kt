@@ -69,6 +69,8 @@ data class FamilyAlert(
     val outcome: FamilyOutcome?,
     val createdAt: Instant,
     val updatedAt: Instant,
+    /** 이 보호자가 이 요청을 받은 연결 (openapi Alert.linkIds). 보호자가 고른 표시 이름을 찾을 때 쓴다 */
+    val linkIds: List<String> = emptyList(),
 ) {
     /** 아직 아무도 답하지 않아 이 보호자가 답할 수 있음 */
     val answerable: Boolean get() = status == FamilyAlertStatus.OPEN && answer == null

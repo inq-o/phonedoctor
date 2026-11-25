@@ -19,9 +19,9 @@ import javax.inject.Inject
 
 data class GuardianSettingsUiState(
     val notifyCaution: Boolean = false,
-    /** [괜찮은 앱이에요]로 답한 앱을 익명으로 알리기 (US7) */
+    /** [허용]로 답한 앱을 익명으로 알리기 (US7) */
     val falsePositiveFeedback: Boolean = true,
-    /** 부모님 폰에 보이는 내 이름. 정하지 않았으면 null (Google 계정 이름) */
+    /** 상대 폰에 보이는 내 이름. 정하지 않았으면 null (Google 계정 이름) */
     val displayName: String? = null,
     val working: Boolean = false,
     val saved: Boolean = false,

@@ -121,11 +121,10 @@ internal fun SeniorSettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (state.familyAvailable) {
                 Section(stringResource(R.string.feature_senior_home_impl_settings_name_title)) {
+                    // 정하지 않았으면 가족 폰에는 가족이 정한 이름이나 "연결한 폰"으로 보인다 (역할 이름 기본값 없음, ux-flows §2)
                     Body(
-                        stringResource(
-                            R.string.feature_senior_home_impl_settings_name_body,
-                            state.displayName ?: stringResource(R.string.feature_senior_home_impl_settings_name_default),
-                        ),
+                        state.displayName?.let { stringResource(R.string.feature_senior_home_impl_settings_name_body, it) }
+                            ?: stringResource(R.string.feature_senior_home_impl_settings_name_unset),
                     )
                     PdOutlinedButton(stringResource(R.string.feature_senior_home_impl_settings_name_change), { renaming = true }, enabled = !state.working)
                 }

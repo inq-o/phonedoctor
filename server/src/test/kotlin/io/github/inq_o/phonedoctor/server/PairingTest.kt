@@ -111,7 +111,7 @@ class AcceptCodeTest {
         val link = r.contract("Link")
         assertEquals("pending", link.str("status"))
         assertEquals(seniorId, link["protectedDevice"]!!.jsonObject.str("deviceId"))
-        assertEquals("부모님", link["protectedDevice"]!!.jsonObject.str("displayName"))
+        assertEquals("", link["protectedDevice"]!!.jsonObject.str("displayName"))
         assertEquals(guardianId, link["guardianDevice"]!!.jsonObject.str("deviceId"))
         assertEquals("김보호", link["guardianDevice"]!!.jsonObject.str("displayName"))
         val push = FakePusher.sent.single()
@@ -233,7 +233,7 @@ class ConfirmLinkTest {
         assertEquals(clock.instant.toString(), link.str("activatedAt"))
         val push = FakePusher.sent.last()
         assertEquals("fcm-guardian1", push.token)
-        assertEquals(mapOf("v" to "1", "type" to "LINK_ACTIVATED", "linkId" to linkId, "protectedName" to "부모님"), push.data)
+        assertEquals(mapOf("v" to "1", "type" to "LINK_ACTIVATED", "linkId" to linkId, "protectedName" to ""), push.data)
 
         // 응답을 못 받아 새 키로 다시 보내도 200, 푸시는 다시 안 감
         val again = client.api(Post, "/links/$linkId/confirm", SENIOR)
@@ -316,7 +316,7 @@ class RevokeLinkTest {
         assertEquals(HttpStatusCode.NoContent, client.api(Delete, "/links/$linkId", SENIOR).status)
         val push = FakePusher.sent.last()
         assertEquals("fcm-guardian1", push.token)
-        assertEquals(mapOf("v" to "1", "type" to "LINK_REVOKED", "linkId" to linkId, "protectedName" to "부모님"), push.data)
+        assertEquals(mapOf("v" to "1", "type" to "LINK_REVOKED", "linkId" to linkId, "protectedName" to ""), push.data)
         assertEquals(false, push.high)
         assertEquals(HttpStatusCode.NoContent, client.api(Delete, "/links/$linkId", SENIOR).status)
         assertEquals(1, FakePusher.types().count { it == "LINK_REVOKED" })

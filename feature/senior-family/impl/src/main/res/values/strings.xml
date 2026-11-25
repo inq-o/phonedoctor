@@ -9,7 +9,7 @@
     <string name="feature_senior_family_impl_error_network">인터넷에 연결되지 않았어요. 와이파이나 데이터를 켜고 다시 해 주세요.</string>
     <string name="feature_senior_family_impl_error_app_check">폰주치의 서버가 이 폰을 확인하지 못했어요. 잠시 뒤에 다시 해 주세요.</string>
     <string name="feature_senior_family_impl_error_busy">지금은 연결할 수 없어요. 잠시 뒤에 다시 해 주세요.</string>
-    <string name="feature_senior_family_impl_error_role">이 폰은 가족 폰을 지키는 폰으로 등록돼 있어요. 부모님 폰에서 코드를 받아 주세요.</string>
+    <string name="feature_senior_family_impl_error_role">이 폰은 가족 폰을 지키는 폰으로 등록돼 있어요. 이 폰에서는 코드를 받을 수 없어요.</string>
     <string name="feature_senior_family_impl_error_unknown">문제가 생겨 하지 못했어요. 잠시 뒤에 다시 해 주세요.</string>
 
     <!-- O-S4 연결 코드 -->
