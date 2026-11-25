@@ -21,6 +21,7 @@ import io.github.inq_o.phonedoctor.core.model.DeviceRole
 import io.github.inq_o.phonedoctor.core.model.FamilyDecision
 import io.github.inq_o.phonedoctor.core.model.SymptomAlert
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
 import io.github.inq_o.phonedoctor.core.network.PhoneDoctorNetworkDataSource
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlert
 import io.github.inq_o.phonedoctor.core.network.model.NetworkAlertCreate
@@ -51,7 +52,11 @@ import kotlinx.coroutines.sync.withLock
 
 /** 가족 서버로 보낼 일을 WorkManager에 맡긴다 (sync:work). 가족 연결이 꺼진 빌드는 아무것도 하지 않는다 */
 fun interface FamilySyncScheduler {
-    fun schedule()
+    /**
+     * [urgent]: 보낼 것이 새로 생김(새 확인 요청, 처리 결과, 새 연결) → 재시도 대기 중이어도 바로 보낸다.
+     * 아니면(주기 검사) 기다리는 작업을 그대로 두되, 대기가 너무 길어졌을 때만 다시 시작한다 (서버를 검사마다 두드리지 않게)
+     */
+    fun schedule(urgent: Boolean)
 }
 
 /** 시니어 폰의 보호 상태. 보호자가 "보호가 멈췄는지" 알 수 있게 6시간마다 알린다 (ux-flows F6) */
@@ -138,7 +143,8 @@ internal class DefaultFamilyAlertSync @Inject constructor(
             } catch (e: ApiException) {
                 if (e.status == 403 && e.slug == "device-not-registered") {
                     deviceGone = true
-                } else if (e.status == 429 || e.status >= 500) {
+                } else if (e.status == 429 || e.status >= 500 || e.isAppCheckFailure()) {
+                    // App Check 거절(401)은 서버의 일시적 문제(JWKS 못 받음)일 수도 있어 다시 시도한다
                     complete = false
                 } else {
                     Log.w(TAG, "가족 동기화 거절: ${e.message}")
@@ -230,19 +236,19 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         if (installedApps.identity(row.packageName) != AppIdentity(row.packageName, row.signingCertSha256, row.versionCode)) return
         if (!strongMode.suspend(row.packageName)) return
         alertDao.setOutcome(row.id, AlertStatus.RESOLVED.name, AlertOutcome.SUSPENDED.name, now())
-        scheduler.schedule()
+        scheduler.schedule(urgent = true)
     }
 
     override suspend fun onLinkConfirmed() {
         linked = true
         linkedCheckedAt = now()
         alertDao.markOpenForSync()
-        scheduler.schedule()
+        scheduler.schedule(urgent = true)
     }
 
     override suspend fun onLinkRevoked() {
         linked = null
-        scheduler.schedule()
+        scheduler.schedule(urgent = true)
     }
 
     override suspend fun onDataDeleted() {
@@ -324,7 +330,7 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                     // 받을 보호자가 없음(모두 끊김). 새 근거가 생기거나 새로 연결되면 다시 보낸다
                     e.status == 409 && (e.slug == "no-active-link" || e.slug == "no-recipient") -> alertDao.setPendingKey(row.id, null, null, null)
                     // 다시 보내도 같은 거절 (형식 오류 등). 매 검사마다 되풀이하지 않는다
-                    e.status in 400..499 && e.status != 429 && !(e.status == 403 && e.slug == "device-not-registered") -> {
+                    e.status in 400..499 && e.status != 429 && !(e.status == 403 && e.slug == "device-not-registered") && !e.isAppCheckFailure() -> {
                         Log.w(TAG, "요청 보내기 거절: ${e.message}")
                         alertDao.setPendingKey(row.id, null, null, null)
                         alertDao.clearNeedsSync(row.id, row.updatedAt)
@@ -365,7 +371,7 @@ internal class DefaultFamilyAlertSync @Inject constructor(
             alertDao.setServerStatus(row.id, SERVER_RESOLVED)
         } catch (e: ApiException) {
             // 응답과 안 맞거나 이미 끝난 요청 등 4xx: 다시 보내도 같다
-            if (e.status !in 400..499 || e.status == 429 || (e.status == 403 && e.slug == "device-not-registered")) throw e
+            if (e.status !in 400..499 || e.status == 429 || (e.status == 403 && e.slug == "device-not-registered") || e.isAppCheckFailure()) throw e
         }
         alertDao.markOutcomeSent(row.id)
     }

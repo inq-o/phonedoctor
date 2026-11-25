@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import io.github.inq_o.phonedoctor.core.data.DISPLAY_NAME_MAX
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
 import io.github.inq_o.phonedoctor.core.packages.InstalledApps
 import io.github.inq_o.phonedoctor.core.packages.StrongMode
 import io.github.inq_o.phonedoctor.feature.seniorsites.api.SiteAlertsFeature
@@ -21,7 +22,7 @@ import java.io.IOException
 import javax.inject.Inject
 
 /** 설정에서 한 일의 결과 */
-enum class SettingsResult { NAME_SAVED, DELETED, NETWORK, BUSY, FAILED }
+enum class SettingsResult { NAME_SAVED, DELETED, NETWORK, APP_CHECK, BUSY, FAILED }
 
 data class SeniorSettingsUiState(
     /** 가족 연결을 쓸 수 있는 빌드 (이름·가족·지우기를 보인다) */
@@ -112,9 +113,14 @@ class SeniorSettingsViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: IOException) {
-                SettingsResult.NETWORK
+                // 망 문제가 아닌 App Check 실패는 "인터넷 없음"과 따로 안내한다
+                if (e.isAppCheckFailure()) SettingsResult.APP_CHECK else SettingsResult.NETWORK
             } catch (e: ApiException) {
-                if (e.status == 429 || e.status >= 500) SettingsResult.BUSY else SettingsResult.FAILED
+                when {
+                    e.isAppCheckFailure() -> SettingsResult.APP_CHECK
+                    e.status == 429 || e.status >= 500 -> SettingsResult.BUSY
+                    else -> SettingsResult.FAILED
+                }
             } catch (e: Exception) {
                 SettingsResult.FAILED
             }

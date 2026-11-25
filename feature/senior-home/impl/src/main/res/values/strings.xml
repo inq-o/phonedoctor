@@ -30,6 +30,7 @@
     <string name="feature_senior_home_impl_settings_delete_dialog_body">연결한 가족과 모두 끊기고, 가족에게 보낸 요청도 지워져요. 다시 연결하려면 처음부터 연결해야 해요.</string>
     <string name="feature_senior_home_impl_settings_saved">이름을 바꿨어요</string>
     <string name="feature_senior_home_impl_settings_deleted">모두 지웠어요. 가족 연결이 모두 끊겼어요</string>
+    <string name="feature_senior_home_impl_settings_app_check">폰주치의 서버가 이 폰을 확인하지 못했어요. 잠시 뒤에 다시 해 주세요</string>
     <string name="feature_senior_home_impl_settings_network">인터넷에 연결되지 않았어요. 연결한 뒤 다시 해 주세요</string>
     <string name="feature_senior_home_impl_settings_busy">지금 서버가 바빠요. 잠시 뒤에 다시 해 주세요</string>
     <string name="feature_senior_home_impl_settings_failed">잘 안 됐어요. 잠시 뒤에 다시 해 주세요</string>
