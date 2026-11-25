@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
  *
  * [footer]는 홈 메뉴 칸처럼 아래쪽에 두지만 고정하지 않는 영역이다. 자리가 남으면 바닥에 붙고,
  * 글꼴을 키워 한 화면에 안 들어가면 위 내용 아래에 이어 붙어 같이 스크롤된다 (위 내용을 가리지 않음).
+ * 화면 루트로만 쓴다 (BoxWithConstraints라 IntrinsicSize 측정 안에 넣으면 예외).
  */
 @Composable
 fun SeniorScreen(
@@ -42,7 +43,7 @@ fun SeniorScreen(
                 Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, content = content)
                 if (footer != null) {
                     Column(
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         content = footer,
                     )

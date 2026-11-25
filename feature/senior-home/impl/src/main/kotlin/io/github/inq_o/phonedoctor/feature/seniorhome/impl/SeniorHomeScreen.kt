@@ -128,14 +128,12 @@ internal fun SeniorHomeScreen(
                 )
             }
         },
-        actions = if (state is SeniorHomeUiState.UsageAccessOff) {
-            { PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings) }
-        } else {
-            null
-        },
-        // 메뉴 칸 2×2는 아래쪽에 두되 고정하지 않는다: 큰 글꼴에서 위 상태·앱 카드를 가리지 않고 같이 스크롤 (원칙 8 예외).
-        // 상태가 바뀌어도 칸의 자리와 이름은 그대로, 채움만 바뀐다 (원칙 2)
+        // 누르는 영역(주요 버튼 + 메뉴 칸 2×2)은 아래쪽에 두되 고정하지 않는다: 큰 글꼴에서 위 상태·앱 카드를 가리지 않고 같이 스크롤 (§2 예외).
+        // [켜러 가기]는 메뉴 칸 위 (읽는 순서: 상태 문장 → 주요 버튼 → 나머지, §7). 칸의 자리와 이름은 상태가 바뀌어도 그대로 (원칙 2)
         footer = {
+            if (state is SeniorHomeUiState.UsageAccessOff) {
+                PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
+            }
             // 확인할 앱이 있으면 주요 행동은 위의 앱 카드, 광고 찾기가 꺼져 있으면 [켜러 가기]다 (한 화면에 주요 행동 하나).
             // 광고 찾기가 꺼져 있거나 불러오는 중이면 [살펴보기]는 눌러도 할 일이 없어 끈다 (자리와 이름은 그대로)
             run {
@@ -352,6 +350,14 @@ private fun FamilyPreview() {
 @Preview(showBackground = true, widthDp = 360, heightDp = 720)
 @Composable
 private fun AttentionPreview() {
+    PhoneDoctorTheme {
+        SeniorHomeScreen(SeniorHomeUiState.Ready(listOf(PreviewAlert), null, scanning = false, notificationsOn = true), {}, {}, {}, {})
+    }
+}
+
+@Preview(showBackground = true, widthDp = 360, heightDp = 720, fontScale = 2f)
+@Composable
+private fun AttentionLargeFontPreview() {
     PhoneDoctorTheme {
         SeniorHomeScreen(SeniorHomeUiState.Ready(listOf(PreviewAlert), null, scanning = false, notificationsOn = true), {}, {}, {}, {})
     }
