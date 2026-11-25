@@ -602,7 +602,7 @@ components:
         displayName:
           type: string
           maxLength: 20
-          description: 상대에게 보일 이름. 시니어 기본값 "부모님", 보호자 기본값은 Google 계정 이름
+          description: 상대에게 보일 이름. 시니어는 기본값 없음(빈 값, 보호자 화면은 "연결한 폰"으로 표시 — ux-flows §2), 보호자 기본값은 Google 계정 이름
         appVersionCode: { type: integer }
         sdkInt: { type: integer, description: Build.VERSION.SDK_INT }
         manufacturer: { type: string, description: 'Build.MANUFACTURER (FCM 지연 분석용)' }
