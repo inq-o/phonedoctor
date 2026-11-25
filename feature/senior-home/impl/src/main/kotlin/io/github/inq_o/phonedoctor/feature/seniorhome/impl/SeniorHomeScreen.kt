@@ -128,11 +128,14 @@ internal fun SeniorHomeScreen(
                 )
             }
         },
-        actions = {
-            // 누르는 건 아래 (원칙 8): 메뉴 칸 2×2. 상태가 바뀌어도 칸의 자리와 이름은 그대로, 채움만 바뀐다 (원칙 2)
-            if (state is SeniorHomeUiState.UsageAccessOff) {
-                PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings)
-            }
+        actions = if (state is SeniorHomeUiState.UsageAccessOff) {
+            { PdPrimaryButton(stringResource(R.string.feature_senior_home_impl_usage_open), onOpenUsageSettings) }
+        } else {
+            null
+        },
+        // 메뉴 칸 2×2는 아래쪽에 두되 고정하지 않는다: 큰 글꼴에서 위 상태·앱 카드를 가리지 않고 같이 스크롤 (원칙 8 예외).
+        // 상태가 바뀌어도 칸의 자리와 이름은 그대로, 채움만 바뀐다 (원칙 2)
+        footer = {
             // 확인할 앱이 있으면 주요 행동은 위의 앱 카드, 광고 찾기가 꺼져 있으면 [켜러 가기]다 (한 화면에 주요 행동 하나).
             // 광고 찾기가 꺼져 있거나 불러오는 중이면 [살펴보기]는 눌러도 할 일이 없어 끈다 (자리와 이름은 그대로)
             run {
