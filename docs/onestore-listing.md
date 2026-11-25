@@ -9,7 +9,7 @@
 | 개인정보처리방침 | "개인정보 처리방침을 공개하여야 하며" ([개인정보 보호·보안](https://onestore-dev.gitbook.io/dev/docs/review/one-store-review-guideline/undefined-2.md)) | [공개함](https://inq-o.github.io/phonedoctor/privacy-policy.html) | 충족 |
 | 접근권한 최소화 | "접근권한을 서비스에 필요한 범위 내로 최소화" (같은 곳). 권한별 제한 목록은 없고 "불필요한 퍼미션 허용은 검증에서 불이익" ([상품 FAQ](https://onestore-dev.gitbook.io/dev/help/faq/apps.md)) | 출시 빌드 권한 8개, 인터넷 권한 없음. 권한마다 아래 3절 설명을 붙임 | 충족(설명 필수) |
 | 법정 고지·동의 | 개인정보를 수집하면 항목·목적·보유기간·거부권을 알리고 명시적 동의 (개인정보 보호·보안) | 출시 빌드는 기기 밖 전송이 없음. 첫 설정에서 읽는 정보와 이유를 안내함 | 해당 없음(가족 연결을 켤 때 다시 점검) |
-| 수집정보 선언 | 기기 밖으로 전송·공유하면 "예" ([수집정보](https://onestore-dev.gitbook.io/dev/docs/apps/product/common-info/main-info/data.md)) | 출시 빌드는 "아니오" | 가족 연결을 켜는 판에서 "예"로 바꾸고 방침 URL 입력 |
+| 수집정보 선언 | 기기 밖으로 전송·공유하면 "예" ([수집정보](https://onestore-dev.gitbook.io/dev/docs/apps/product/common-info/main-info/data.md)) | 출시 빌드도 **"예"**: 원스토어는 기기 안에 저장하는 것도 "수집"으로 봄. 앱 활동 → 기타 기록(다른 앱이 화면에 뜬 기록·광고 횟수, 기기에만 저장), 목적은 앱 기능·사기 예방/보안. 나머지 유형·국외 이전은 "아니오" | 가족 연결을 켜는 판에서 기기 ID·서버 전송 항목을 더하고 방침 URL 입력 |
 | 악성행위·사용자 기만 | 스파이웨어, "사용자를 속이는 모든 코드 또는 행위"(피싱·사기광고) 금지 (개인정보 보호·보안) | 앱 삭제는 안드로이드 삭제 화면에서 사용자가 직접 확인. 겁주기 문구 없음 | 충족 |
 | 부적절한 광고 | "앱 영역을 벗어나거나 사용자의 불편을 초래하는 광고는 허용되지 않습니다" ([앱기능](https://onestore-dev.gitbook.io/dev/docs/review/one-store-review-guideline/undefined-7.md)) | 광고 없음 | 충족 |
 | 메타데이터 | 관련 없거나 오해의 소지가 있는 메타데이터 불가 ([상품 등록정보](https://onestore-dev.gitbook.io/dev/docs/review/one-store-review-guideline/undefined-5.md)) | 설명에 탐지율·"완벽 차단" 같은 표현을 쓰지 않음(4절) | 문구 점검 |
@@ -32,11 +32,11 @@
 | 대표 아이콘 | 512×512 JPG/PNG | `docs/onestore/icon-512.png` (앱 아이콘과 같은 모양) |
 | 그래픽 이미지 | 1024×578 JPG/PNG | `docs/onestore/graphic-1024x578.png` |
 | 스크린샷 | 2~8장, 1MB 이내, 1,300px 이하, 권장 세로 720×1280 | `docs/onestore/screenshot-1~4.png` (606×1280, 출시 빌드를 S10+에서 캡처: 확인 필요 홈, 앱 확인, 지운 뒤, 정상 홈) |
-| 키워드 | 1~10개 | 광고 앱, 광고 차단, 시니어, 부모님 폰, 휴대폰 검사, 앱 삭제, 광고 알림 |
+| 키워드 | 1~10개, 자동완성은 붙여 쓴 형태 | 광고앱, 광고차단, 시니어, 부모님폰, 휴대폰검사, 앱삭제, 광고알림 |
 | 권한설명 | 권한과 사용 목적, 설치 전 사용자에게 보임 | 3절 |
 | 연령등급 | IARC 설문 + 비게임은 "ONE store 앱 연령등급" 추가 ([연령등급](https://onestore-dev.gitbook.io/dev/docs/apps/product/common-info/age-rating.md)) | 전체이용가 예상(폭력·성적 내용·결제 없음) |
-| 판매자 정보 | 공식 E-mail·전화·웹사이트(필수 여부 미확인) | 메일은 방침과 같은 것, 웹사이트는 GitHub Pages |
-| 서명 | 5가지 중 선택 ([App 서명](https://onestore-dev.gitbook.io/dev/docs/apps/product/android/app-signing.md)) | **"ONE store 앱 서명 선택해제(서명한 APK 등록)"**: App Check에 등록할 SHA-256과 Android 개발자 인증의 키 소유권 증명이 우리 키 하나로 끝남. AAB로 한 번 바꾸면 APK로 못 돌아감 |
+| 판매자 정보 | 공식 E-mail·전화·웹사이트(필수 여부 미확인) | 판매자명·공식 메일·전화번호는 필수. 메일은 방침과 같은 것, 웹사이트(선택)는 레포 주소(GitHub Pages 첫 화면은 404) |
+| 서명 | 5가지 중 선택 ([App 서명](https://onestore-dev.gitbook.io/dev/docs/apps/product/android/app-signing.md)) | **"앱 서명 사용 안함(서명 키를 등록하지 않고 서명한 APK를 등록합니다.)"**(콘솔 표기, 2026-11-26): App Check에 등록할 SHA-256과 Android 개발자 인증의 키 소유권 증명이 우리 키 하나로 끝남. AAB로 한 번 바꾸면 APK로 못 돌아감 |
 
 ## 3. 권한설명 초안
 
@@ -120,9 +120,13 @@
 3. **ONEconsole**
    - [ ] 2단계 인증 켜기
    - [ ] 신규 상품 등록: 제목 "폰주치의", 패키지 `io.github.inq_o.phonedoctor`
-   - [ ] 앱 서명: **"ONE store 앱 서명 선택해제(서명한 APK 등록)"**
+   - [ ] 신규 바이너리: 유형 APK, 서명키 **"앱 서명 사용 안함"**. "Android 개발자 인증 대상 여부" 팝업은 닫으면 됨(5절)
    - [ ] 판매정보: 4절 한줄설명·상품설명, 3절 권한설명, 키워드, 아이콘·그래픽·스크린샷(`docs/onestore/`)
-   - [ ] 수집정보: 정보 수집·공유 "아니오"(출시 빌드는 인터넷 권한 없음), 개인정보처리방침 URL https://inq-o.github.io/phonedoctor/privacy-policy.html
-   - [ ] 연령등급 설문(전체이용가 예상)
-   - [ ] 바이너리 `app-release.apk` 등록 → 검증 요청
+   - [ ] 공통정보 > 기본정보: 상품유형 생활/위치 > 생산성, 지식재산권 "아니오", 정보 수집·공유 "예"(2절 수집정보 선언 줄), 외부결제 사용안함, Crypto 아니오, 개인정보처리방침 URL https://inq-o.github.io/phonedoctor/privacy-policy.html
+   - [ ] 연령등급: IARC 앱 유형 "다른 모든 앱 유형", 질문은 모두 "아니요"(전체이용가 예상)
+   - [ ] 바이너리 `app-release.apk` 등록
+   - [ ] 왼쪽 메뉴 "Android 검증요청": 배포 옵션 "즉시 적용", 검증 시 참고사항에 아래 글, 첨부파일 없음 → [검증요청]
+     ```
+     광고를 띄우는 앱을 찾아 알려 주는 앱입니다. 사용 기록 접근 권한은 첫 실행 안내에 따라 설정에서 켜야 검사됩니다. 모든 앱 조회는 광고를 띄운 앱의 이름·아이콘 표시, 앱 삭제 요청은 안드로이드 삭제 화면을 열 때만 씁니다. 인터넷 권한이 없어 수집한 정보는 기기 밖으로 나가지 않습니다. 광고 앱이 없으면 홈에 '지금은 확인할 앱이 없어요'가 정상 표시입니다.
+     ```
 4. (나중에) 릴리스 키 SHA-256을 Firebase에 등록(가족 연결을 출시 빌드에서 켤 때), 2027년 전 Android Developer Console 정식 배포 계정과 패키지 등록
