@@ -47,6 +47,7 @@ import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianScreen
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianSectionHeader
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusCircle
 import io.github.inq_o.phonedoctor.core.designsystem.component.StatusKind
+import io.github.inq_o.phonedoctor.core.designsystem.theme.LocalBadgeColors
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 import io.github.inq_o.phonedoctor.core.model.FamilyAlert
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
@@ -132,10 +133,11 @@ internal fun GuardianHomeScreen(
             }
         },
         contentPadding = 0.dp,
-        actions = {
-            if (state is GuardianHomeUiState.Failed) GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_retry), onRetry)
+        actions = when {
+            state is GuardianHomeUiState.Failed -> ({ GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_retry), onRetry) })
             // 연결된 폰이 없을 때만 [폰 연결]이 화면의 주요 행동 (연결이 있으면 목록의 "폰 추가 연결")
-            if (noLinks) GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_add_family), onAddFamily)
+            noLinks -> ({ GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_add_family), onAddFamily) })
+            else -> null
         },
     ) {
         if (!notificationsOn) {
@@ -298,7 +300,8 @@ private fun lastChecked(link: FamilyLink): String =
 
 @Composable
 private fun Warning(text: String) {
-    Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+    // 14sp 경고도 본문 7:1 (§7): 배지 실패 글자색(라이트 #7F1D1D)
+    Text(text, style = MaterialTheme.typography.bodyMedium, color = LocalBadgeColors.current.risk.ink, modifier = Modifier.padding(top = 8.dp))
 }
 
 @Composable

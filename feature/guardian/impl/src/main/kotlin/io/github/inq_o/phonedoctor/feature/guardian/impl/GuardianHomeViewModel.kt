@@ -80,7 +80,10 @@ class GuardianHomeViewModel @Inject constructor(
             val shown = visible(links)
             state.value = GuardianHomeUiState.Ready(
                 shown,
-                requests = loaded?.filter { it.answerable } ?: current?.requests.orEmpty(),
+                // 요청만 못 읽었으면 보이던 요청을 두되, 지금 보이는 연결로 받은 것만 (설정에서 끊은 폰의 요청이 남지 않게)
+                requests = loaded?.filter { it.answerable } ?: current?.requests.orEmpty().filter { r ->
+                    shown.any { it.link.status == LinkStatus.ACTIVE && it.link.linkId in r.linkIds }
+                },
                 // 연결이 있으면 지난 요청(답한 것·알림 전용·끝난 것)을 볼 수 있다
                 hasHistory = shown.any { it.link.status == LinkStatus.ACTIVE },
             )

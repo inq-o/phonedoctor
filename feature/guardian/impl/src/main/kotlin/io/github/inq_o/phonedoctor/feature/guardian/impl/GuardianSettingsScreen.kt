@@ -30,7 +30,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -44,6 +47,7 @@ import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianRowDivide
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianScreen
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianSectionHeader
 import io.github.inq_o.phonedoctor.core.designsystem.theme.GuardianTheme
+import io.github.inq_o.phonedoctor.core.designsystem.theme.LocalBadgeColors
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
@@ -129,9 +133,7 @@ internal fun GuardianSettingsScreen(
         backLabel = stringResource(R.string.feature_guardian_impl_back),
         contentPadding = 0.dp,
         modifier = modifier,
-        actions = {
-            if (state.needsReauth) GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_settings_reauth), onReauth, enabled = !state.working)
-        },
+        actions = if (state.needsReauth) ({ GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_settings_reauth), onReauth, enabled = !state.working) }) else null,
     ) {
         Column(Modifier.padding(horizontal = 16.dp)) {
             state.error?.let { ErrorText(it.message()) }
@@ -141,7 +143,12 @@ internal fun GuardianSettingsScreen(
             state.linkMessage?.let { m ->
                 val name = phoneName(m.linkId, m.seniorName)
                 if (m.error == null) {
-                    Body(stringResource(if (m.wasPending) R.string.feature_guardian_impl_home_cancelled else R.string.feature_guardian_impl_home_revoked, name))
+                    // 확인창이 닫힌 뒤 결과를 낭독으로도 알린다
+                    Text(
+                        stringResource(if (m.wasPending) R.string.feature_guardian_impl_home_cancelled else R.string.feature_guardian_impl_home_revoked, name),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.padding(vertical = 8.dp).semantics { liveRegion = LiveRegionMode.Polite },
+                    )
                 } else {
                     ErrorText(stringResource(R.string.feature_guardian_impl_home_revoke_failed))
                     Body(m.error.message())
@@ -203,7 +210,8 @@ internal fun GuardianSettingsScreen(
             GuardianRow(
                 title = stringResource(R.string.feature_guardian_impl_settings_delete_title),
                 subtitle = stringResource(R.string.feature_guardian_impl_settings_delete_body),
-                titleColor = MaterialTheme.colorScheme.error,
+                // 16sp 글자도 본문 7:1 (§7): 배지 실패 글자색
+                titleColor = LocalBadgeColors.current.risk.ink,
                 emphasized = true,
                 onClick = { confirmingDelete = true }.takeIf { !state.working },
             )
@@ -300,8 +308,9 @@ internal fun GuardianSettingsScreen(
 private fun ManageLinkDialog(link: FamilyLink, onSaveName: (String?) -> Unit, onRevoke: () -> Unit, onDismiss: () -> Unit) {
     val pending = link.status == LinkStatus.PENDING
     val current = LocalChosenPhoneNames.current[link.linkId]
+    val presets = phoneNamePresets()
     var choice by rememberSaveable(link.linkId, stateSaver = PhoneNameChoiceSaver) {
-        mutableStateOf(current?.let { PhoneNameChoice(custom = true, text = it) } ?: PhoneNameChoice())
+        mutableStateOf(current?.let { name -> if (name in presets) PhoneNameChoice(preset = name) else PhoneNameChoice(custom = true, text = name) } ?: PhoneNameChoice())
     }
     GuardianTheme {
         AlertDialog(

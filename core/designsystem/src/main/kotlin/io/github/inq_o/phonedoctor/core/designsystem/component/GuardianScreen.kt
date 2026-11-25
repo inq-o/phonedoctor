@@ -65,7 +65,7 @@ fun GuardianScreen(
     topActions: @Composable RowScope.() -> Unit = {},
     contentPadding: Dp = 16.dp,
     bottomBar: (@Composable ColumnScope.() -> Unit)? = null,
-    actions: @Composable ColumnScope.() -> Unit = {},
+    actions: (@Composable ColumnScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     GuardianTheme {
@@ -110,11 +110,14 @@ fun GuardianScreen(
                     content = bottomBar,
                 )
             }
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                content = actions,
-            )
+            // 줄 버튼이 없으면 빈 여백도 두지 않는다
+            if (actions != null) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    content = actions,
+                )
+            }
         }
     }
 }

@@ -87,7 +87,7 @@ class AlertDetailViewModel @AssistedInject constructor(
             if (state.value is AlertDetailUiState.Failed) state.value = AlertDetailUiState.Loading
             try {
                 val alert = repository.alert(alertId)
-                state.update { (it as? AlertDetailUiState.Ready)?.copy(alert = alert) ?: AlertDetailUiState.Ready(alert) }
+                state.update { (it as? AlertDetailUiState.Ready)?.copy(alert = alert, error = null) ?: AlertDetailUiState.Ready(alert) }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: ApiException) {

@@ -379,6 +379,32 @@ class GuardianViewModelTest {
     }
 
     @Test
+    fun settingsDoesNotShowRevokedLinkAgainWhenListReloads() = runTest(main.dispatcher) {
+        family.links += listOf(link("a", LinkStatus.ACTIVE), link("g", LinkStatus.ACTIVE))
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
+        vm.loadLinks()
+        advanceUntilIdle()
+        vm.revoke(family.links[0])
+        advanceUntilIdle()
+        // 서버 목록에 아직 남아 있어도(늦게 온 응답 등) 이 화면에서 끊은 연결은 다시 보이지 않는다
+        vm.loadLinks()
+        advanceUntilIdle()
+        assertEquals(listOf("g"), vm.uiState.value.links!!.map { it.linkId })
+    }
+
+    @Test
+    fun phoneStatusCountsOnlyRequestsForThatPhone() {
+        val mom = GuardianLink(link("l1", LinkStatus.ACTIVE))
+        val dad = GuardianLink(link("l2", LinkStatus.ACTIVE))
+        // 보호자가 여럿이면 linkIds에 다른 보호자의 연결(x9)도 들어 있다
+        val reqs = listOf(request("a1").copy(linkIds = listOf("l1", "x9")), request("a2").copy(linkIds = listOf("l1")), request("a3").copy(linkIds = listOf("x9")))
+        assertEquals(PhoneStatus.Attention(2), phoneStatus(mom, reqs))
+        assertEquals(PhoneStatus.Ok, phoneStatus(dad, reqs))
+        assertEquals(PhoneStatus.Offline, phoneStatus(dad.copy(contactLost = true), reqs))
+        assertEquals(PhoneStatus.Pending, phoneStatus(GuardianLink(link("p", LinkStatus.PENDING)), reqs))
+    }
+
+    @Test
     fun settingsSavesPhoneNameOnlyOnThisPhone() = runTest(main.dispatcher) {
         val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
         vm.setPhoneName("l1", "아빠")
@@ -412,12 +438,14 @@ class GuardianViewModelTest {
 
     @Test
     fun requestFailureStillShowsLinksAndKeepsShownRequests() = runTest(main.dispatcher) {
-        family.links += link("l1", LinkStatus.ACTIVE)
-        requests.alerts += request("open")
+        family.links += listOf(link("l1", LinkStatus.ACTIVE), link("l2", LinkStatus.ACTIVE))
+        requests.alerts += listOf(request("open").copy(linkIds = listOf("l1")), request("gone").copy(linkIds = listOf("l2")))
         val vm = home()
         vm.refresh()
         advanceUntilIdle()
         requests.fail["alerts"] = IOException("offline")
+        // 설정에서 l2를 끊고 돌아옴: 요청만 못 읽었어도 끊은 폰의 요청은 남기지 않는다
+        family.links.removeAll { it.linkId == "l2" }
         vm.refresh()
         advanceUntilIdle()
         val ready = vm.uiState.value as GuardianHomeUiState.Ready
@@ -504,10 +532,13 @@ class GuardianViewModelTest {
     @Test
     fun historyListsEverythingAndKeepsListOnFailure() = runTest(main.dispatcher) {
         requests.alerts += listOf(request("a1"), request("a2", status = FamilyAlertStatus.EXPIRED))
-        val vm = AlertHistoryViewModel(requests)
+        family.links += listOf(link("l1", LinkStatus.ACTIVE), link("p", LinkStatus.PENDING))
+        val vm = AlertHistoryViewModel(requests, family)
         vm.refresh()
         advanceUntilIdle()
         assertEquals(2, (vm.uiState.value as AlertHistoryUiState.Ready).alerts.size)
+        // 폰 이름은 이 보호자가 연결한 폰 수로 정한다 (요청의 linkIds에는 다른 보호자의 연결도 있다)
+        assertEquals(1, (vm.uiState.value as AlertHistoryUiState.Ready).phoneCount)
         requests.fail["alerts"] = IOException("offline")
         vm.refresh()
         advanceUntilIdle()

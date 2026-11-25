@@ -101,10 +101,9 @@ internal fun AlertDetailScreen(
         backLabel = stringResource(R.string.feature_guardian_impl_back),
         contentPadding = 0.dp,
         modifier = modifier,
-        bottomBar = if (answerable) ({ AnswerBar(ready!!, onMessageChange, onDecide) }) else null,
-        actions = {
-            if (state is AlertDetailUiState.Failed) GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry)
-        },
+        // 아래에 붙는 것은 오류와 버튼만: 메시지 입력칸·안내는 본문과 같이 스크롤 (글꼴 200%·키보드에서도 버튼이 잘리지 않게, §7)
+        bottomBar = if (answerable) ({ AnswerBar(ready!!, onDecide) }) else null,
+        actions = if (state is AlertDetailUiState.Failed) ({ GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry) }) else null,
     ) {
         when (state) {
             AlertDetailUiState.Loading -> CircularProgressIndicator(Modifier.padding(16.dp))
@@ -116,43 +115,24 @@ internal fun AlertDetailScreen(
                 Headline(stringResource(R.string.feature_guardian_impl_detail_not_found), announce = true)
                 Body(stringResource(R.string.feature_guardian_impl_detail_not_found_body))
             }
-            is AlertDetailUiState.Ready -> Detail(state)
+            is AlertDetailUiState.Ready -> Detail(state, answerable, onMessageChange)
         }
     }
 }
 
-/** 아래에 붙는 답하기 영역: 오류(있으면) → 같이 보낼 메시지 → 허용 결과 한 줄 → 버튼 */
+/** 아래에 붙는 답하기 영역: 오류(있으면, 낭독) → 버튼 */
 @Composable
-private fun ColumnScope.AnswerBar(state: AlertDetailUiState.Ready, onMessageChange: (String) -> Unit, onDecide: (FamilyDecision) -> Unit) {
+private fun ColumnScope.AnswerBar(state: AlertDetailUiState.Ready, onDecide: (FamilyDecision) -> Unit) {
     val alert = state.alert
     val sending = state.sending != null
     state.error?.let { error ->
-        Row(
+        Text(
+            error.message(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = LocalBadgeColors.current.risk.ink,
             modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(LocalBadgeColors.current.risk.background).padding(12.dp)
-                .semantics { liveRegion = LiveRegionMode.Assertive },
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(error.message(), style = MaterialTheme.typography.bodyMedium, color = LocalBadgeColors.current.risk.ink)
-        }
-    }
-    OutlinedTextField(
-        value = state.message,
-        onValueChange = onMessageChange,
-        label = { Text(stringResource(R.string.feature_guardian_impl_detail_message_label)) },
-        placeholder = { Text(stringResource(R.string.feature_guardian_impl_detail_message_hint)) },
-        supportingText = {
-            Row(Modifier.fillMaxWidth()) {
-                Text(stringResource(R.string.feature_guardian_impl_detail_message_help), modifier = Modifier.weight(1f))
-                Text("${state.message.length}/$MESSAGE_TO_SENIOR_MAX")
-            }
-        },
-        singleLine = true,
-        enabled = !sending,
-        modifier = Modifier.fillMaxWidth(),
-    )
-    // 알림 전용(이미 허용한 앱)에는 [허용]이 없다
-    if (!alert.notice) {
-        Text(stringResource(R.string.feature_guardian_impl_detail_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Assertive },
+        )
     }
     val uninstall: @Composable (Modifier) -> Unit = {
         GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_decide_uninstall), { onDecide(FamilyDecision.RECOMMEND_UNINSTALL) }, it, enabled = !sending)
@@ -171,8 +151,34 @@ private fun ColumnScope.AnswerBar(state: AlertDetailUiState.Ready, onMessageChan
     if (sending) CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally))
 }
 
+/** 같이 보낼 메시지와 허용 결과 한 줄 (본문 끝, 스크롤됨) */
 @Composable
-private fun Detail(state: AlertDetailUiState.Ready) {
+private fun MessageField(state: AlertDetailUiState.Ready, onMessageChange: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+            value = state.message,
+            onValueChange = onMessageChange,
+            label = { Text(stringResource(R.string.feature_guardian_impl_detail_message_label)) },
+            placeholder = { Text(stringResource(R.string.feature_guardian_impl_detail_message_hint)) },
+            supportingText = {
+                Row(Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.feature_guardian_impl_detail_message_help), modifier = Modifier.weight(1f))
+                    Text("${state.message.length}/$MESSAGE_TO_SENIOR_MAX")
+                }
+            },
+            singleLine = true,
+            enabled = state.sending == null,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        // 알림 전용(이미 허용한 앱)에는 [허용]이 없다
+        if (!state.alert.notice) {
+            Text(stringResource(R.string.feature_guardian_impl_detail_explain), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessageChange: (String) -> Unit) {
     val alert = state.alert
     Row(
         modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
@@ -203,6 +209,11 @@ private fun Detail(state: AlertDetailUiState.Ready) {
             state.rejected && alert.answerable -> ErrorText(stringResource(R.string.feature_guardian_impl_answer_rejected))
             alert.notice && alert.answerable -> Body(stringResource(R.string.feature_guardian_impl_detail_notice))
         }
+        if (state.answered && alert.answer?.decision == FamilyDecision.RECOMMEND_UNINSTALL) {
+            Body(stringResource(R.string.feature_guardian_impl_answer_result_later))
+        }
+        // 답할 수 없는 요청은 아래 오류 상자가 없으므로 불러오기 실패를 여기에
+        if (!answerable) state.error?.let { ErrorText(it.message()) }
     }
 
     // 둘 다 있으면 감지 내용 위·판정 근거 아래 (ux-flows G2)
@@ -237,6 +248,8 @@ private fun Detail(state: AlertDetailUiState.Ready) {
             )
         }
     }
+
+    if (answerable) MessageField(state, onMessageChange)
 
     Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Text(stringResource(R.string.feature_guardian_impl_detail_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

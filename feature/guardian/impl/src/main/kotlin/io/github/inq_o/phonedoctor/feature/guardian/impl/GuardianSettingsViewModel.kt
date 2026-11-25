@@ -15,6 +15,7 @@ import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
 import io.github.inq_o.phonedoctor.core.network.ApiException
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,12 +66,19 @@ class GuardianSettingsViewModel @Inject constructor(
         viewModelScope.launch { alerts.falsePositiveFeedback.collect { v -> state.update { it.copy(falsePositiveFeedback = v) } } }
     }
 
-    /** 화면이 보일 때마다 연결 목록을 다시 읽는다 */
+    private var linksJob: Job? = null
+
+    /** 이 화면에서 끊은 연결: 끊기 전에 시작한 불러오기 결과가 늦게 와도 다시 보이지 않게 */
+    private val revoked = mutableSetOf<String>()
+
+    /** 화면이 보일 때마다 연결 목록을 다시 읽는다 (이전 불러오기는 취소: 응답 순서가 뒤바뀌지 않게) */
     fun loadLinks() {
-        viewModelScope.launch {
+        linksJob?.cancel()
+        linksJob = viewModelScope.launch {
             try {
                 val links = family.links()
                     .filter { it.status == LinkStatus.ACTIVE || it.status == LinkStatus.PENDING }
+                    .filterNot { it.linkId in revoked }
                     .sortedWith(compareBy<FamilyLink> { it.status != LinkStatus.ACTIVE }.thenBy { it.createdAt })
                 state.update { it.copy(links = links, linksError = null) }
             } catch (e: CancellationException) {
@@ -90,6 +98,7 @@ class GuardianSettingsViewModel @Inject constructor(
     fun revoke(link: FamilyLink) {
         if (state.value.revoking != null) return
         state.update { it.copy(revoking = link.linkId, linkMessage = null) }
+        linksJob?.cancel()
         viewModelScope.launch {
             var deviceGone = false
             val error = try {
@@ -108,6 +117,7 @@ class GuardianSettingsViewModel @Inject constructor(
                 e.toGuardianError()
             }
             val pending = link.status == LinkStatus.PENDING
+            if (error == null) revoked += link.linkId
             state.update { s ->
                 s.copy(
                     links = if (error != null) s.links else if (deviceGone) emptyList() else s.links?.filterNot { it.linkId == link.linkId },

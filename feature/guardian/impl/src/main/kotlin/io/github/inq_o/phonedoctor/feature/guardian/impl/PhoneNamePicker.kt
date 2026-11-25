@@ -34,15 +34,19 @@ internal data class PhoneNameChoice(val preset: String? = null, val custom: Bool
 /**
  * 상대 폰을 이 폰에서 부를 이름 (ux-flows §2·§4 O-G4). 고른 칩은 ✓와 테두리로도 보인다 (색만으로 구분하지 않음, §5)
  */
+/** 고를 수 있는 이름 (엄마·아빠·할머니·할아버지) */
+@Composable
+internal fun phoneNamePresets(): List<String> = listOf(
+    stringResource(R.string.feature_guardian_impl_phone_name_mom),
+    stringResource(R.string.feature_guardian_impl_phone_name_dad),
+    stringResource(R.string.feature_guardian_impl_phone_name_grandma),
+    stringResource(R.string.feature_guardian_impl_phone_name_grandpa),
+)
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun PhoneNamePicker(choice: PhoneNameChoice, onChange: (PhoneNameChoice) -> Unit, modifier: Modifier = Modifier) {
-    val presets = listOf(
-        stringResource(R.string.feature_guardian_impl_phone_name_mom),
-        stringResource(R.string.feature_guardian_impl_phone_name_dad),
-        stringResource(R.string.feature_guardian_impl_phone_name_grandma),
-        stringResource(R.string.feature_guardian_impl_phone_name_grandpa),
-    )
+    val presets = phoneNamePresets()
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.feature_guardian_impl_phone_name_legend), style = MaterialTheme.typography.labelLarge)
         FlowRow(

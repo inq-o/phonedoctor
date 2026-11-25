@@ -49,9 +49,7 @@ internal fun AlertHistoryScreen(
         backLabel = stringResource(R.string.feature_guardian_impl_back),
         contentPadding = 0.dp,
         modifier = modifier,
-        actions = {
-            if (state is AlertHistoryUiState.Failed) GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry)
-        },
+        actions = if (state is AlertHistoryUiState.Failed) ({ GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_retry), onRetry) }) else null,
     ) {
         when (state) {
             AlertHistoryUiState.Loading -> CircularProgressIndicator(Modifier.padding(16.dp))
@@ -66,7 +64,7 @@ internal fun AlertHistoryScreen(
                     val zone = ZoneId.systemDefault()
                     val today = LocalDate.now(zone)
                     // 폰이 여럿이면 줄마다 폰 이름을 붙인다
-                    val showPhone = state.alerts.flatMap { it.linkIds }.toSet().size > 1
+                    val showPhone = state.phoneCount > 1
                     state.alerts.groupBy { it.createdAt.atZone(zone).toLocalDate() }.entries.forEachIndexed { i, (day, alerts) ->
                         GuardianSectionHeader(
                             if (day == today) stringResource(R.string.feature_guardian_impl_history_today) else stringResource(R.string.feature_guardian_impl_history_day, day.monthValue, day.dayOfMonth),
