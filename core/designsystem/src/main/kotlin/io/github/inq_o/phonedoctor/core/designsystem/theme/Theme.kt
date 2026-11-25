@@ -64,6 +64,25 @@ data class StatusColors(val safe: Color, val caution: Color, val onStatus: Color
 
 val LocalStatusColors = staticCompositionLocalOf { StatusColors(Safe, Caution, OnPrimary) }
 
+/** 배지 한 종류의 글자·바탕 */
+@Immutable
+data class BadgeColor(val ink: Color, val background: Color)
+
+/** 보호자 배지 (ux-flows.md §5): 확인 필요·답변 대기 / 실패 / 허용 / 삭제 요청·선택 / 끝난 결과 */
+@Immutable
+data class BadgeColors(val caution: BadgeColor, val risk: BadgeColor, val safe: BadgeColor, val info: BadgeColor, val neutral: BadgeColor)
+
+private val LightBadges = BadgeColors(
+    BadgeColor(BadgeCautionInk, BadgeCautionBg), BadgeColor(BadgeRiskInk, BadgeRiskBg), BadgeColor(BadgeSafeInk, BadgeSafeBg),
+    BadgeColor(BadgeInfoInk, BadgeInfoBg), BadgeColor(BadgeNeutralInk, BadgeNeutralBg),
+)
+private val DarkBadges = BadgeColors(
+    BadgeColor(BadgeCautionInkDark, BadgeCautionBgDark), BadgeColor(BadgeRiskInkDark, BadgeRiskBgDark), BadgeColor(BadgeSafeInkDark, BadgeSafeBgDark),
+    BadgeColor(BadgeInfoInkDark, BadgeInfoBgDark), BadgeColor(BadgeNeutralInkDark, BadgeNeutralBgDark),
+)
+
+val LocalBadgeColors = staticCompositionLocalOf { LightBadges }
+
 /**
  * 시니어 화면 테마. 색·위치를 전화로 설명할 수 있게 Dynamic Color는 쓰지 않는다 (ux-flows.md 원칙 2).
  * 어두운 화면은 시스템 설정을 따른다.
@@ -74,7 +93,7 @@ fun PhoneDoctorTheme(
     content: @Composable () -> Unit,
 ) {
     val status = if (darkTheme) StatusColors(SafeDark, CautionDark, OnPrimaryDark) else StatusColors(Safe, Caution, OnPrimary)
-    CompositionLocalProvider(LocalStatusColors provides status) {
+    CompositionLocalProvider(LocalStatusColors provides status, LocalBadgeColors provides if (darkTheme) DarkBadges else LightBadges) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
             typography = Typography,

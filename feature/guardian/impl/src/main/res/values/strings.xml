@@ -61,7 +61,7 @@
     <string name="feature_guardian_impl_phone_name_grandpa">할아버지</string>
     <string name="feature_guardian_impl_phone_name_custom">직접 입력</string>
     <string name="feature_guardian_impl_phone_name_custom_label">표시 이름 (%1$d자까지)</string>
-    <string name="feature_guardian_impl_phone_name_skip_note">고르지 않으면 %1$s으로 표시돼요</string>
+    <string name="feature_guardian_impl_phone_name_skip_note">고르지 않으면 %1$s으로 표시돼요. 설정에서 바꿀 수 있어요</string>
     <string name="feature_guardian_impl_phone_name_skip">건너뛰기</string>
     <string name="feature_guardian_impl_phone_name_save">저장</string>
 
@@ -87,6 +87,18 @@
     <string name="feature_guardian_impl_revoke_dialog_body">답변할 요청이 사라지고 알림을 받지 않아요. 다시 연결하려면 새 코드가 필요해요</string>
     <string name="feature_guardian_impl_cancel_dialog_title">%1$s에 보낸 요청을 취소할까요?</string>
     <string name="feature_guardian_impl_cancel_dialog_body">상대 폰의 연결 요청이 사라져요. 다시 연결하려면 새 코드가 필요해요</string>
+    <string name="feature_guardian_impl_home_watching">지켜보는 폰</string>
+    <string name="feature_guardian_impl_home_status_attention">확인 필요 %1$d건</string>
+    <string name="feature_guardian_impl_home_status_ok">확인할 앱 없음</string>
+    <string name="feature_guardian_impl_home_status_offline">오프라인</string>
+    <string name="feature_guardian_impl_home_status_pending">수락 대기</string>
+    <string name="feature_guardian_impl_home_offline_body">폰주치의가 삭제되었거나 알림이 꺼져 있을 수 있어요</string>
+    <string name="feature_guardian_impl_home_offline_howto">확인 방법 보기</string>
+    <string name="feature_guardian_impl_home_offline_steps">그 폰에서 폰주치의를 열어 주세요. 열리지 않으면 다시 설치해야 해요. 폰 설정의 알림에서 폰주치의 알림이 켜져 있는지도 확인해 주세요</string>
+    <string name="feature_guardian_impl_home_requests_title">답변할 요청</string>
+    <string name="feature_guardian_impl_home_requests_empty">답변할 요청이 없어요</string>
+    <string name="feature_guardian_impl_home_add_more">폰 추가 연결</string>
+    <string name="feature_guardian_impl_home_name_prompt">표시 이름 정하기</string>
     <!-- 요청 (G1·G2·G3) -->
     <string name="feature_guardian_impl_guardian_fallback">가족</string>
     <string name="feature_guardian_impl_home_requests">답변할 요청 %1$d건</string>
@@ -153,13 +165,40 @@
     <string name="feature_guardian_impl_detail_message_label">같이 보낼 메시지 (선택)</string>
     <string name="feature_guardian_impl_detail_message_hint">예: 광고 앱 같아요</string>
     <string name="feature_guardian_impl_detail_explain">허용하면 이 버전은 다시 묻지 않아요. 답은 바꿀 수 없어요</string>
+    <string name="feature_guardian_impl_detail_open_badge">확인 필요</string>
+    <string name="feature_guardian_impl_detail_note">광고 판단은 틀릴 수 있어요</string>
+    <string name="feature_guardian_impl_detail_more">자세히 보기</string>
+    <string name="feature_guardian_impl_detail_less">접기</string>
+    <string name="feature_guardian_impl_detail_package">패키지 %1$s</string>
+    <string name="feature_guardian_impl_detail_version">버전 %1$s</string>
+    <string name="feature_guardian_impl_detail_ads_label">사용 중이 아닐 때 광고</string>
+    <string name="feature_guardian_impl_detail_ads_today">오늘 %1$d회</string>
+    <string name="feature_guardian_impl_detail_ads_date">%1$d월 %2$d일 %3$d회</string>
+    <string name="feature_guardian_impl_detail_first">처음</string>
+    <string name="feature_guardian_impl_detail_last">마지막</string>
+    <string name="feature_guardian_impl_detail_days_label">광고 뜬 날</string>
+    <string name="feature_guardian_impl_detail_days_value">%1$d일 (요청 뒤)</string>
+    <string name="feature_guardian_impl_detail_installed_label">설치</string>
+    <string name="feature_guardian_impl_detail_progress">진행</string>
+    <string name="feature_guardian_impl_detail_result">결과</string>
+    <string name="feature_guardian_impl_detail_result_waiting">대기 중</string>
+    <string name="feature_guardian_impl_detail_message_help">삭제 요청과 함께 전달돼요</string>
     <string name="feature_guardian_impl_history_title">지난 요청</string>
     <string name="feature_guardian_impl_history_load_failed">요청 기록을 불러오지 못했어요</string>
+    <string name="feature_guardian_impl_history_today">오늘</string>
+    <string name="feature_guardian_impl_history_day">%1$d월 %2$d일</string>
     <string name="feature_guardian_impl_history_empty">지난 요청이 없어요</string>
 
     <!-- G4 -->
     <string name="feature_guardian_impl_settings">설정</string>
     <string name="feature_guardian_impl_settings_title">설정</string>
+    <string name="feature_guardian_impl_settings_links">연결된 폰</string>
+    <string name="feature_guardian_impl_settings_links_loading">불러오는 중</string>
+    <string name="feature_guardian_impl_settings_linked_on">%1$s 연결</string>
+    <string name="feature_guardian_impl_settings_linked_by">%1$s님, %2$s 연결</string>
+    <string name="feature_guardian_impl_settings_notifications">알림</string>
+    <string name="feature_guardian_impl_settings_account">계정</string>
+    <string name="feature_guardian_impl_cancel">취소</string>
     <string name="feature_guardian_impl_settings_caution">주의 앱 알림</string>
     <string name="feature_guardian_impl_settings_caution_body">위험 앱, 광고 앱 외에 주의 앱도 알림</string>
     <string name="feature_guardian_impl_settings_feedback">판정 개선 참여</string>

@@ -346,37 +346,48 @@ class GuardianViewModelTest {
     }
 
     @Test
-    fun revokeRemovesLinkAndTreatsGoneAsRevoked() = runTest(main.dispatcher) {
-        family.links += listOf(link("a", LinkStatus.ACTIVE, senior = "엄마"), link("p", LinkStatus.PENDING, senior = "아빠"), link("g", LinkStatus.ACTIVE))
-        val vm = home()
-        vm.refresh()
+    fun settingsRevokesLinkedPhonesAndTreatsGoneAsRevoked() = runTest(main.dispatcher) {
+        // 연결 끊기·요청 취소는 G4 설정의 연결된 폰에서 (ux-flows §4 G4, 홈에 바로 두지 않음)
+        family.links += listOf(link("a", LinkStatus.ACTIVE, senior = "김영희"), link("p", LinkStatus.PENDING, senior = "김철수"), link("g", LinkStatus.ACTIVE))
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
+        vm.loadLinks()
         advanceUntilIdle()
+        assertEquals(listOf("a", "g", "p"), vm.uiState.value.links!!.map { it.linkId })
 
         vm.revoke(family.links[0])
         vm.revoke(family.links[1]) // 끊는 중에는 다른 연결을 끊지 않는다
         advanceUntilIdle()
-        var ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertEquals(GuardianMessage.Revoked("a", "엄마", wasPending = false), ready.message)
-        assertEquals(listOf("g", "p"), ready.links.map { it.link.linkId })
+        assertEquals(LinkMessage("a", "김영희", wasPending = false), vm.uiState.value.linkMessage)
+        assertEquals(listOf("g", "p"), vm.uiState.value.links!!.map { it.linkId })
         assertEquals(1, family.calls.count { it == "revoke" })
 
         family.fail["revoke"] = apiError(404)
-        vm.revoke(ready.links[1].link)
+        vm.revoke(vm.uiState.value.links!![1])
         advanceUntilIdle()
-        ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertEquals(GuardianMessage.Revoked("p", "아빠", wasPending = true), ready.message)
+        assertEquals(LinkMessage("p", "김철수", wasPending = true), vm.uiState.value.linkMessage)
 
         family.fail["revoke"] = apiError(503)
-        vm.revoke(ready.links[0].link)
+        vm.revoke(vm.uiState.value.links!![0])
         advanceUntilIdle()
-        ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertEquals(GuardianMessage.Failed(GuardianError.BUSY), ready.message)
-        assertEquals(listOf("g"), ready.links.map { it.link.linkId })
+        assertEquals(GuardianError.BUSY, vm.uiState.value.linkMessage?.error)
+        assertEquals(listOf("g"), vm.uiState.value.links!!.map { it.linkId })
 
         family.fail["revoke"] = DeviceNotRegisteredException()
-        vm.revoke(ready.links[0].link)
+        vm.revoke(vm.uiState.value.links!![0])
         advanceUntilIdle()
-        assertTrue((vm.uiState.value as GuardianHomeUiState.Ready).links.isEmpty())
+        assertTrue(vm.uiState.value.links!!.isEmpty())
+    }
+
+    @Test
+    fun settingsSavesPhoneNameOnlyOnThisPhone() = runTest(main.dispatcher) {
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
+        vm.setPhoneName("l1", "아빠")
+        advanceUntilIdle()
+        assertEquals(mapOf("l1" to "아빠"), phoneNames.names.value)
+        vm.setPhoneName("l1", null)
+        advanceUntilIdle()
+        assertTrue(phoneNames.names.value.isEmpty())
+        assertTrue(family.calls.isEmpty())
     }
 
     // 요청 (G1·G2·G3)
@@ -435,14 +446,15 @@ class GuardianViewModelTest {
     }
 
     @Test
-    fun allowSendsTheMessageTooAndNoticeCannotBeAllowed() = runTest(main.dispatcher) {
+    fun allowDoesNotSendTheMessageAndNoticeCannotBeAllowed() = runTest(main.dispatcher) {
         requests.alerts += listOf(request("a1"), request("n1", notice = true))
         val vm = detail()
         advanceUntilIdle()
-        vm.onMessageChange("엄마 이건 괜찮아요")
+        vm.onMessageChange("이건 괜찮아요")
         vm.decide(FamilyDecision.ALLOW)
         advanceUntilIdle()
-        assertEquals(Triple("a1", FamilyDecision.ALLOW, "엄마 이건 괜찮아요"), requests.decided.single())
+        // 같이 보낼 메시지는 삭제 요청 때만 (ux-flows §4 G2: 허용이면 시니어 알림이 없다)
+        assertEquals(Triple("a1", FamilyDecision.ALLOW, null), requests.decided.single())
 
         val notice = detail("n1")
         advanceUntilIdle()
@@ -585,21 +597,6 @@ class GuardianViewModelTest {
         assertTrue((home.uiState.value as GuardianHomeUiState.Ready).requests.isEmpty())
     }
 
-    @Test
-    fun revokingTheLastLinkClearsRequests() = runTest(main.dispatcher) {
-        family.links += link("l1", LinkStatus.ACTIVE)
-        requests.alerts += request("a1")
-        val vm = home()
-        vm.refresh()
-        advanceUntilIdle()
-        assertEquals(1, (vm.uiState.value as GuardianHomeUiState.Ready).requests.size)
-        vm.revoke(family.links[0])
-        advanceUntilIdle()
-        val ready = vm.uiState.value as GuardianHomeUiState.Ready
-        assertTrue(ready.requests.isEmpty())
-        assertFalse(ready.hasHistory)
-    }
-
     // G4
 
     private class FakeSettings : UserSettingsRepository {
@@ -615,7 +612,7 @@ class GuardianViewModelTest {
 
     @Test
     fun settingsSaveCautionAndName() = runTest(main.dispatcher) {
-        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
         vm.setNotifyCaution(true)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.notifyCaution)
@@ -636,7 +633,7 @@ class GuardianViewModelTest {
     @Test
     fun deletingAllDataResetsRoleAndAsksForReauthWhenNeeded() = runTest(main.dispatcher) {
         val settings = FakeSettings()
-        val vm = GuardianSettingsViewModel(family, settings, requests)
+        val vm = GuardianSettingsViewModel(family, settings, requests, phoneNames)
         family.fail["delete"] = RecentLoginRequiredException()
         vm.deleteAll()
         advanceUntilIdle()
@@ -658,7 +655,7 @@ class GuardianViewModelTest {
 
     @Test
     fun reauthWithAnotherAccountAsksForTheFirstOne() = runTest(main.dispatcher) {
-        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
         vm.startReauth()
         family.fail["reauth"] = io.github.inq_o.phonedoctor.core.data.ReauthAccountMismatchException()
         vm.onReauthToken("other")
@@ -671,7 +668,7 @@ class GuardianViewModelTest {
 
     @Test
     fun feedbackSwitchIsLocalOnly() = runTest(main.dispatcher) {
-        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
         advanceUntilIdle()
         assertTrue(vm.uiState.value.falsePositiveFeedback)
         vm.setFalsePositiveFeedback(false)
@@ -682,7 +679,7 @@ class GuardianViewModelTest {
 
     @Test
     fun closingTheReauthPickerIsQuiet() {
-        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests)
+        val vm = GuardianSettingsViewModel(family, FakeSettings(), requests, phoneNames)
         vm.startReauth()
         vm.onReauthFailed(androidx.credentials.exceptions.GetCredentialCancellationException())
         assertFalse(vm.uiState.value.working)

@@ -31,6 +31,7 @@ import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianScreen
+import io.github.inq_o.phonedoctor.core.designsystem.component.PdButtonPair
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
 
 /**
@@ -89,13 +90,20 @@ internal fun EnterCodeScreen(
     LaunchedEffect(Unit) { focus.requestFocus() }
     GuardianScreen(
         title = stringResource(R.string.feature_guardian_impl_code_title),
+        onBack = onHome.takeIf { !state.busy },
+        backLabel = stringResource(R.string.feature_guardian_impl_back),
         modifier = modifier,
         actions = {
             if (state.error == CodeError.ALREADY_LINKED || state.error == CodeError.USED) {
                 GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_home), onHome)
             } else {
-                GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_code_scan), onScan, enabled = !state.busy)
-                GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_code_submit), onSubmit, enabled = state.canSubmit)
+                // 보호자 화면: 왼쪽 보조, 오른쪽 주요
+                PdButtonPair(
+                    first = { GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_code_scan), onScan, it, enabled = !state.busy) },
+                    second = { GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_code_submit), onSubmit, it, enabled = state.canSubmit) },
+                    minHeight = 48.dp,
+                    gap = 8.dp,
+                )
             }
         },
     ) {

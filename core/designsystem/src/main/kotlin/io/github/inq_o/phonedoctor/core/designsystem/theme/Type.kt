@@ -66,14 +66,20 @@ val Typography = Typography(
     ),
 )
 
-// 보호자 화면 기준 (ux-flows.md §5): 상태 문장 22sp, 본문 16sp, 버튼 16sp. Material 3 기본 크기에 어절 단위 줄바꿈만 더한다
+// 보호자 화면 기준 (ux-flows.md §5): 4단계 — 상태 22 Bold / 제목·앱 이름 18 Bold / 본문·버튼 16 / 보조 14
 private val Default = Typography()
 
 val GuardianTypography = Typography(
-    headlineSmall = Default.headlineSmall.copy(fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
-    titleLarge = Default.titleLarge.copy(lineBreak = KoreanLineBreak),
-    titleMedium = Default.titleMedium.copy(fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
-    bodyLarge = Default.bodyLarge.copy(lineBreak = KoreanLineBreak),
-    bodyMedium = Default.bodyMedium.copy(lineBreak = KoreanLineBreak),
-    labelLarge = Default.labelLarge.copy(fontSize = 16.sp, lineHeight = 24.sp),
+    // 홈 위 막대 "폰주치의"와 상태 문장 ("확인 필요 1건")
+    headlineSmall = Default.headlineSmall.copy(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    titleLarge = Default.titleLarge.copy(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    // 화면 제목(뒤로 옆)·앱 이름·확인창 제목
+    titleMedium = Default.titleMedium.copy(fontSize = 18.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    // 목록 줄 제목 (앱 이름 16 Bold)
+    titleSmall = Default.titleSmall.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold, lineBreak = KoreanLineBreak),
+    bodyLarge = Default.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, lineBreak = KoreanLineBreak),
+    // 보조: 묶음 제목·시각·설명
+    bodyMedium = Default.bodyMedium.copy(fontSize = 14.sp, lineHeight = 21.sp, lineBreak = KoreanLineBreak),
+    labelMedium = Default.labelMedium.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
+    labelLarge = Default.labelLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
 )

@@ -18,7 +18,6 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.core.content.ContextCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianOutlinedButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianPrimaryButton
 import io.github.inq_o.phonedoctor.core.designsystem.component.GuardianScreen
 import io.github.inq_o.phonedoctor.core.designsystem.theme.PhoneDoctorTheme
@@ -83,9 +82,11 @@ internal fun GuardianSignInScreen(
 ) {
     GuardianScreen(
         title = stringResource(R.string.feature_guardian_impl_sign_in_title),
+        // 뒤로는 위 막대 (보호자 화면은 흔한 앱 모양, ux-flows §1)
+        onBack = onBack?.takeIf { !state.busy },
+        backLabel = stringResource(R.string.feature_guardian_impl_back),
         modifier = modifier,
         actions = {
-            if (onBack != null) GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_back), onBack, enabled = !state.busy)
             GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_sign_in), onSignIn, enabled = !state.busy)
         },
     ) {

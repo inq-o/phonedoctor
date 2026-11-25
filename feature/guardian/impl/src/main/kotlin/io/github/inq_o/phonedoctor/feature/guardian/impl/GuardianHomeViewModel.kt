@@ -3,14 +3,12 @@ package io.github.inq_o.phonedoctor.feature.guardian.impl
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import io.github.inq_o.phonedoctor.core.data.DeviceNotRegisteredException
 import io.github.inq_o.phonedoctor.core.data.FamilyRepository
 import io.github.inq_o.phonedoctor.core.data.GuardianAlertRepository
 import io.github.inq_o.phonedoctor.core.model.FamilyAlert
 import io.github.inq_o.phonedoctor.core.model.FamilyAlertStatus
 import io.github.inq_o.phonedoctor.core.model.FamilyLink
 import io.github.inq_o.phonedoctor.core.model.LinkStatus
-import io.github.inq_o.phonedoctor.core.network.ApiException
 import io.github.inq_o.phonedoctor.core.notifications.RequestChanges
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -26,22 +24,14 @@ import javax.inject.Inject
 /** 보호자 홈의 연결 하나. [contactLost]: 시니어 폰의 검사 보고가 48시간 넘게 없음 (ux-flows F6) */
 data class GuardianLink(val link: FamilyLink, val contactLost: Boolean = false)
 
-/** 연결 끊기·요청 취소 결과 안내 */
-sealed interface GuardianMessage {
-    data class Revoked(val linkId: String, val seniorName: String, val wasPending: Boolean) : GuardianMessage
-    data class Failed(val error: GuardianError) : GuardianMessage
-}
-
 sealed interface GuardianHomeUiState {
     data object Loading : GuardianHomeUiState
 
     data class Failed(val error: GuardianError) : GuardianHomeUiState
 
-    /** [links]: 연결됨 먼저, 그다음 답을 기다리는 요청. [revoking]은 끊는 중인 연결 */
+    /** [links]: 연결됨 먼저, 그다음 수락을 기다리는 연결. 연결 끊기·요청 취소는 G4 설정에서 (ux-flows §4 G4) */
     data class Ready(
         val links: List<GuardianLink>,
-        val revoking: String? = null,
-        val message: GuardianMessage? = null,
         /** 답을 기다리는 요청 (열려 있고 아무도 답하지 않음), 최근 것부터 */
         val requests: List<FamilyAlert> = emptyList(),
         /** 지난 요청(답했거나 끝난 것)이 있어 [지난 요청 보기]를 보인다 */
@@ -90,58 +80,9 @@ class GuardianHomeViewModel @Inject constructor(
             val shown = visible(links)
             state.value = GuardianHomeUiState.Ready(
                 shown,
-                current?.revoking,
                 requests = loaded?.filter { it.answerable } ?: current?.requests.orEmpty(),
                 // 연결이 있으면 지난 요청(답한 것·알림 전용·끝난 것)을 볼 수 있다
                 hasHistory = shown.any { it.link.status == LinkStatus.ACTIVE },
-            )
-        }
-    }
-
-    fun revoke(link: FamilyLink) {
-        val ready = state.value as? GuardianHomeUiState.Ready ?: return
-        if (ready.revoking != null) return
-        state.value = ready.copy(revoking = link.linkId, message = null)
-        viewModelScope.launch {
-            var deviceGone = false
-            val error = try {
-                family.revokeLink(link.linkId)
-                null
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: DeviceNotRegisteredException) {
-                // 서버가 이 기기를 지웠으면 연결도 모두 없다
-                deviceGone = true
-                null
-            } catch (e: ApiException) {
-                // 이미 없는 연결이면 끊은 것과 같다
-                if (e.status == 404) null else e.toGuardianError()
-            } catch (e: Exception) {
-                e.toGuardianError()
-            }
-            val now = state.value as? GuardianHomeUiState.Ready ?: return@launch
-            state.value = if (error == null) {
-                now.copy(
-                    links = if (deviceGone) emptyList() else now.links.filterNot { it.link.linkId == link.linkId },
-                    revoking = null,
-                    message = GuardianMessage.Revoked(link.linkId, link.seniorName, wasPending = link.status == LinkStatus.PENDING),
-                )
-            } else {
-                now.copy(revoking = null, message = GuardianMessage.Failed(error))
-            }
-            // 끊은 연결로 받은 요청은 서버에서 볼 수 없게 된다: 요청 목록도 다시 읽는다
-            if (error == null) refreshRequests()
-        }
-    }
-
-    private fun refreshRequests() {
-        viewModelScope.launch {
-            val loaded = runCatchingNonCancel { alerts.alerts(FamilyAlertStatus.OPEN) }
-            val now = state.value as? GuardianHomeUiState.Ready ?: return@launch
-            val active = now.links.any { it.link.status == LinkStatus.ACTIVE }
-            state.value = now.copy(
-                requests = if (!active) emptyList() else loaded?.filter { it.answerable } ?: now.requests,
-                hasHistory = active,
             )
         }
     }
