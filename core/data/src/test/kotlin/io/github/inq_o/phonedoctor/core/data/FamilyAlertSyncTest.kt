@@ -440,6 +440,25 @@ class FamilyAlertSyncTest {
     }
 
     @Test
+    fun `새 요청을 보내면 6시간을 기다리지 않고 검사 시각도 보고한다`() = runTest {
+        scans.latest = clock - 1_000
+        val s = sync()
+        s.sync()
+        assertEquals(1, server.calls.count { it == "reportStatus" })
+        clock += 60_000
+        s.sync()
+        assertEquals(1, server.calls.count { it == "reportStatus" })
+        openAlert()
+        s.sync()
+        assertEquals(1, server.calls.count { it == "createAlert" })
+        assertEquals(2, server.calls.count { it == "reportStatus" })
+        // 이미 보낸 요청만 있으면 다시 6시간 간격
+        clock += 60_000
+        s.sync()
+        assertEquals(2, server.calls.count { it == "reportStatus" })
+    }
+
+    @Test
     fun `서버가 형식을 거절하면 매번 다시 보내지 않는다`() = runTest {
         openAlert()
         val s = sync()
