@@ -3,6 +3,7 @@ package io.github.inq_o.phonedoctor.ui
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -22,7 +23,7 @@ class NavigationTest {
 
     @Test
     fun home_opensScanHistory_andReturns() {
-        composeTestRule.onNodeWithText("검사 기록").performClick()
+        composeTestRule.onNodeWithText("검사 기록").performScrollTo().performClick()
         composeTestRule.onNodeWithText("살펴본 기록").assertExists()
         composeTestRule.onNodeWithText("뒤로").performClick()
         composeTestRule.onNodeWithText("살펴보기").assertExists()
