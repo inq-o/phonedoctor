@@ -102,6 +102,7 @@ private fun SignInError.message(): String = stringResource(
         SignInError.NO_ACCOUNT -> R.string.feature_guardian_impl_sign_in_no_account
         SignInError.UNAVAILABLE -> R.string.feature_guardian_impl_sign_in_unavailable
         SignInError.NETWORK -> R.string.feature_guardian_impl_error_network
+        SignInError.APP_CHECK -> R.string.feature_guardian_impl_error_app_check
         SignInError.WRONG_ROLE -> R.string.feature_guardian_impl_error_role
         SignInError.UNKNOWN -> R.string.feature_guardian_impl_sign_in_failed
     },

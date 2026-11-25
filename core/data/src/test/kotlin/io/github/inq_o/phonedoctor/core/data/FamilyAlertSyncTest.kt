@@ -427,6 +427,19 @@ class FamilyAlertSyncTest {
     }
 
     @Test
+    fun `App Check 거절은 버리지 않고 다음 동기화에 다시 보낸다`() = runTest {
+        openAlert()
+        val s = sync()
+        server.fail["createAlert"] = ApiException(401, "app-check-invalid", null, null, null, null)
+        assertFalse(s.sync().complete)
+        assertTrue(alerts.rows.getValue(1).needsSync)
+        server.fail.remove("createAlert")
+        assertTrue(s.sync().complete)
+        assertEquals(2, server.calls.count { it == "createAlert" })
+        assertFalse(alerts.rows.getValue(1).needsSync)
+    }
+
+    @Test
     fun `서버가 형식을 거절하면 매번 다시 보내지 않는다`() = runTest {
         openAlert()
         val s = sync()

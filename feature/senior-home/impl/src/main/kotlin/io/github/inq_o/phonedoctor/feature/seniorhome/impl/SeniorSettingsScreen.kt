@@ -221,6 +221,7 @@ private fun ResultText(result: SettingsResult) {
                 SettingsResult.NAME_SAVED -> R.string.feature_senior_home_impl_settings_saved
                 SettingsResult.DELETED -> R.string.feature_senior_home_impl_settings_deleted
                 SettingsResult.NETWORK -> R.string.feature_senior_home_impl_settings_network
+                SettingsResult.APP_CHECK -> R.string.feature_senior_home_impl_settings_app_check
                 SettingsResult.BUSY -> R.string.feature_senior_home_impl_settings_busy
                 SettingsResult.FAILED -> R.string.feature_senior_home_impl_settings_failed
             },

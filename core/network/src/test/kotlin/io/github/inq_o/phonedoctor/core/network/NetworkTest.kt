@@ -317,7 +317,24 @@ class RetrofitNetworkTest {
         assertEquals(emptyList(), uncaught)
         // (코루틴 시험은 예외를 복사해 원래 예외를 cause로 붙이므로 원인 사슬에서 찾는다)
         assertTrue(generateSequence<Throwable>(e) { it.cause }.any { it.message == "Play Integrity 오류" })
+        // 망 문제가 아니므로 화면은 "인터넷 없음" 대신 App Check 실패로 안내한다
+        assertTrue(e.isAppCheckFailure())
         assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `App Check 토큰을 망 문제로 못 받으면 App Check 실패가 아님`() = runTest {
+        // (FirebaseNetworkException은 로컬 시험에서 만들 수 없어 원인 사슬의 IOException으로 확인)
+        tokens.appCheckFailure = IllegalStateException("토큰 교환 실패", IOException("망 없음"))
+        val e = assertFailsWith<IOException> { network.listLinks() }
+        assertTrue(!e.isAppCheckFailure())
+        assertEquals(0, server.requestCount)
+    }
+
+    @Test
+    fun `서버가 App Check 토큰을 거절해도 App Check 실패`() = runTest {
+        respond(401, """{"type":"https://phonedoctor.example/problems/app-check-invalid","title":"인증 실패","status":401}""")
+        assertTrue(assertFailsWith<ApiException> { network.listLinks() }.isAppCheckFailure())
     }
 }
 

@@ -55,7 +55,8 @@ internal suspend fun finishScan(
     report.opened.forEach(notifyOpened)
     // 사이트 알림 기록도 30일 지나면 지운다 (사이트 알림이 끊겨도 남지 않게)
     prune()
-    // 가족과 연결한 시니어 폰: 새 근거·결과를 보내고, 6시간마다 보호 상태를 알린다
-    if (senior) familySync.schedule()
+    // 가족과 연결한 시니어 폰: 새 근거·결과를 보내고, 6시간마다 보호 상태를 알린다.
+    // 새 확인 요청이 열리거나 닫혔을 때만 재시도 대기를 풀고 바로 보낸다
+    if (senior) familySync.schedule(urgent = report.opened.isNotEmpty() || report.closed.isNotEmpty())
     return report
 }

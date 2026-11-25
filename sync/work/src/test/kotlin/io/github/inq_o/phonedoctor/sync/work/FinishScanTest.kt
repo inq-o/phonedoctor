@@ -19,15 +19,24 @@ class FinishScanTest {
         val notified = mutableListOf<Long>()
         val cancelled = mutableListOf<Long>()
         var pruned = 0
-        var synced = 0
-        finishScan(report, { notified += it.id }, { cancelled += it }, { pruned++ }, senior = true) { synced++ }
+        val synced = mutableListOf<Boolean>()
+        finishScan(report, { notified += it.id }, { cancelled += it }, { pruned++ }, senior = true) { synced += it }
         assertEquals(listOf(7L), notified)
         assertEquals(listOf(3L), cancelled)
         assertEquals(1, pruned)
-        assertEquals(1, synced)
+        // 새 요청이 열렸으니 재시도 대기를 풀고 바로 보낸다
+        assertEquals(listOf(true), synced)
         // 가족과 연결하지 않은 폰은 동기화를 맡기지 않는다
-        finishScan(report, {}, {}, {}, senior = false) { synced++ }
-        assertEquals(1, synced)
+        finishScan(report, {}, {}, {}, senior = false) { synced += it }
+        assertEquals(listOf(true), synced)
+    }
+
+    @Test
+    fun quietScanDoesNotRushFamilySync() = runBlocking {
+        val synced = mutableListOf<Boolean>()
+        finishScan(ScanReport(run(), opened = emptyList(), closed = emptyList()), {}, {}, {}, senior = true) { synced += it }
+        // 새로 생긴 것이 없으면 급하지 않다 (재시도 대기를 검사마다 처음으로 돌리지 않게)
+        assertEquals(listOf(false), synced)
     }
 
     private fun run() = ScanRun(

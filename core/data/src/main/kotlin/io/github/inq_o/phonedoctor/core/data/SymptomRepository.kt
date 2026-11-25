@@ -89,7 +89,7 @@ class DefaultSymptomRepository @Inject constructor(
         // 열 단위로: 그사이 가족 동기화가 서버 ID·보호자 응답을 썼을 수 있다
         alertDao.setOutcome(id, status, outcome.name, System.currentTimeMillis())
         // 가족에게 보낸 요청이면 결과를 알린다 (보내지 않은 요청이면 동기화가 표시만 지운다. 읽은 뒤 서버 ID가 생겼을 수 있어 늘 맡긴다)
-        familySync.schedule()
+        familySync.schedule(urgent = true)
         // 취소(아직 안 지움): 보호자에게는 동기화가 declined로 알리고, 시니어에게는 하루 뒤 한 번 다시 알린다
         if (outcome == AlertOutcome.DECLINED) declineNudge.schedule(id)
     }

@@ -58,6 +58,6 @@ class FamilyMessagingService : FirebaseMessagingService() {
         val applied = runBlocking { alertSync.applyDecision(alertId, decision, data["guardianName"], null) } ?: return
         if (applied.notify) notifier.notifyDecision(applied.alert, applied.decision, applied.guardianName)
         // 괜찮다고 했으면 "허용함" 결과를 서버에 알린다
-        if (applied.decision == FamilyDecision.ALLOW) familySync.schedule()
+        if (applied.decision == FamilyDecision.ALLOW) familySync.schedule(urgent = true)
     }
 }

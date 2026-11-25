@@ -16,12 +16,14 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.inq_o.phonedoctor.core.data.RoleMismatchException
 import io.github.inq_o.phonedoctor.core.network.ApiException
+import io.github.inq_o.phonedoctor.core.network.isAppCheckFailure
 import java.io.IOException
 
 /** 화면이 안내할 실패 종류 */
-enum class FamilyError { NETWORK, BUSY, WRONG_ROLE, UNKNOWN }
+enum class FamilyError { NETWORK, APP_CHECK, BUSY, WRONG_ROLE, UNKNOWN }
 
-internal fun Throwable.toFamilyError(): FamilyError = when (this) {
+// 망 문제가 아닌 App Check 실패는 "인터넷 없음"과 따로 안내한다 (IOException이라 먼저 본다)
+internal fun Throwable.toFamilyError(): FamilyError = if (isAppCheckFailure()) FamilyError.APP_CHECK else when (this) {
     is IOException -> FamilyError.NETWORK
     is ApiException -> if (status == 429 || status >= 500) FamilyError.BUSY else FamilyError.UNKNOWN
     is RoleMismatchException -> FamilyError.WRONG_ROLE
@@ -32,6 +34,7 @@ internal fun Throwable.toFamilyError(): FamilyError = when (this) {
 internal fun FamilyError.message(): String = stringResource(
     when (this) {
         FamilyError.NETWORK -> R.string.feature_senior_family_impl_error_network
+        FamilyError.APP_CHECK -> R.string.feature_senior_family_impl_error_app_check
         FamilyError.BUSY -> R.string.feature_senior_family_impl_error_busy
         FamilyError.WRONG_ROLE -> R.string.feature_senior_family_impl_error_role
         FamilyError.UNKNOWN -> R.string.feature_senior_family_impl_error_unknown
