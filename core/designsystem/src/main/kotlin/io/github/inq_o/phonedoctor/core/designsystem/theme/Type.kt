@@ -80,6 +80,9 @@ val GuardianTypography = Typography(
     bodyLarge = Default.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, lineBreak = KoreanLineBreak),
     // 보조: 묶음 제목·시각·설명
     bodyMedium = Default.bodyMedium.copy(fontSize = 14.sp, lineHeight = 21.sp, lineBreak = KoreanLineBreak),
+    // 입력칸 도움말·떠 있는 라벨 등 M3 부품 기본값도 14 밑으로 내려가지 않게
+    bodySmall = Default.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp, lineBreak = KoreanLineBreak),
+    labelSmall = Default.labelSmall.copy(fontSize = 14.sp, lineHeight = 20.sp),
     labelMedium = Default.labelMedium.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold),
     labelLarge = Default.labelLarge.copy(fontSize = 16.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
 )

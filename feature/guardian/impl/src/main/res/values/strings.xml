@@ -118,7 +118,8 @@
     <string name="feature_guardian_impl_decide_allow">허용</string>
     <string name="feature_guardian_impl_decide_uninstall">삭제 요청</string>
     <string name="feature_guardian_impl_answered_first">%1$s님이 먼저 답했어요</string>
-    <string name="feature_guardian_impl_answer_sent">삭제 요청을 보냈어요. %1$s에서 알림을 누르면 삭제 화면이 열려요</string>
+    <string name="feature_guardian_impl_answer_sent">삭제 요청을 보냈어요</string>
+    <string name="feature_guardian_impl_answer_sent_body">%1$s에서 알림을 누르면 삭제 화면이 열려요</string>
     <string name="feature_guardian_impl_answer_result_later">결과가 나오면 알림으로 알려 드려요</string>
     <string name="feature_guardian_impl_answer_sent_allow">허용했어요. 이 버전은 다시 묻지 않아요</string>
     <string name="feature_guardian_impl_answer_rejected">이미 끝났거나 다른 보호자가 답한 요청이에요</string>
