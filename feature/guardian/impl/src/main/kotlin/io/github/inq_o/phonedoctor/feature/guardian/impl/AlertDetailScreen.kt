@@ -1,10 +1,11 @@
 package io.github.inq_o.phonedoctor.feature.guardian.impl
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -14,7 +15,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -81,8 +82,8 @@ fun AlertDetailScreen(
 }
 
 /**
- * G2 요청 상세·응답 (ux-flows §4 G2): 앱과 배지 → 감지 내용·판정 근거 표 → "광고 판단은 틀릴 수 있어요" → 자세히 보기(접힘).
- * 답할 수 있으면 아래에 같이 보낼 메시지와 [허용 | 삭제 요청] (오른쪽이 주요 행동, 파랑)
+ * G2 요청 상세·응답 (ux-flows §4 G2): 앱과 배지 → 감지 내용·판정 근거 표 → "광고 판단은 틀릴 수 있어요" → 자세히 보기(접힘) → 진행.
+ * 답할 수 있으면 본문 끝에 같이 보낼 메시지, 아래에 [허용 | 삭제 요청] (오른쪽이 주요 행동, 파랑)
  */
 @Composable
 internal fun AlertDetailScreen(
@@ -192,25 +193,22 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
         }
     }
 
-    // 지금 상태: 먼저 온 답 / 방금 답함 / 거절됨 / 결과·만료 / 알림 전용 안내
+    // 지금 상태: 먼저 온 답 / 방금 답함 / 거절됨 / 알림 전용 안내. 삭제 요청 안내는 결과가 오기 전까지만 (결과는 배지·진행 띠)
+    val waiting = alert.outcome == null && alert.status != FamilyAlertStatus.EXPIRED
     Column(Modifier.padding(horizontal = 16.dp)) {
         when {
             state.answeredFirst != null -> StatusBox(
                 stringResource(R.string.feature_guardian_impl_answered_first, state.answeredFirst.guardianName.trim().ifEmpty { stringResource(R.string.feature_guardian_impl_guardian_fallback) }),
             )
-            state.answered -> Headline(
-                if (alert.answer?.decision == FamilyDecision.ALLOW) {
-                    stringResource(R.string.feature_guardian_impl_answer_sent_allow)
-                } else {
-                    stringResource(R.string.feature_guardian_impl_answer_sent, phoneName(alert.linkIds, alert.seniorName))
-                },
-                announce = true,
-            )
+            state.answered && alert.answer?.decision == FamilyDecision.ALLOW ->
+                Headline(stringResource(R.string.feature_guardian_impl_answer_sent_allow), announce = true)
+            state.answered && waiting -> {
+                Headline(stringResource(R.string.feature_guardian_impl_answer_sent), announce = true)
+                Body(stringResource(R.string.feature_guardian_impl_answer_sent_body, phoneName(alert.linkIds, alert.seniorName)))
+                Body(stringResource(R.string.feature_guardian_impl_answer_result_later))
+            }
             state.rejected && alert.answerable -> ErrorText(stringResource(R.string.feature_guardian_impl_answer_rejected))
             alert.notice && alert.answerable -> Body(stringResource(R.string.feature_guardian_impl_detail_notice))
-        }
-        if (state.answered && alert.answer?.decision == FamilyDecision.RECOMMEND_UNINSTALL) {
-            Body(stringResource(R.string.feature_guardian_impl_answer_result_later))
         }
         // 답할 수 없는 요청은 아래 오류 상자가 없으므로 불러오기 실패를 여기에
         if (!answerable) state.error?.let { ErrorText(it.message()) }
@@ -220,6 +218,11 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
     alert.symptom?.let { Evidence(it, alert.firstInstallTime) }
     alert.verdict?.let { Verdict(it) }
     if (alert.symptom == null && alert.verdict == null) Column(Modifier.padding(horizontal = 16.dp)) { Body(stringResource(R.string.feature_guardian_impl_alert_install_scan)) }
+    // 표 바로 아래: 판단은 틀릴 수 있음 + 자세히 보기 (ux-flows G2)
+    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Text(stringResource(R.string.feature_guardian_impl_detail_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        More(alert)
+    }
 
     // 결과·답 (끝난 요청)
     val answer = alert.answer
@@ -250,11 +253,6 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
     }
 
     if (answerable) MessageField(state, onMessageChange)
-
-    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text(stringResource(R.string.feature_guardian_impl_detail_note), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        More(alert)
-    }
 }
 
 @Composable
@@ -271,10 +269,12 @@ private fun StatusBox(text: String) {
 @Composable
 private fun More(alert: FamilyAlert) {
     var open by rememberSaveable { mutableStateOf(false) }
-    TextButton(onClick = { open = !open }, contentPadding = PaddingValues(0.dp), modifier = Modifier.heightIn(min = 48.dp)) {
+    // 버튼 최소 폭이 없는 글자 버튼: [자세히 보기]와 [접기]가 같은 왼쪽 끝에 붙는다
+    Box(Modifier.heightIn(min = 48.dp).clickable(role = Role.Button) { open = !open }, contentAlignment = Alignment.CenterStart) {
         Text(
             stringResource(if (open) R.string.feature_guardian_impl_detail_less else R.string.feature_guardian_impl_detail_more),
             style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
     if (open) {
@@ -292,7 +292,7 @@ private fun More(alert: FamilyAlert) {
 /** 감지 내용 표 (ux-flows G2) */
 @Composable
 private fun Evidence(symptom: FamilySymptom, installedAt: Instant?) {
-    GuardianSectionHeader(stringResource(R.string.feature_guardian_impl_detail_evidence_title))
+    GuardianSectionHeader(stringResource(R.string.feature_guardian_impl_detail_evidence_title), topPadding = 8.dp)
     GuardianBand {
         val date = runCatching { LocalDate.parse(symptom.date) }.getOrNull()
         FactRow(

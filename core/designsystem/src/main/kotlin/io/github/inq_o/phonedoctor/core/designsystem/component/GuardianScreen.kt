@@ -153,7 +153,7 @@ fun GuardianRowDivider() {
 }
 
 /**
- * 띠 안의 한 줄. [onClick]이 있으면 줄 전체가 눌리고 오른쪽에 ›.
+ * 띠 안의 한 줄. [onClick]이 있으면 줄 전체가 눌리고 오른쪽에 › ([chevron]이 false면 생략, 예: + 아이콘이 있는 줄).
  * @param leading 앱 아이콘·상태 원
  * @param trailing 배지·스위치 (› 앞)
  */
@@ -166,6 +166,7 @@ fun GuardianRow(
     emphasized: Boolean = false,
     onClick: (() -> Unit)? = null,
     role: Role = Role.Button,
+    chevron: Boolean = true,
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
@@ -186,7 +187,7 @@ fun GuardianRow(
             subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
         trailing?.invoke()
-        if (onClick != null) {
+        if (onClick != null && chevron) {
             Icon(
                 Icons.AutoMirrored.Filled.KeyboardArrowRight,
                 contentDescription = null,

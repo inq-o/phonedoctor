@@ -40,6 +40,19 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = SurfaceVariantLight,
     onSurfaceVariant = OnBackground,
     outline = OutlineLight,
+    // M3 기본(보라 계열)이 확인창·선택 칩·스위치 바탕에 새지 않게 같은 팔레트로 덮는다
+    primaryContainer = BadgeInfoBg,
+    onPrimaryContainer = BadgeInfoInk,
+    secondary = OutlineLight,
+    onSecondary = OnPrimary,
+    secondaryContainer = BadgeInfoBg,
+    onSecondaryContainer = BadgeInfoInk,
+    surfaceContainerLowest = SurfaceLight,
+    surfaceContainerLow = Background,
+    surfaceContainer = Background,
+    surfaceContainerHigh = SurfaceLight,
+    surfaceContainerHighest = SurfaceVariantLight,
+    surfaceTint = Color.Transparent,
 )
 
 private val DarkColorScheme = darkColorScheme(
@@ -56,6 +69,18 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = SurfaceVariantDark,
     onSurfaceVariant = OnBackgroundDark,
     outline = OutlineDark,
+    primaryContainer = BadgeInfoBgDark,
+    onPrimaryContainer = BadgeInfoInkDark,
+    secondary = OutlineDark,
+    onSecondary = BackgroundDark,
+    secondaryContainer = BadgeInfoBgDark,
+    onSecondaryContainer = BadgeInfoInkDark,
+    surfaceContainerLowest = BackgroundDark,
+    surfaceContainerLow = BackgroundDark,
+    surfaceContainer = SurfaceDark,
+    surfaceContainerHigh = SurfaceDark,
+    surfaceContainerHighest = SurfaceVariantDark,
+    surfaceTint = Color.Transparent,
 )
 
 /** M3 역할에 없는 상태 색 */

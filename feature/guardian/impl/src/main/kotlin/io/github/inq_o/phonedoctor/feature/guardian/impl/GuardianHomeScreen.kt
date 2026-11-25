@@ -212,6 +212,7 @@ private fun ReadyContent(
         GuardianRow(
             stringResource(R.string.feature_guardian_impl_home_add_more),
             onClick = onAddFamily,
+            chevron = false,
             trailing = { Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
         )
     }
