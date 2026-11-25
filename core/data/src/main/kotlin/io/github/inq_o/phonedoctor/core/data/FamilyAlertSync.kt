@@ -163,8 +163,10 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         }
         // 응답을 먼저 받아 와야 이미 답한 요청에 근거를 다시 보내 새 요청을 만들지 않는다. 못 받아 왔으면 이번에는 근거를 보내지 않는다
         val pulled = step { decisions += pull() }
-        for (row in alertDao.pendingSync()) step { push(row.id, pulled, decisions) }
-        step { reportStatusIfDue(device.deviceId, decisions) }
+        var sentAlert = false
+        for (row in alertDao.pendingSync()) step { if (push(row.id, pulled, decisions)) sentAlert = true }
+        // 새 요청을 보냈으면 보호자가 곧 홈을 열어 본다: 6시간 간격을 기다리지 않고 검사 시각도 같이 보낸다
+        step { reportStatusIfDue(device.deviceId, decisions, force = sentAlert) }
         return finish(deviceGone, complete, decisions)
     }
 
@@ -305,9 +307,10 @@ internal class DefaultFamilyAlertSync @Inject constructor(
     }
 
     /** [pulled]: 이번에 응답을 받아 왔는지. 못 받아 왔으면 근거는 보내지 않는다 (이미 답한 요청 옆에 새 요청이 생길 수 있음) */
-    private suspend fun push(id: Long, pulled: Boolean, decisions: MutableList<AppliedDecision>) {
+    /** @return 이번에 근거를 서버에 새로 보냈으면 true (보호자 홈 "마지막 검사"를 바로 맞추는 데 씀) */
+    private suspend fun push(id: Long, pulled: Boolean, decisions: MutableList<AppliedDecision>): Boolean {
         // 목록을 읽은 뒤 푸시·당겨 오기가 응답을 적었을 수 있어 다시 읽는다
-        val row = alertDao.get(id) ?: return
+        val row = alertDao.get(id) ?: return false
         val evidenceChanged = row.sentDate != row.date || row.sentCount != row.count
         // 서버 요청이 답 없이 7일 만료됐는데 이 폰에서는 또 광고를 띄움: 서버에 새 요청으로 연다
         val serverWaiting = row.serverStatus == SERVER_OPEN || row.serverStatus == SERVER_EXPIRED
@@ -315,7 +318,8 @@ internal class DefaultFamilyAlertSync @Inject constructor(
             (row.kind == KIND_NOTICE || row.status == AlertStatus.OPEN.name) &&
             (row.serverAlertId == null || (serverWaiting && evidenceChanged))
         // 보낼 근거가 있는데 응답을 못 받아 왔으면 표시를 남겨 두고 다음에
-        if (wantsEvidence && !pulled) return
+        if (wantsEvidence && !pulled) return false
+        var sent = false
         if (wantsEvidence) {
             // 응답을 못 받은 보내기가 있으면 같은 키로: 서버가 처음 결과를 돌려준다 (그때 보낸 근거로 적는다)
             val key = row.pendingKey ?: newKey().also { alertDao.setPendingKey(row.id, it, row.date, row.count) }
@@ -325,6 +329,7 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                 val alert = network.createAlert(key, alertBody(row))
                 alertDao.markSent(row.id, alert.alertId, sentDate, sentCount, alert.status.wire() ?: SERVER_OPEN)
                 absorb(alert)?.let(decisions::add)
+                sent = true
             } catch (e: ApiException) {
                 when {
                     // 받을 보호자가 없음(모두 끊김). 새 근거가 생기거나 새로 연결되면 다시 보낸다
@@ -334,18 +339,19 @@ internal class DefaultFamilyAlertSync @Inject constructor(
                         Log.w(TAG, "요청 보내기 거절: ${e.message}")
                         alertDao.setPendingKey(row.id, null, null, null)
                         alertDao.clearNeedsSync(row.id, row.updatedAt)
-                        return
+                        return false
                     }
                     else -> throw e
                 }
             }
         }
-        val fresh = alertDao.get(row.id) ?: return
+        val fresh = alertDao.get(row.id) ?: return sent
         // 알림 전용은 만들 때 결과를 보낸 것으로 둔다. 보호자가 지우자고 해 다시 열렸을 때만 결과를 보낸다
         if (fresh.status == AlertStatus.RESOLVED.name && fresh.serverAlertId != null && !fresh.outcomeSent) {
             sendOutcome(fresh)
         }
         alertDao.clearNeedsSync(row.id, row.updatedAt)
+        return sent
     }
 
     /** 처리 결과 (F1 15~19). 보내기 전에 서버 요청을 다시 읽어 지금 상태에 맞는 결과만 보낸다 */
@@ -376,9 +382,9 @@ internal class DefaultFamilyAlertSync @Inject constructor(
         alertDao.markOutcomeSent(row.id)
     }
 
-    private suspend fun reportStatusIfDue(deviceId: String, decisions: MutableList<AppliedDecision>) {
+    private suspend fun reportStatusIfDue(deviceId: String, decisions: MutableList<AppliedDecision>, force: Boolean = false) {
         val at = now()
-        if (at - preferences.lastStatusReportAt.first() < STATUS_INTERVAL_MS) return
+        if (!force && at - preferences.lastStatusReportAt.first() < STATUS_INTERVAL_MS) return
         // 6시간마다 답을 기다리는 요청이 서버에 아직 있는지도 본다 (받을 보호자가 모두 끊으면 서버가 지운다). 그때 안 응답도 알린다
         for (row in alertDao.waitingOnServer()) refreshRow(row.id)?.let(decisions::add)
         // 검사가 한 번도 돌지 않았으면 알릴 것이 없다
