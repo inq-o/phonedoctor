@@ -1,5 +1,6 @@
 package io.github.inq_o.phonedoctor.core.data
 
+import androidx.annotation.WorkerThread
 import io.github.inq_o.phonedoctor.core.datastore.UserPreferences
 import io.github.inq_o.phonedoctor.core.model.PHONE_NAME_MAX
 import io.github.inq_o.phonedoctor.core.model.PhoneNameLookup
@@ -27,6 +28,7 @@ internal class DefaultPhoneNameRepository @Inject constructor(
     override suspend fun setChosenName(linkId: String, name: String?) =
         preferences.setPhoneName(linkId, name?.trim()?.take(PHONE_NAME_MAX))
 
-    /** 알림을 만들 때(FCM 수신 스레드) 부른다. DataStore 한 번 읽기라 짧다 */
+    /** 알림을 만들 때(FCM 수신 스레드) 부른다. DataStore 한 번 읽기라 짧지만 막는 호출이라 메인 스레드에서 부르지 않는다 */
+    @WorkerThread
     override fun chosenName(linkId: String): String? = runBlocking { preferences.phoneNames.first()[linkId] }
 }

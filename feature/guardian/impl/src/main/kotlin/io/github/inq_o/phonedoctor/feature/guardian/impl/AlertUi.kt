@@ -76,7 +76,7 @@ internal fun AlertCard(alert: FamilyAlert, onClick: () -> Unit) {
             Text(alert.appLabel, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(4.dp))
             Text(
-                stringResource(R.string.feature_guardian_impl_alert_where, phoneName(alert.linkIds.firstOrNull(), alert.seniorName), evidenceLine(alert.symptom)),
+                stringResource(R.string.feature_guardian_impl_alert_where, phoneName(alert.linkIds, alert.seniorName), evidenceLine(alert.symptom)),
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.height(4.dp))

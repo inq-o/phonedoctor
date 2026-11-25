@@ -55,8 +55,8 @@ internal fun LinkWaitingScreen(
     state: LinkWaitingUiState,
     onHome: () -> Unit,
     onRetry: () -> Unit,
-    onSaveName: (String?) -> Unit = {},
     modifier: Modifier = Modifier,
+    onSaveName: (String?) -> Unit = {},
 ) {
     // 연결 전이라 보호자가 고른 이름은 아직 없다: 상대가 정한 이름, 없으면 "상대 폰"
     val name = phoneName(null, state.seniorName, unnamed = R.string.feature_guardian_impl_phone_other)
@@ -70,7 +70,10 @@ internal fun LinkWaitingScreen(
                 // O-G4: [건너뛰기 | 저장] (보호자 화면: 왼쪽 보조, 오른쪽 주요)
                 is LinkWaitingUiState.Connected -> PdButtonPair(
                     first = { GuardianOutlinedButton(stringResource(R.string.feature_guardian_impl_phone_name_skip), { onSaveName(null) }, it) },
-                    second = { GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_phone_name_save), { onSaveName(choice.value) }, it) },
+                    second = {
+                        // 고르지 않았거나 직접 입력이 비었으면 저장할 것이 없다 ([건너뛰기]와 구분)
+                        GuardianPrimaryButton(stringResource(R.string.feature_guardian_impl_phone_name_save), { onSaveName(choice.value) }, it, enabled = choice.value != null)
+                    },
                     minHeight = 48.dp,
                     gap = 8.dp,
                 )

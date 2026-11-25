@@ -316,6 +316,11 @@ class FamilyRepositoryTest {
         assertEquals("엄마", names.chosenName("l1"))
         names.setChosenName("l1", " ")
         assertNull(names.chosenName("l1"))
+        // 이름을 모두 지워도 다른 설정은 그대로
+        prefs.setNotifyCaution(true)
+        prefs.clearPhoneNames()
+        assertTrue(names.chosenNames.first().isEmpty())
+        assertTrue(prefs.notifyCaution.first())
     }
 
     @Test

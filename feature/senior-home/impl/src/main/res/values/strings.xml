@@ -4,7 +4,7 @@
     <string name="feature_senior_home_impl_settings_home">홈으로</string>
     <string name="feature_senior_home_impl_settings_keep">그대로 두기</string>
     <string name="feature_senior_home_impl_settings_name_title">가족에게 보이는 이름</string>
-    <string name="feature_senior_home_impl_settings_name_body">가족 폰에는 "%1$s"(이)라고 보여요.</string>
+    <string name="feature_senior_home_impl_settings_name_body">가족이 따로 이름을 정하지 않았으면 가족 폰에 "%1$s님 폰"으로 보여요.</string>
     <string name="feature_senior_home_impl_settings_name_unset">아직 정하지 않았어요. 가족 폰에는 가족이 정한 이름으로 보여요.</string>
     <string name="feature_senior_home_impl_settings_name_change">이름 바꾸기</string>
     <string name="feature_senior_home_impl_settings_name_dialog">가족에게 어떻게 보일까요?</string>

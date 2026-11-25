@@ -61,7 +61,7 @@
     <string name="feature_guardian_impl_phone_name_grandpa">할아버지</string>
     <string name="feature_guardian_impl_phone_name_custom">직접 입력</string>
     <string name="feature_guardian_impl_phone_name_custom_label">표시 이름 (%1$d자까지)</string>
-    <string name="feature_guardian_impl_phone_name_skip_note">고르지 않으면 %1$s으로 표시돼요. 설정에서 바꿀 수 있어요</string>
+    <string name="feature_guardian_impl_phone_name_skip_note">고르지 않으면 %1$s으로 표시돼요</string>
     <string name="feature_guardian_impl_phone_name_skip">건너뛰기</string>
     <string name="feature_guardian_impl_phone_name_save">저장</string>
 

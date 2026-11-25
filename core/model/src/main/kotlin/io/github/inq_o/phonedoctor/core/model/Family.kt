@@ -69,7 +69,7 @@ data class FamilyAlert(
     val outcome: FamilyOutcome?,
     val createdAt: Instant,
     val updatedAt: Instant,
-    /** 이 보호자가 이 요청을 받은 연결 (openapi Alert.linkIds). 보호자가 고른 표시 이름을 찾을 때 쓴다 */
+    /** 이 요청을 받은 모든 보호자의 연결 (openapi Alert.linkIds). 이 보호자가 고른 표시 이름은 이 중 이름이 저장된 연결로 찾는다 */
     val linkIds: List<String> = emptyList(),
 ) {
     /** 아직 아무도 답하지 않아 이 보호자가 답할 수 있음 */

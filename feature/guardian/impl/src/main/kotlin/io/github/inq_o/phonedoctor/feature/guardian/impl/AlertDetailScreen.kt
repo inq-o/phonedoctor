@@ -74,7 +74,7 @@ internal fun AlertDetailScreen(
     val ready = state as? AlertDetailUiState.Ready
     val answerable = ready != null && ready.canAnswer
     GuardianScreen(
-        title = ready?.let { phoneName(it.alert.linkIds.firstOrNull(), it.alert.seniorName) },
+        title = ready?.let { phoneName(it.alert.linkIds, it.alert.seniorName) },
         modifier = modifier,
         actions = {
             when {
@@ -153,7 +153,7 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
             if (alert.answer?.decision == FamilyDecision.ALLOW) {
                 stringResource(R.string.feature_guardian_impl_answer_sent_allow)
             } else {
-                stringResource(R.string.feature_guardian_impl_answer_sent, phoneName(alert.linkIds.firstOrNull(), alert.seniorName))
+                stringResource(R.string.feature_guardian_impl_answer_sent, phoneName(alert.linkIds, alert.seniorName))
             },
             announce = true,
         )
@@ -185,7 +185,8 @@ private fun Detail(state: AlertDetailUiState.Ready, answerable: Boolean, onMessa
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        Body(stringResource(R.string.feature_guardian_impl_detail_explain))
+        // 알림 전용(이미 허용한 앱)에는 [허용]이 없다
+        if (!alert.notice) Body(stringResource(R.string.feature_guardian_impl_detail_explain))
         if (state.sending != null) CircularProgressIndicator()
     }
 }

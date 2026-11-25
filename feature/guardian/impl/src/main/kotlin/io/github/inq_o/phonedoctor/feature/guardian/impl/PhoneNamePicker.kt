@@ -27,8 +27,8 @@ import io.github.inq_o.phonedoctor.core.model.PHONE_NAME_MAX
 
 /** 표시 이름 고르기의 선택 (O-G4·G4). 처음엔 아무것도 고르지 않는다 (ux-flows §4: 미리 고르지 않음) */
 internal data class PhoneNameChoice(val preset: String? = null, val custom: Boolean = false, val text: String = "") {
-    /** 저장할 이름. 고르지 않았거나 직접 입력이 비었으면 null */
-    val value: String? get() = (if (custom) text else preset)?.trim()?.takeIf { it.isNotEmpty() }
+    /** 저장할 이름. 고르지 않았거나 직접 입력이 비었으면 null. 끝의 "폰"은 뗀다 (화면이 "{이름} 폰"으로 붙인다) */
+    val value: String? get() = (if (custom) text else preset)?.trim()?.removeSuffix("폰")?.trim()?.takeIf { it.isNotEmpty() }
 }
 
 /**

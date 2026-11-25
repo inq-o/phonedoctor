@@ -70,28 +70,43 @@ internal fun GuardianError.message(): String = stringResource(
 internal val LocalChosenPhoneNames = staticCompositionLocalOf<Map<String, String>> { emptyMap() }
 
 /**
+ * 요청의 [linkIds]는 그 요청을 받은 모든 보호자의 연결이다 (서버 alertViews). 이름 맵에는 이 보호자의 연결만 있으므로
+ * 목록에서 이름이 있는 연결을 찾는다 (첫 ID가 다른 보호자의 연결일 수 있음)
+ */
+internal fun chosenNameFor(linkIds: List<String>, names: Map<String, String>): String? = linkIds.firstNotNullOfOrNull { names[it] }
+
+/** 요청 화면용: [linkIds] 중 이 보호자가 이름을 정한 연결의 이름 → 상대가 정한 이름 → "연결한 폰" */
+@Composable
+internal fun phoneName(linkIds: List<String>, own: String): String =
+    phoneLabel(PhoneName.of(chosenNameFor(linkIds, LocalChosenPhoneNames.current), own), R.string.feature_guardian_impl_phone_unnamed)
+
+/**
  * 상대 폰 이름 (ux-flows §2): "엄마 폰"(보호자가 고른 이름) / "김영희님 폰"(상대가 정한 이름) / "연결한 폰".
  * 역할 이름을 대신 넣지 않는다. 연결 전처럼 이름을 모를 때는 [unnamed]("상대 폰")
  */
 @Composable
 internal fun phoneName(linkId: String?, own: String, @StringRes unnamed: Int = R.string.feature_guardian_impl_phone_unnamed): String =
-    when (val name = PhoneName.of(linkId?.let { LocalChosenPhoneNames.current[it] }, own)) {
-        is PhoneName.Chosen -> stringResource(R.string.feature_guardian_impl_phone_chosen, name.name)
-        is PhoneName.Own -> stringResource(R.string.feature_guardian_impl_phone_own, name.name)
-        PhoneName.Unnamed -> stringResource(unnamed)
-    }
+    phoneLabel(PhoneName.of(linkId?.let { LocalChosenPhoneNames.current[it] }, own), unnamed)
+
+@Composable
+private fun phoneLabel(name: PhoneName, @StringRes unnamed: Int): String = when (name) {
+    is PhoneName.Chosen -> stringResource(R.string.feature_guardian_impl_phone_chosen, name.name)
+    is PhoneName.Own -> stringResource(R.string.feature_guardian_impl_phone_own, name.name)
+    PhoneName.Unnamed -> stringResource(unnamed)
+}
 
 /** 보호자 화면마다 감싸 표시 이름을 내려 준다 */
 @Composable
 fun ProvidePhoneNames(viewModel: PhoneNamesViewModel = hiltViewModel(), content: @Composable () -> Unit) {
+    // 불러오기 전에는 그리지 않는다: 빈 맵으로 그리면 "김영희님 폰" → "엄마 폰"으로 바뀌어 보이고 낭독도 틀린 이름을 읽는다
     val names by viewModel.names.collectAsStateWithLifecycle()
-    CompositionLocalProvider(LocalChosenPhoneNames provides names, content = content)
+    names?.let { CompositionLocalProvider(LocalChosenPhoneNames provides it, content = content) }
 }
 
 @HiltViewModel
 class PhoneNamesViewModel @Inject constructor(repository: PhoneNameRepository) : ViewModel() {
-    val names: StateFlow<Map<String, String>> =
-        repository.chosenNames.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+    val names: StateFlow<Map<String, String>?> =
+        repository.chosenNames.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 }
 
 /** 상태 문장 (22sp). [announce]면 바뀔 때 화면 낭독이 읽어 준다 */

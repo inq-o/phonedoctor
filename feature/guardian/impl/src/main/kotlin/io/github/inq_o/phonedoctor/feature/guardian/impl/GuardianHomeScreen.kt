@@ -262,7 +262,6 @@ private fun RevokeDialog(link: FamilyLink, onRevoke: () -> Unit, onKeep: () -> U
                 Text(
                     stringResource(
                         if (pending) R.string.feature_guardian_impl_cancel_dialog_body else R.string.feature_guardian_impl_revoke_dialog_body,
-                        name,
                     ),
                 )
             },
